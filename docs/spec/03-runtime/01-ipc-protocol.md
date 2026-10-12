@@ -1703,6 +1703,14 @@ The authorization request uses the initial 401 Bearer challenge's `scope`, other
 all valid protected-resource `scopes_supported` entries, otherwise omits `scope`.
 Authorization-server scope catalogs do not add or select requested permissions.
 
+Discovery binds every token to the configured server. The protected-resource
+`resource` must match the MCP server URL after canonicalization (lowercase
+scheme/host, default port and fragment dropped, trailing slash ignored), or be
+the same origin and a whole-segment path prefix of it; anything else fails the
+login before the browser opens. Metadata without `resource` uses the server URL.
+Authorization-server metadata must carry an `issuer` equal to the authorization
+server it was fetched for (RFC 8414 §3.3). Discovery never follows redirects.
+
 - `pi-desktop/mcp/oauth/start({ id, level?, projectPath? }) -> { ok: true, loginId }`
   Initiates OAuth metadata discovery and PKCE authorization code flow. Returns immediately; user browser navigation and callback exchange proceed asynchronously in the background.
 - `pi-desktop/mcp/oauth/cancel({ loginId?, id? }) -> { ok: boolean }`
@@ -1726,7 +1734,7 @@ type McpOAuthLoginEvent = {
 - `McpServerStatus` includes:
   - `hasOauth: boolean` — whether the server has an encrypted OAuth secret stored in host-core (`secret:mcp:<serverId>:oauth`).
   - `authRequired: boolean` — flags that a connection attempt or `tools/call` returned HTTP 401 Unauthorized and user re-authentication is required.
-- OAuth tokens (`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`, `redirectUris`) are persisted exclusively in host-core encrypted secrets under `secret:mcp:<serverId>:oauth` and never exposed to the renderer. Authorization-server endpoints must be HTTPS (loopback HTTP is the only exception). Token-endpoint error bodies stay in main-process logs and are not copied into renderer events.
+- OAuth tokens (`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`, `redirectUris`) are persisted exclusively in host-core encrypted secrets under `secret:mcp:<serverId>:oauth` and never exposed to the renderer. Authorization-server endpoints must be HTTPS (loopback HTTP is the only exception). Token-endpoint error bodies stay in main-process logs and are not copied into renderer events. `UserMcpRuntime` attaches a stored token only when its `resource` still matches the server URL; after the URL is edited to another resource the token is withheld and the server reports `authRequired` until the user re-authorizes.
 
 ## 12c. Subagent API (D202)
 
