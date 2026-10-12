@@ -1,12 +1,16 @@
 # ADR 0276: Official plugin channel and backup channels
 
+> Superseded 2026-10-12 by [ADR fork-removes-plugin-marketplace](fork-removes-plugin-marketplace.md):
+> this build has no remote plugin marketplace, no resolve request, and no
+> device identifier. The text below is historical.
+
 > Amended 2026-10-08: the marketplace UI and persisted settings now use only
 > the official channel; legacy source values are ignored. The resolve request
 > is capped at three seconds and falls back to the official catalog URL after
 > a timeout, rate limit, or `NO_DOWNLOAD_SOURCE`. Publication refusals remain
 > authoritative.
 
-- Status: Accepted for implementation
+- Status: Superseded by ADR fork-removes-plugin-marketplace
 - Date: 2026-09-17
 - Deciders: PI-Desktop plugin and distribution maintainers
 - Related: ADR 0102, D238, E2E-024P, E2E-PLUGIN-official-channel-resolves-through-the-platform

@@ -199,7 +199,7 @@ Session Analytics
 | **Service**         | 运行常驻后台任务            |
 | **Message Bus**     | 在插件之间传递消息           |
 
-插件可以通过 `.piplug` 分发，也可以从插件市场安装。
+插件以 `.piplug` 安装包或文件夹分发并在本地安装；本构建没有远程插件市场。
 
 <div align="center">
 
@@ -412,7 +412,7 @@ PI-Desktop 围绕：
 
 <img src="docs/image/readme/plugins_en.png" alt="PI-Desktop Plugins" />
 
-<p align="center"><sub>插件市场：扩展 Agent，也扩展整个桌面</sub></p>
+<p align="center"><sub>插件：扩展 Agent，也扩展整个桌面</sub></p>
 
 </td>
 

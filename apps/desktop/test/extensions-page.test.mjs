@@ -26,10 +26,6 @@ const settingsComponents = new Map(
     .map((name) => [name, readFileSync(join(settingsDir, name), "utf8")]),
 );
 const pageSrc = readPluginsSourceSync();
-const marketPanelSrc = readFileSync(
-  join(here, "../src/features/plugins/MarketplacePanel.tsx"),
-  "utf8",
-);
 const settingsPageSrc = readSettingsSourceSync();
 const electronMainSrc = readMainSourceSync();
 const hostCapabilitySources = [
@@ -92,34 +88,30 @@ test("count interpolations carry plural forms in both catalogs", () => {
   }
 });
 
-test("the extensions page keeps only installed and market tabs", () => {
-  assert.match(pageSrc, /type TabId = "installed" \| "market"/);
-  for (const id of [
-    "plugins-tab-installed",
-    "plugins-tab-market",
-    "plugins-panel-installed",
-    "plugins-panel-market",
+test("the plugins page lists installed plugins only, with no marketplace", () => {
+  // This build has no remote marketplace (ADR fork-removes-plugin-marketplace):
+  // no tabs, no catalog, no remote install or update check.
+  assert.match(pageSrc, /id="plugins-panel-installed"/);
+  for (const removed of [
+    /plugins-(?:tab|panel)-market/,
+    /role="tablist"/,
+    /type TabId/,
+    /MarketplacePanel|PluginDetailSheet|PluginInstallDialog/,
+    /api\.market[A-Z]/,
+    /queueInstall|refreshMarket|checkUpdates|applyAutoUpdates|setPluginAutoUpdate/,
   ]) {
-    assert.ok(pageSrc.includes(id), `missing extension surface ${id}`);
+    assert.doesNotMatch(pageSrc, removed);
   }
   for (const id of ["mcp", "skills", "subagents"]) {
     assert.doesNotMatch(pageSrc, new RegExp(`plugins-(?:tab|panel)-${id}`));
   }
+  // Local installs stay: a package file, a development folder, a template.
+  assert.match(pageSrc, /api\.installPluginFromPackage\(\)/);
+  assert.match(pageSrc, /api\.loadDevPlugin\(\)/);
 });
 
-test("the extensions page uses tabs instead of the removed capability overview", () => {
+test("the extensions page has no removed capability overview", () => {
   assert.doesNotMatch(pageSrc, /plugins-hero|plugins-stat|const summary\s*=/);
-  assert.match(pageSrc, /className="plugins-segment"/);
-});
-
-test("marketplace keeps refresh and install actions without source switching", () => {
-  const source = `${pageSrc}\n${marketPanelSrc}`;
-  assert.doesNotMatch(
-    source,
-    /MarketplaceSourceSettings|pluginMarketSource|pluginMarketCustomUrl|marketProvider|marketCustomUrl|marketSource/,
-  );
-  assert.match(marketPanelSrc, /refreshMarket\(query, \{ refreshRemote: true \}\)/);
-  assert.match(marketPanelSrc, /queueInstall/);
 });
 
 test("installed plugin rows keep secondary detail behind a disclosure", () => {
@@ -134,12 +126,6 @@ test("extension row actions stay visible and labelled", () => {
   assert.match(styles, /\.ui-tooltip\s*\{[\s\S]*?position:\s*fixed;/);
   const actionBlock = styles.match(/\.ext-row-actions\s*\{[^}]*\}/)?.[0] ?? "";
   assert.match(actionBlock, /opacity:\s*1/);
-});
-
-test("the client hides development-only demo plugins from marketplace results", () => {
-  assert.match(pageSrc, /function isClientVisibleMarketPlugin/);
-  assert.match(pageSrc, /!plugin\.id\.startsWith\("demo\."\)/);
-  assert.match(pageSrc, /setMarket\(\(res\.plugins \?\? \[\]\)\.filter\(isClientVisibleMarketPlugin\)\)/);
 });
 
 test("Settings exposes three independent Agent capability destinations", () => {

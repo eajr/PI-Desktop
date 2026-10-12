@@ -2,408 +2,19 @@ use super::*;
 use crate::activation::ActivationMode;
 use tempfile::tempdir;
 
-/// Serializes tests that repoint `PI_DESKTOP_PLUGIN_MARKET_URL`.
-///
-/// The marketplace source is process-global, so two tests pointing it at
-/// different catalogs — or one clearing it while another is mid-fetch —
-/// read each other's value.
-static MARKET_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// Serializes tests that repoint process-wide environment such as
+/// `PI_DESKTOP_DATA_DIR`, so two tests cannot read each other's value.
+static PROCESS_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-fn lock_market_env() -> std::sync::MutexGuard<'static, ()> {
-    MARKET_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-fn with_local_market<T>(f: impl FnOnce() -> T) -> T {
-    let _guard = lock_market_env();
-    // Force offline/local fallback path for deterministic unit tests.
-    // Safety: test-only process env mutation.
-    unsafe {
-        std::env::set_var(
-            "PI_DESKTOP_PLUGIN_MARKET_URL",
-            "file:///nope/does-not-exist-catalog.json",
-        );
-    }
-    let out = f();
-    unsafe {
-        std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
-    }
-    out
-}
-
-#[test]
-fn install_market_package_and_check_update_metadata() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let search = mgr.market_search(Some("hello"), None).unwrap();
-        assert!(!search.is_empty());
-        let installed = mgr
-            .install_from_market("demo.hello", None, true, true, None)
-            .unwrap();
-        assert_eq!(installed.plugin.id, "demo.hello");
-        assert!(installed.plugin.path.unwrap().contains("installed"));
-        assert_eq!(installed.plugin.source, "marketplace");
-        let listed = mgr.list();
-        assert!(
-            listed.iter().any(|plugin| plugin.id == "demo.hello"),
-            "installed marketplace plugin must be present in the registry"
-        );
-    });
-}
-
-#[test]
-fn market_search_preserves_catalog_order() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        let mut catalog = built_in_catalog_at(dir.path());
-        catalog.plugins.reverse();
-        let catalog_path = dir.path().join("plugins/market/catalog.json");
-        fs::create_dir_all(catalog_path.parent().unwrap()).unwrap();
-        fs::write(&catalog_path, serde_json::to_string(&catalog).unwrap()).unwrap();
-
-        let mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let results = mgr.market_search(None, None).unwrap();
-        let ids: Vec<_> = results.iter().map(|plugin| plugin.id.as_str()).collect();
-        assert_eq!(ids, ["demo.workspace-notes", "demo.hello"]);
-    });
-}
-
-#[test]
-fn default_catalog_materializes_packages_under_manager_data_dir() {
-    with_local_market(|| {
-        let manager_dir = tempdir().unwrap();
-        let env_dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", env_dir.path());
-        }
-
-        let _manager = PluginManager::new(manager_dir.path(), MarketChannel::Official, None);
-        let expected = bundled_package_bytes("demo.workspace-notes", "0.1.0").unwrap();
-        let package = manager_dir
-            .path()
-            .join("plugins/market/packages/demo.workspace-notes-0.1.0.piplug");
-        let env_package = env_dir
-            .path()
-            .join("plugins/market/packages/demo.workspace-notes-0.1.0.piplug");
-
-        assert_eq!(fs::read(package).unwrap(), expected);
-        assert!(!env_package.exists());
-
-        unsafe {
-            std::env::remove_var("PI_DESKTOP_DATA_DIR");
-        }
-    });
-}
-
-#[test]
-fn curl_diagnostic_decoding_preserves_utf8() {
-    let diagnostic = "curl: (35) TLS handshake failed\n";
-    assert_eq!(decode_curl_output(diagnostic.as_bytes()), diagnostic);
-}
-
-#[cfg(windows)]
-#[test]
-fn curl_diagnostic_decoding_handles_gbk() {
-    // "你好" encoded as GBK, representative of localized curl output on
-    // a Simplified Chinese Windows installation.
-    let gbk = [0xC4, 0xE3, 0xBA, 0xC3];
-    assert_eq!(decode_windows_code_page(&gbk, 936).as_deref(), Some("你好"));
-}
-
-#[test]
-fn marketplace_install_refreshes_catalog_before_checksum_verification() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let package_bytes = bundled_package_bytes("demo.hello", "0.2.0").unwrap();
-        let package_path = dir.path().join("fresh-demo.hello.piplug");
-        fs::write(&package_path, &package_bytes).unwrap();
-
-        let mut remote = built_in_catalog_at(dir.path());
-        let remote_version = &mut remote.plugins[0].versions[0];
-        remote_version.url = format!("file://{}", package_path.to_string_lossy());
-        remote_version.shasum = sha256_hex(&package_bytes);
-        let remote_catalog_path = dir.path().join("remote-catalog.json");
-        fs::write(
-            &remote_catalog_path,
-            serde_json::to_string_pretty(&remote).unwrap(),
-        )
-        .unwrap();
-
-        // Simulate the UI's still-fresh cache from before the publisher
-        // replaced the package at the mutable marketplace URL.
-        let mut cached = remote.clone();
-        cached.plugins[0].versions[0].shasum = "stale-checksum".into();
-        fs::write(
-            mgr.catalog_path(),
-            serde_json::to_string_pretty(&cached).unwrap(),
-        )
-        .unwrap();
-        fs::write(
-            mgr.market_cache_meta_path(),
-            serde_json::to_string(&json!({
-                "fetchedAt": Utc::now().to_rfc3339()
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        unsafe {
-            std::env::set_var(
-                "PI_DESKTOP_PLUGIN_MARKET_URL",
-                format!("file://{}", remote_catalog_path.to_string_lossy()),
-            );
-        }
-
-        let installed = mgr
-            .install_from_market("demo.hello", None, true, false, None)
-            .expect("install should use the refreshed checksum");
-        assert_eq!(installed.plugin.id, "demo.hello");
-        assert_eq!(installed.plugin.version, "0.2.0");
-    });
-}
-
-#[test]
-fn marketplace_uses_highest_semver_when_catalog_versions_are_unsorted() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let entry = MarketCatalogEntry {
-            id: "pi.todo".into(),
-            name: "Fresh Todo".into(),
-            description: "Todo plugin".into(),
-            author: "PI-Desktop".into(),
-            icon_url: None,
-            categories: vec![],
-            verified: true,
-            downloads: None,
-            homepage: None,
-            repository: None,
-            readme_markdown: None,
-            safety_notes: None,
-            versions: vec![
-                MarketVersion {
-                    version: "0.5.0".into(),
-                    published_at: "2026-08-12T00:00:00Z".into(),
-                    changelog: None,
-                    min_pi_desktop: None,
-                    shasum: "old".into(),
-                    url: "old.piplug".into(),
-                    size_bytes: 1,
-                    permissions: vec!["ui.panel".into()],
-                    ..Default::default()
-                },
-                MarketVersion {
-                    version: "0.5.1".into(),
-                    published_at: "2026-08-13T00:00:00Z".into(),
-                    changelog: None,
-                    min_pi_desktop: None,
-                    shasum: "new".into(),
-                    url: "new.piplug".into(),
-                    size_bytes: 1,
-                    permissions: vec!["ui.panel".into(), "notify".into()],
-                    ..Default::default()
-                },
-            ],
-            ..Default::default()
-        };
-
-        let summary = mgr.to_market_summary(&entry);
-        assert_eq!(summary.latest_version, "0.5.1");
-        assert!(!summary.update_available);
-        assert_eq!(
-            latest_market_version(&entry.versions)
-                .expect("latest version")
-                .version,
-            "0.5.1"
-        );
-        assert_eq!(compare_plugin_versions("0.5.1", "0.5.0"), Ordering::Greater);
-        assert_eq!(
-            compare_plugin_versions("0.5.1", "0.5.1-beta.1"),
-            Ordering::Greater
-        );
-    });
-}
-
-#[test]
-fn market_entry_offers_an_update_only_when_the_catalog_is_newer() {
-    with_local_market(|| {
-        let ship = tempdir().unwrap();
-        write_plugin(
-            &ship.path().join("pi.todo"),
-            json!({
-                "schemaVersion": 1,
-                "id": "pi.todo",
-                "name": "Todo",
-                "version": "0.6.0",
-                "main": "main.js",
-                "permissions": ["ui.panel"],
-            }),
-            &[],
-        );
-
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        mgr.sync_builtin(Some(ship.path())).unwrap();
-        assert_eq!(mgr.get("pi.todo").unwrap().version, "0.6.0");
-
-        // Same catalog shape at three versions, so the only difference between
-        // the assertions is which side the installed version sits on.
-        let entry = |latest: &str| MarketCatalogEntry {
-            id: "pi.todo".into(),
-            name: "Todo".into(),
-            description: "Todo plugin".into(),
-            author: "PI-Desktop".into(),
-            versions: vec![MarketVersion {
-                version: latest.into(),
-                published_at: "2026-08-12T00:00:00Z".into(),
-                shasum: "a".repeat(64),
-                url: "pi.todo.piplug".into(),
-                size_bytes: 1,
-                permissions: vec!["ui.panel".into()],
-                ..Default::default()
-            }],
-            ..Default::default()
-        };
-
-        // A catalog that is behind the installed plugin must not present the
-        // older version as an update: that would be a downgrade wearing the
-        // update affordance.
-        assert!(!mgr.to_market_summary(&entry("0.5.0")).update_available);
-        assert!(mgr.to_market_summary(&entry("0.7.0")).update_available);
-        // Same version is not an update either.
-        assert!(!mgr.to_market_summary(&entry("0.6.0")).update_available);
-
-        // The data directory is process-global; leaving it set would leak into
-        // whichever test runs next.
-        unsafe {
-            std::env::remove_var("PI_DESKTOP_DATA_DIR");
-        }
-    });
-}
-
-#[test]
-fn announced_version_without_a_package_is_visible_but_not_installable() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        mgr.install_from_market("demo.hello", None, true, true, None)
-            .unwrap();
-
-        // The publisher announced 0.9.0 but has not uploaded its package.
-        let mut catalog = built_in_catalog_at(dir.path());
-        let announced = MarketVersion {
-            version: "0.9.0".into(),
-            published_at: "2026-08-13T00:00:00Z".into(),
-            changelog: None,
-            min_pi_desktop: None,
-            shasum: String::new(),
-            url: String::new(),
-            size_bytes: 0,
-            permissions: catalog.plugins[0].versions[0].permissions.clone(),
-            ..Default::default()
-        };
-        catalog.plugins[0].versions.push(announced);
-        fs::write(
-            mgr.catalog_path(),
-            serde_json::to_string_pretty(&catalog).unwrap(),
-        )
-        .unwrap();
-
-        // Discovery still shows the newest version, flagged as unbuyable.
-        let summary = &mgr.market_search(Some("Hello"), None).unwrap()[0];
-        assert_eq!(summary.latest_version, "0.9.0");
-        assert!(!summary.installable);
-        assert!(mgr
-            .market_get("demo.hello")
-            .unwrap()
-            .versions
-            .iter()
-            .any(|v| v.version == "0.9.0"));
-
-        // The install seam refuses it, and a batch update skips it instead
-        // of failing the whole run.
-        let err = mgr
-            .market_download_info("demo.hello", Some("0.9.0"))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("PLUGIN_MARKET_INVALID"), "{err}");
-        let updates = mgr.check_updates(false).unwrap();
-        assert_eq!(updates.len(), 1);
-        assert_eq!(updates[0].version, "0.9.0");
-        assert!(mgr.apply_updates(false).unwrap().is_empty());
-        assert_eq!(mgr.get("demo.hello").unwrap().version, "0.2.0");
-    });
-}
-
-#[test]
-fn silent_update_check_uses_cached_catalog_without_refreshing_remote() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        mgr.install_from_market("demo.hello", None, true, false, None)
-            .unwrap();
-
-        let mut cached = built_in_catalog_at(dir.path());
-        cached.plugins[0].versions[0].version = "0.3.0".into();
-        fs::write(
-            mgr.catalog_path(),
-            serde_json::to_string_pretty(&cached).unwrap(),
-        )
-        .unwrap();
-
-        let mut remote = cached.clone();
-        remote.plugins[0].versions[0].version = "0.9.0".into();
-        let remote_path = dir.path().join("remote-catalog.json");
-        fs::write(&remote_path, serde_json::to_string_pretty(&remote).unwrap()).unwrap();
-        unsafe {
-            std::env::set_var(
-                "PI_DESKTOP_PLUGIN_MARKET_URL",
-                format!("file://{}", remote_path.to_string_lossy()),
-            );
-        }
-
-        let updates = mgr.check_updates(false).unwrap();
-        assert_eq!(updates.len(), 1);
-        assert_eq!(updates[0].version, "0.3.0");
-        assert_eq!(
-            mgr.market_search(Some("Hello"), None).unwrap()[0].latest_version,
-            "0.3.0"
-        );
-        assert_eq!(
-            mgr.market_get("demo.hello").unwrap().summary.latest_version,
-            "0.3.0"
-        );
-
-        unsafe {
-            std::env::remove_var("PI_DESKTOP_DATA_DIR");
-            std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
-        }
-    });
+fn lock_process_env() -> std::sync::MutexGuard<'static, ()> {
+    PROCESS_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 #[test]
 fn package_path_traversal_rejected() {
-    // PI_DESKTOP_DATA_DIR is process-wide; hold the same lock the market
-    // tests use so two tests cannot point it at each other's directory.
-    let _env = lock_market_env();
+    // PI_DESKTOP_DATA_DIR is process-wide; hold the shared lock so two tests
+    // cannot point it at each other's directory.
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     unsafe {
         std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
@@ -411,16 +22,14 @@ fn package_path_traversal_rejected() {
     let bad = make_zip(&[("../evil.js", b"alert(1)")]);
     let pkg = dir.path().join("bad.piplug");
     fs::write(&pkg, bad).unwrap();
-    let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(dir.path());
     let err = mgr
         .install_from_package(
             pkg.to_str().unwrap(),
             InstallOptions {
                 source: "installed".into(),
                 enable: true,
-                marketplace: None,
                 expected_shasum: None,
-                auto_update: false,
                 granted_permissions: None,
             },
         )
@@ -430,205 +39,6 @@ fn package_path_traversal_rejected() {
     unsafe {
         std::env::remove_var("PI_DESKTOP_DATA_DIR");
     }
-}
-
-#[test]
-fn high_risk_permissions_roundtrip_on_notes_plugin() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        // Clean up any existing packages to ensure fresh generation
-        let packages_dir = dir.path().join("plugins/market/packages");
-        if packages_dir.exists() {
-            let _ = fs::remove_dir_all(&packages_dir);
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let installed = mgr
-            .install_from_market("demo.workspace-notes", None, true, false, None)
-            .unwrap();
-        assert!(installed
-            .plugin
-            .permissions
-            .iter()
-            .any(|p| p == "fs.write.workspace"));
-        assert!(installed
-            .plugin
-            .permissions
-            .iter()
-            .any(|p| p == "net.fetch"));
-    });
-}
-
-#[test]
-fn resolve_relative_package_urls_against_catalog() {
-    let resolved = PluginManager::resolve_package_url(
-        OFFICIAL_CHANNEL_CATALOG_URL,
-        None,
-        "packages/demo.hello-0.2.0.piplug",
-    );
-    assert_eq!(
-        resolved,
-        "https://plugins.aiuo.net/packages/demo.hello-0.2.0.piplug"
-    );
-}
-
-/// The official channel's install path, against the live deployment.
-///
-/// This test is ignored by default because it contacts the plugin center. It
-/// requires both explicit test opt-in and user authorization.
-#[test]
-#[ignore = "requires explicit live plugin marketplace authorization"]
-fn the_plugin_center_resolves_a_published_package() {
-    if std::env::var("PI_DESKTOP_RUN_LIVE_PLUGIN_MARKET_TESTS").as_deref() != Ok("1") {
-        eprintln!(
-            "Set PI_DESKTOP_RUN_LIVE_PLUGIN_MARKET_TESTS=1 after authorization to run this live test."
-        );
-        return;
-    }
-    let _guard = lock_market_env();
-    let Ok(bytes) = download_url(OFFICIAL_CHANNEL_CATALOG_URL) else {
-        return;
-    };
-    let catalog: MarketCatalogFile =
-        serde_json::from_slice(&bytes).expect("the published catalog parses");
-    // A device id of the shape the platform is sent, so a failure here is the
-    // interface's and not the identifier's.
-    let device = "0".repeat(64);
-    for plugin in &catalog.plugins {
-        for version in &plugin.versions {
-            if version.shasum.trim().is_empty() {
-                continue;
-            }
-            let Ok(resolved) = super::resolve::request(
-                OFFICIAL_CHANNEL_CATALOG_URL,
-                &device,
-                &plugin.id,
-                &version.version,
-            ) else {
-                // Not published yet, withdrawn since, or the deployment cannot
-                // answer: none of those is what this test is about.
-                continue;
-            };
-            assert_eq!(
-                resolved.sha256.trim().to_ascii_lowercase(),
-                version.shasum.trim().to_ascii_lowercase(),
-                "the platform answers with the digest the catalog carries for {}",
-                plugin.id
-            );
-            assert!(
-                !resolved.downloads.is_empty(),
-                "a 200 carries at least one mirror for {}",
-                plugin.id
-            );
-            for mirror in &resolved.downloads {
-                assert!(
-                    mirror.url.starts_with("https://"),
-                    "a mirror is fetched over https: {}",
-                    mirror.url
-                );
-            }
-            return;
-        }
-    }
-}
-
-#[test]
-fn market_channel_from_settings_ignores_legacy_source_values() {
-    assert_eq!(
-        market_channel_from_settings(None).0,
-        MarketChannel::Official
-    );
-    assert_eq!(
-        market_channel_from_settings(Some(&json!({}))).0,
-        MarketChannel::Official
-    );
-    assert_eq!(
-        market_channel_from_settings(Some(&json!({"pluginMarketSource": "official"}))).0,
-        MarketChannel::Official
-    );
-    for source in ["official", "github", "mirror", "custom", "nonsense"] {
-        let (channel, custom_url) = market_channel_from_settings(Some(&json!({
-            "pluginMarketSource": source,
-            "pluginMarketCustomUrl": "https://example.test/catalog.json",
-        })));
-        assert_eq!(channel, MarketChannel::Official, "source {source}");
-        assert_eq!(custom_url, None, "source {source}");
-    }
-}
-
-#[test]
-fn cached_catalog_is_scoped_to_the_source_that_fetched_it() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        // A bundled offline snapshot records no source and stays usable until
-        // an official remote snapshot has been fetched.
-        let _ = fs::remove_file(mgr.market_cache_meta_path());
-        let previous_source = "https://legacy.example.test/catalog.json";
-        // Without cache metadata, the bundled offline catalog has no
-        // provider-specific URLs and remains usable for any active source.
-        assert!(mgr.cached_catalog_matches_source(OFFICIAL_CHANNEL_CATALOG_URL));
-        assert!(mgr.cached_catalog_matches_source(previous_source));
-
-        fs::create_dir_all(dir.path().join("plugins/market")).unwrap();
-        fs::write(
-            mgr.market_cache_meta_path(),
-            serde_json::to_string(&json!({"sourceUrl": previous_source})).unwrap(),
-        )
-        .unwrap();
-        assert!(mgr.cached_catalog_matches_source(previous_source));
-        assert!(!mgr.cached_catalog_matches_source(OFFICIAL_CHANNEL_CATALOG_URL));
-    });
-}
-
-#[test]
-fn catalog_cache_ignores_a_snapshot_from_another_source() {
-    with_local_market(|| {
-        let local_source = std::env::var("PI_DESKTOP_PLUGIN_MARKET_URL").unwrap();
-        let dir = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
-        }
-        let mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-
-        // A snapshot carrying a plugin the built-in catalog does not have,
-        // left by an older catalog source.
-        let mut foreign = built_in_catalog_at(dir.path());
-        foreign.provider_id = "official".into();
-        foreign.plugins.truncate(1);
-        foreign.plugins[0].id = "legacy.only".into();
-        foreign.plugins[0].name = "Legacy Only".into();
-        fs::create_dir_all(dir.path().join("plugins/market")).unwrap();
-        fs::write(mgr.catalog_path(), serde_json::to_string(&foreign).unwrap()).unwrap();
-        fs::write(
-            mgr.market_cache_meta_path(),
-            serde_json::to_string(&json!({
-                "sourceUrl": "https://legacy.example.test/catalog.json"
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-
-        // The old source no longer matches the active catalog, so search must
-        // fall back to the built-in catalog.
-        let results = mgr.market_search(None, None).unwrap();
-        assert!(!results.iter().any(|p| p.id == "legacy.only"));
-        assert!(results.iter().any(|p| p.id == "demo.hello"));
-
-        // Re-record the snapshot against the active source and it is used.
-        fs::write(
-            mgr.market_cache_meta_path(),
-            serde_json::to_string(&json!({"sourceUrl": local_source})).unwrap(),
-        )
-        .unwrap();
-        let results = mgr.market_search(None, None).unwrap();
-        assert!(results.iter().any(|p| p.id == "legacy.only"));
-    });
 }
 
 fn write_plugin(root: &Path, manifest: Value, extra: &[(&str, &str)]) {
@@ -666,9 +76,9 @@ fn read_manifest_err(root: &Path) -> String {
 
 #[test]
 fn accepts_and_summarizes_new_contributions() {
-    // PI_DESKTOP_DATA_DIR is process-wide; hold the same lock the market
-    // tests use so two tests cannot point it at each other's directory.
-    let _env = lock_market_env();
+    // PI_DESKTOP_DATA_DIR is process-wide; hold the shared lock so two tests
+    // cannot point it at each other's directory.
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     let root = dir.path().join("plugin");
     write_plugin(
@@ -731,7 +141,7 @@ fn accepts_and_summarizes_new_contributions() {
     unsafe {
         std::env::set_var("PI_DESKTOP_DATA_DIR", data.path());
     }
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     let summary = mgr.load_dev(root.to_str().unwrap()).unwrap();
     assert!(summary.capabilities.contains(&"mcp".to_string()));
     assert!(summary.capabilities.contains(&"bus".to_string()));
@@ -993,55 +403,51 @@ fn package_relative_theme_assets_cannot_escape_through_symlinks() {
 
 #[test]
 fn install_from_package_accepts_a_package_relative_theme_asset() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        let manifest = json!({
-            "schemaVersion": 1,
-            "id": "demo.theme-pack",
-            "name": "Theme Pack",
-            "version": "0.1.0",
-            "main": "main.js",
-            "contributes": {
-                "themes": [{
-                    "id": "sunset",
-                    "label": "Sunset",
-                    "path": "themes/sunset.css",
-                    "assets": ["art/preview.png"]
-                }]
-            },
-            "permissions": ["ui.theme"]
-        });
-        let package = make_zip(&[
-            (
-                "theme-pack/manifest.json",
-                &serde_json::to_vec(&manifest).unwrap(),
-            ),
-            ("theme-pack/main.js", b"export function onLoad() {}"),
-            ("theme-pack/themes/sunset.css", b":root {}"),
-            ("theme-pack/art/preview.png", b"png"),
-        ]);
-        let package_path = dir.path().join("theme-pack.piplug");
-        fs::write(&package_path, package).unwrap();
-
-        let mut manager = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let installed = manager
-            .install_from_package(
-                package_path.to_str().unwrap(),
-                InstallOptions {
-                    source: "installed".into(),
-                    enable: true,
-                    marketplace: None,
-                    expected_shasum: None,
-                    auto_update: false,
-                    granted_permissions: None,
-                },
-            )
-            .unwrap();
-
-        assert_eq!(installed.plugin.id, "demo.theme-pack");
-        let install_root = Path::new(installed.plugin.path.as_deref().unwrap());
-        assert!(install_root.join("art/preview.png").is_file());
+    let dir = tempdir().unwrap();
+    let manifest = json!({
+        "schemaVersion": 1,
+        "id": "demo.theme-pack",
+        "name": "Theme Pack",
+        "version": "0.1.0",
+        "main": "main.js",
+        "contributes": {
+            "themes": [{
+                "id": "sunset",
+                "label": "Sunset",
+                "path": "themes/sunset.css",
+                "assets": ["art/preview.png"]
+            }]
+        },
+        "permissions": ["ui.theme"]
     });
+    let package = make_zip(&[
+        (
+            "theme-pack/manifest.json",
+            &serde_json::to_vec(&manifest).unwrap(),
+        ),
+        ("theme-pack/main.js", b"export function onLoad() {}"),
+        ("theme-pack/themes/sunset.css", b":root {}"),
+        ("theme-pack/art/preview.png", b"png"),
+    ]);
+    let package_path = dir.path().join("theme-pack.piplug");
+    fs::write(&package_path, package).unwrap();
+
+    let mut manager = PluginManager::new(dir.path());
+    let installed = manager
+        .install_from_package(
+            package_path.to_str().unwrap(),
+            InstallOptions {
+                source: "installed".into(),
+                enable: true,
+                expected_shasum: None,
+                granted_permissions: None,
+            },
+        )
+        .unwrap();
+
+    assert_eq!(installed.plugin.id, "demo.theme-pack");
+    let install_root = Path::new(installed.plugin.path.as_deref().unwrap());
+    assert!(install_root.join("art/preview.png").is_file());
 }
 
 #[test]
@@ -1183,7 +589,7 @@ fn bundled_plugins_refresh_from_disk_but_keep_user_state() {
     );
 
     let data = tempdir().unwrap();
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     mgr.sync_builtin(Some(ship.path())).unwrap();
 
     let listed = mgr.get("pi.files").expect("bundled plugin is registered");
@@ -1237,7 +643,7 @@ fn bundled_plugin_can_default_to_disabled_without_overwriting_user_state() {
     );
 
     let data = tempdir().unwrap();
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     mgr.sync_builtin(Some(ship.path())).unwrap();
     let listed = mgr.get("pi.opt-in").expect("bundled plugin is registered");
     assert!(!listed.enabled, "opt-in bundled plugins start disabled");
@@ -1273,7 +679,7 @@ fn a_bundled_plugin_keeps_the_update_the_user_installed() {
     write_plugin(&shipped, shipped_manifest("1.0.0"), &[]);
 
     let data = tempdir().unwrap();
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     mgr.sync_builtin(Some(ship.path())).unwrap();
     assert!(mgr.get("pi.view").unwrap().bundled);
 
@@ -1296,7 +702,7 @@ fn a_bundled_plugin_keeps_the_update_the_user_installed() {
     );
 
     // The next launch reconciles against the shipped 1.0.0 again.
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     mgr.sync_builtin(Some(ship.path())).unwrap();
     let after = mgr.get("pi.view").unwrap();
     assert_eq!(
@@ -1335,7 +741,7 @@ fn a_newer_shipped_version_replaces_an_older_user_install() {
     write_plugin(&shipped, manifest("1.0.0"), &[]);
 
     let data = tempdir().unwrap();
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     mgr.sync_builtin(Some(ship.path())).unwrap();
 
     let update = data.path().join("package");
@@ -1379,7 +785,7 @@ fn a_plugin_a_build_stops_shipping_is_no_longer_bundled() {
     write_plugin(&shipped, manifest("1.0.0"), &[]);
 
     let data = tempdir().unwrap();
-    let mut mgr = PluginManager::new(data.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(data.path());
     mgr.sync_builtin(Some(ship.path())).unwrap();
 
     let update = data.path().join("package");
@@ -1504,9 +910,9 @@ fn services_and_bus_declarations_are_checked() {
 /// things that rewrite a plugin record: a restart and a reinstall.
 #[test]
 fn a_project_scope_survives_a_reload_and_a_reinstall() {
-    // PI_DESKTOP_DATA_DIR is process-wide; hold the same lock the market
-    // tests use so two tests cannot point it at each other's directory.
-    let _env = lock_market_env();
+    // PI_DESKTOP_DATA_DIR is process-wide; hold the shared lock so two tests
+    // cannot point it at each other's directory.
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     unsafe {
         std::env::set_var("PI_DESKTOP_DATA_DIR", dir.path());
@@ -1525,7 +931,7 @@ fn a_project_scope_survives_a_reload_and_a_reinstall() {
         &[],
     );
 
-    let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(dir.path());
     let installed = mgr
         .install_from_path(
             source.to_str().unwrap(),
@@ -1557,7 +963,7 @@ fn a_project_scope_survives_a_reload_and_a_reinstall() {
     assert!(!disabled.enabled);
     assert_eq!(disabled.scope.projects, vec!["/work/api".to_string()]);
 
-    let reloaded = PluginManager::new(dir.path(), MarketChannel::Official, None);
+    let reloaded = PluginManager::new(dir.path());
     let after = reloaded.get("demo.scoped").expect("plugin missing");
     assert_eq!(after.scope.mode, ActivationMode::Projects);
     assert_eq!(after.scope.projects, vec!["/work/api".to_string()]);
@@ -1565,7 +971,7 @@ fn a_project_scope_survives_a_reload_and_a_reinstall() {
     // Reinstalling over the top is an update, not a reset: widening a
     // project-scoped plugin back to everywhere would hand it reach the user
     // never granted.
-    let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
+    let mut mgr = PluginManager::new(dir.path());
     let again = mgr
         .install_from_path(
             source.to_str().unwrap(),
@@ -1581,299 +987,6 @@ fn a_project_scope_survives_a_reload_and_a_reinstall() {
 
     unsafe {
         std::env::remove_var("PI_DESKTOP_DATA_DIR");
-    }
-}
-
-/// Build a manager whose catalog is already on disk.
-///
-/// `PluginManager::new` falls back to a built-in catalog when no catalog exists
-/// and materializes its packages under the manager's own data directory. Tests
-/// that build fixture catalogs use the same helper, so pre-writing this catalog
-/// keeps those tests off the fallback materialization path entirely.
-fn offline_manager(dir: &Path) -> PluginManager {
-    let catalog_path = dir.join("plugins/market/catalog.json");
-    fs::create_dir_all(catalog_path.parent().unwrap()).unwrap();
-    fs::write(
-        &catalog_path,
-        serde_json::to_string(&json!({
-            "schemaVersion": 2,
-            "providerId": "official",
-            "plugins": [],
-        }))
-        .unwrap(),
-    )
-    .unwrap();
-    PluginManager::new(dir, MarketChannel::Official, None)
-}
-
-/// Build a catalog v2 entry with one live and one withdrawn version.
-fn v2_entry() -> MarketCatalogEntry {
-    MarketCatalogEntry {
-        id: "acme.todo".into(),
-        name: "Todo".into(),
-        description: "Publisher-owned plugin".into(),
-        author: "acme".into(),
-        publisher_id: Some("acme".into()),
-        trust: Some("verified".into()),
-        repository: Some("https://github.com/acme/pi-plugin-todo".into()),
-        versions: vec![
-            MarketVersion {
-                version: "1.0.0".into(),
-                published_at: "2026-08-01T00:00:00Z".into(),
-                shasum: "a".repeat(64),
-                url: "acme.todo@1.0.0/acme.todo-1.0.0.piplug".into(),
-                size_bytes: 2048,
-                permissions: vec!["ui.panel".into()],
-                ..Default::default()
-            },
-            MarketVersion {
-                version: "1.1.0".into(),
-                published_at: "2026-08-10T00:00:00Z".into(),
-                shasum: "b".repeat(64),
-                url: "acme.todo@1.1.0/acme.todo-1.1.0.piplug".into(),
-                size_bytes: 2048,
-                permissions: vec!["ui.panel".into()],
-                yanked: true,
-                yanked_reason: Some("leaked a token in the bundle".into()),
-                ..Default::default()
-            },
-        ],
-        ..Default::default()
-    }
-}
-
-fn v2_catalog(entry: MarketCatalogEntry) -> MarketCatalogFile {
-    MarketCatalogFile {
-        schema_version: 2,
-        provider_id: "official".into(),
-        artifact_base_url: Some(
-            "https://github.com/vastsa/pi-plugin-center/releases/download".into(),
-        ),
-        plugins: vec![entry],
-        ..Default::default()
-    }
-}
-
-#[test]
-fn package_downloads_are_restricted_to_distribution_hosts() {
-    let catalog = "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/catalog.json";
-    // GitHub release entry point and the storage hosts it redirects to.
-    for url in [
-            "https://github.com/vastsa/pi-plugin-center/releases/download/acme.todo@1.0.0/acme.todo-1.0.0.piplug",
-            "https://objects.githubusercontent.com/github-production-release-asset/1",
-            "https://release-assets.githubusercontent.com/github-production-release-asset/1",
-            "https://codeload.github.com/acme/pi-plugin-todo/zip/refs/tags/v1.0.0",
-            "https://cnb.cool/aixk/pi-plugin-center/-/releases/download/x.piplug",
-        ] {
-            package_host_allowed(url, catalog).unwrap_or_else(|e| panic!("{url}: {e}"));
-        }
-
-    // A publisher-supplied URL cannot send the request anywhere else, and a
-    // near-miss domain must not satisfy the suffix rule.
-    for url in [
-        "https://evil.test/acme.todo-1.0.0.piplug",
-        "https://notgithub.com/x.piplug",
-        "https://github.com.evil.test/x.piplug",
-        "https://cnb.cool.evil.test/x.piplug",
-    ] {
-        let err = package_host_allowed(url, catalog).unwrap_err().to_string();
-        assert!(err.contains("PLUGIN_MARKET_UNTRUSTED_HOST"), "{url}: {err}");
-    }
-}
-
-#[test]
-fn a_private_catalog_is_trusted_only_for_its_own_host() {
-    let catalog = "https://plugins.company.local/catalog.json";
-    package_host_allowed("https://plugins.company.local/a.piplug", catalog).unwrap();
-    assert!(package_host_allowed("https://other.company.local/a.piplug", catalog).is_err());
-}
-
-#[test]
-fn package_urls_reject_credentials_and_plain_http() {
-    let catalog = "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/catalog.json";
-    let err = package_host_allowed("https://user:pass@github.com/a.piplug", catalog)
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("must not embed credentials"), "{err}");
-
-    assert!(package_host_allowed("http://github.com/a.piplug", catalog).is_err());
-    // A loopback development catalog stays usable.
-    package_host_allowed(
-        "http://127.0.0.1:8080/a.piplug",
-        "http://127.0.0.1:8080/catalog.json",
-    )
-    .unwrap();
-}
-
-#[test]
-fn relative_package_urls_resolve_against_the_declared_artifact_base() {
-    let catalog = "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/catalog.json";
-    // v2: the declared base wins, so a release asset is reachable even
-    // though it does not live under the catalog directory.
-    assert_eq!(
-            PluginManager::resolve_package_url(
-                catalog,
-                Some("https://github.com/vastsa/pi-plugin-center/releases/download"),
-                "acme.todo@1.0.0/acme.todo-1.0.0.piplug",
-            ),
-            "https://github.com/vastsa/pi-plugin-center/releases/download/acme.todo@1.0.0/acme.todo-1.0.0.piplug"
-        );
-    // v1: no declared base, so the catalog directory still anchors it.
-    assert_eq!(
-        PluginManager::resolve_package_url(catalog, None, "packages/x.piplug"),
-        "https://raw.githubusercontent.com/vastsa/pi-plugin-center/main/packages/x.piplug"
-    );
-    // An absolute URL is passed through for the host allowlist to judge.
-    assert_eq!(
-        PluginManager::resolve_package_url(
-            catalog,
-            Some("https://base.test/"),
-            "https://cnb.cool/x.piplug"
-        ),
-        "https://cnb.cool/x.piplug"
-    );
-}
-
-/// The official platform can return package URLs on approved GitHub and CNB
-/// hosts. The catalog's declared base keeps each package on its own host.
-#[test]
-fn official_catalog_package_bases_resolve_to_approved_mirror_hosts() {
-    let relative = "packages/acme.todo-1.0.0.piplug";
-
-    let github = PluginManager::resolve_package_url(
-        OFFICIAL_CHANNEL_CATALOG_URL,
-        Some("https://raw.githubusercontent.com/AIUO-Net/pi-desktop-plugins/main"),
-        relative,
-    );
-    assert_eq!(
-        github,
-        "https://raw.githubusercontent.com/AIUO-Net/pi-desktop-plugins/main/packages/acme.todo-1.0.0.piplug"
-    );
-
-    let mirror = PluginManager::resolve_package_url(
-        OFFICIAL_CHANNEL_CATALOG_URL,
-        Some("https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main"),
-        relative,
-    );
-    assert_eq!(
-        mirror,
-        "https://cnb.cool/aixk/pi-desktop-plugins/-/git/raw/main/packages/acme.todo-1.0.0.piplug"
-    );
-
-    // Both package hosts are accepted while the catalog stays official.
-    package_host_allowed(&github, OFFICIAL_CHANNEL_CATALOG_URL).unwrap();
-    package_host_allowed(&mirror, OFFICIAL_CHANNEL_CATALOG_URL).unwrap();
-    assert!(github.starts_with("https://raw.githubusercontent.com/AIUO-Net/"));
-    assert!(mirror.starts_with("https://cnb.cool/"));
-}
-
-#[test]
-fn a_yanked_version_is_never_offered_or_installed() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        let mgr = offline_manager(dir.path());
-        let entry = v2_entry();
-
-        // 1.1.0 is newer but withdrawn, so the offered version is 1.0.0.
-        assert_eq!(
-            latest_market_version(&entry.versions)
-                .expect("live version")
-                .version,
-            "1.0.0"
-        );
-        let summary = mgr.to_market_summary(&entry);
-        assert_eq!(summary.latest_version, "1.0.0");
-
-        // An explicit pick of the withdrawn version is refused with its reason.
-        let catalog = v2_catalog(entry);
-        let err = mgr
-            .market_download_info_from_catalog(&catalog, "acme.todo", Some("1.1.0"))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("PLUGIN_MARKET_YANKED"), "{err}");
-        assert!(err.contains("leaked a token"), "{err}");
-
-        // The live version still resolves, carrying its source pin.
-        let info = mgr
-            .market_download_info_from_catalog(&catalog, "acme.todo", None)
-            .unwrap();
-        assert_eq!(info.version, "1.0.0");
-        assert_eq!(info.publisher_id.as_deref(), Some("acme"));
-    });
-}
-
-#[test]
-fn a_version_requiring_a_newer_host_is_not_installable() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        let mgr = offline_manager(dir.path());
-        let mut entry = v2_entry();
-        entry.versions.retain(|v| !v.yanked);
-        entry.versions[0].min_pi_desktop = Some("999.0.0".into());
-
-        assert!(!mgr.to_market_summary(&entry).installable);
-        let catalog = v2_catalog(entry.clone());
-        let err = mgr
-            .market_download_info_from_catalog(&catalog, "acme.todo", None)
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("PLUGIN_HOST_TOO_OLD"), "{err}");
-
-        // A range expression is not a version bound this host can evaluate,
-        // and an unreadable bound must not make a plugin uninstallable.
-        entry.versions[0].min_pi_desktop = Some(">=0.2.0".into());
-        assert!(mgr.to_market_summary(&entry).installable);
-    });
-}
-
-#[test]
-fn a_package_url_off_the_allowlist_is_not_offered_for_install() {
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        let mgr = offline_manager(dir.path());
-        let mut entry = v2_entry();
-        entry.versions.retain(|v| !v.yanked);
-        entry.versions[0].url = "https://evil.test/acme.todo-1.0.0.piplug".into();
-        assert!(!mgr.to_market_summary(&entry).installable);
-    });
-}
-
-#[test]
-fn verified_trust_is_honoured_only_from_the_official_source() {
-    let _guard = lock_market_env();
-    let dir = tempdir().unwrap();
-
-    // A catalog already on disk keeps manager construction offline. It is
-    // written literally rather than from the built-in catalog: keeping this
-    // test's snapshot self-contained avoids exercising package materialization.
-    // Safety: test-only process env mutation, serialized by the market lock.
-    unsafe {
-        std::env::set_var("PI_DESKTOP_PLUGIN_MARKET_URL", OFFICIAL_CHANNEL_CATALOG_URL);
-    }
-    let official = offline_manager(dir.path());
-    assert_eq!(official.resolve_trust(&v2_entry()), "verified");
-
-    // A non-official development override cannot promote itself past community.
-    unsafe {
-        std::env::set_var(
-            "PI_DESKTOP_PLUGIN_MARKET_URL",
-            "https://plugins.company.local/catalog.json",
-        );
-    }
-    let custom = offline_manager(dir.path());
-    assert_eq!(custom.resolve_trust(&v2_entry()), "community");
-
-    // An unrecognised tier is not trusted, and a v1 entry keeps its meaning.
-    let mut odd = v2_entry();
-    odd.trust = Some("platinum".into());
-    assert_eq!(custom.resolve_trust(&odd), "unknown");
-    let mut v1 = v2_entry();
-    v1.trust = None;
-    v1.verified = false;
-    assert_eq!(custom.resolve_trust(&v1), "community");
-
-    unsafe {
-        std::env::remove_var("PI_DESKTOP_PLUGIN_MARKET_URL");
     }
 }
 
@@ -2075,7 +1188,7 @@ fn composer_transforms_require_permission_and_localized_titles() {
 
 #[test]
 fn plugin_rows_read_the_i18n_block_for_the_active_locale() {
-    let _env = lock_market_env();
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     let root = dir.path().join("plugin");
     write_plugin(
@@ -2094,7 +1207,7 @@ fn plugin_rows_read_the_i18n_block_for_the_active_locale() {
         }),
         &[],
     );
-    let mut mgr = offline_manager(dir.path());
+    let mut mgr = PluginManager::new(dir.path());
     mgr.set_locale("en");
     let row = mgr.load_dev(root.to_str().unwrap()).unwrap();
     assert_eq!(row.name, "Todo List");
@@ -2123,7 +1236,7 @@ fn plugin_rows_read_the_i18n_block_for_the_active_locale() {
 
 #[test]
 fn a_partial_translation_falls_back_per_field() {
-    let _env = lock_market_env();
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     let root = dir.path().join("plugin");
     write_plugin(
@@ -2139,7 +1252,7 @@ fn a_partial_translation_falls_back_per_field() {
         }),
         &[],
     );
-    let mut mgr = offline_manager(dir.path());
+    let mut mgr = PluginManager::new(dir.path());
     mgr.set_locale("en");
     let row = mgr.load_dev(root.to_str().unwrap()).unwrap();
     assert_eq!(row.name, "English name");
@@ -2153,7 +1266,7 @@ fn a_partial_translation_falls_back_per_field() {
 
 #[test]
 fn a_plugin_without_an_i18n_block_keeps_the_authors_strings() {
-    let _env = lock_market_env();
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     let root = dir.path().join("plugin");
     write_plugin(
@@ -2168,7 +1281,7 @@ fn a_plugin_without_an_i18n_block_keeps_the_authors_strings() {
         }),
         &[],
     );
-    let mut mgr = offline_manager(dir.path());
+    let mut mgr = PluginManager::new(dir.path());
     mgr.set_locale("zh-CN");
     let row = mgr.load_dev(root.to_str().unwrap()).unwrap();
     assert_eq!(row.name, "Plain");
@@ -2177,7 +1290,7 @@ fn a_plugin_without_an_i18n_block_keeps_the_authors_strings() {
 
 #[test]
 fn the_registry_never_persists_the_i18n_block() {
-    let _env = lock_market_env();
+    let _env = lock_process_env();
     let dir = tempdir().unwrap();
     let root = dir.path().join("plugin");
     write_plugin(
@@ -2192,7 +1305,7 @@ fn the_registry_never_persists_the_i18n_block() {
         }),
         &[],
     );
-    let mut mgr = offline_manager(dir.path());
+    let mut mgr = PluginManager::new(dir.path());
     mgr.set_locale("zh-CN");
     mgr.load_dev(root.to_str().unwrap()).unwrap();
 
@@ -2204,160 +1317,9 @@ fn the_registry_never_persists_the_i18n_block() {
 
     // A restart re-reads each manifest, so rows are localized again without
     // the registry having carried anything.
-    let mut reloaded = PluginManager::new(dir.path(), MarketChannel::Official, None);
+    let mut reloaded = PluginManager::new(dir.path());
     reloaded.set_locale("zh-CN");
     assert_eq!(reloaded.get("acme.stored").unwrap().name, "已存");
-}
-
-#[test]
-fn market_cards_and_details_read_the_catalog_i18n_block() {
-    let _env = lock_market_env();
-    let dir = tempdir().unwrap();
-    let mut mgr = offline_manager(dir.path());
-    let mut entry = v2_entry();
-    entry.safety_notes = Some("Reads nothing else".into());
-    entry.i18n = Some(
-        [
-            (
-                "en".to_string(),
-                PluginDisplayI18n {
-                    name: Some("Todo".into()),
-                    description: Some("Publisher-owned plugin".into()),
-                    safety_notes: Some("Reads nothing else".into()),
-                },
-            ),
-            (
-                "zh-CN".to_string(),
-                PluginDisplayI18n {
-                    name: Some("待办".into()),
-                    description: Some("发布者自有的插件".into()),
-                    safety_notes: Some("不读取其他内容".into()),
-                },
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    );
-    fs::write(
-        mgr.catalog_path(),
-        serde_json::to_string(&v2_catalog(entry)).unwrap(),
-    )
-    .unwrap();
-
-    mgr.set_locale("zh-CN");
-    let card = mgr.market_search(None, None).unwrap().remove(0);
-    assert_eq!(card.name, "待办");
-    assert_eq!(card.description, "发布者自有的插件");
-    assert_eq!(
-        mgr.market_get("acme.todo").unwrap().safety_notes.as_deref(),
-        Some("不读取其他内容")
-    );
-    // Search matches either language: the card is drawn in one of them, and a
-    // user typing the other must still find it.
-    assert_eq!(
-        mgr.market_search(Some("Publisher-owned"), None)
-            .unwrap()
-            .len(),
-        1
-    );
-
-    mgr.set_locale("en");
-    let card = mgr.market_search(None, None).unwrap().remove(0);
-    assert_eq!(card.name, "Todo");
-    assert_eq!(card.description, "Publisher-owned plugin");
-    assert_eq!(
-        mgr.market_get("acme.todo").unwrap().safety_notes.as_deref(),
-        Some("Reads nothing else")
-    );
-}
-
-/// An install reports the phases it passes through, and a user who cancels
-/// stops it before anything is written.
-#[test]
-fn an_install_reports_progress_and_honours_a_cancel() {
-    #[derive(Default)]
-    struct InstallLog {
-        phases: Vec<&'static str>,
-        bytes: Vec<(u64, u64)>,
-        errors: Vec<String>,
-    }
-
-    impl InstallObserver for InstallLog {
-        fn progress(&mut self, event: InstallProgress) {
-            self.phases.push(event.phase.as_str());
-            if event.received_bytes > 0 {
-                self.bytes.push((event.received_bytes, event.total_bytes));
-            }
-            if let Some(error) = event.error {
-                self.errors.push(error);
-            }
-        }
-    }
-
-    struct CancelAfterFirstReport {
-        seen: usize,
-    }
-
-    impl InstallObserver for CancelAfterFirstReport {
-        fn progress(&mut self, _event: InstallProgress) {
-            self.seen += 1;
-        }
-
-        fn cancelled(&self) -> bool {
-            self.seen > 0
-        }
-    }
-
-    with_local_market(|| {
-        let dir = tempdir().unwrap();
-        // The manager's directory owns its packages, even when another host
-        // or test changes the process-wide default directory.
-        let other = tempdir().unwrap();
-        unsafe {
-            std::env::set_var("PI_DESKTOP_DATA_DIR", other.path());
-        }
-        let mut mgr = PluginManager::new(dir.path(), MarketChannel::Official, None);
-        let catalog: MarketCatalogFile =
-            serde_json::from_str(&fs::read_to_string(mgr.catalog_path()).unwrap()).unwrap();
-        for plugin in &catalog.plugins {
-            for version in &plugin.versions {
-                let local = version.url.strip_prefix("file://").unwrap();
-                assert!(Path::new(local).starts_with(dir.path()));
-            }
-        }
-
-        let mut log = InstallLog::default();
-        let installed = mgr
-            .install_from_market_observed("demo.workspace-notes", None, true, false, None, &mut log)
-            .expect("the fixture package installs");
-        assert_eq!(installed.plugin.id, "demo.workspace-notes");
-        // The fixture catalog serves a local package, so resolution is skipped
-        // and the phases are the ones a download has: bytes, verify, install.
-        for phase in ["download", "verify", "install"] {
-            assert!(
-                log.phases.contains(&phase),
-                "{phase} missing from {:?}",
-                log.phases
-            );
-        }
-        assert!(
-            log.bytes
-                .iter()
-                .any(|(received, total)| *received > 0 && *total >= *received),
-            "bytes were reported against the announced size: {:?}",
-            log.bytes
-        );
-        assert!(log.errors.is_empty(), "{:?}", log.errors);
-
-        // A cancel that arrives while the bytes arrive stops the install before
-        // it is verified, written or registered.
-        let mut cancelling = CancelAfterFirstReport { seen: 0 };
-        let error = mgr
-            .install_from_market_observed("demo.hello", None, true, false, None, &mut cancelling)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("PLUGIN_CANCELLED"), "{error}");
-    });
 }
 
 #[test]
@@ -2382,4 +1344,277 @@ fn plugin_ui_meta_parses_the_floating_widget_placement() {
     assert!(panel.shape.is_none());
     assert!(panel.always_on_top.is_none());
     assert!(panel.resizable.is_none());
+}
+
+/// Build a store-only zip, the only compression `extract_zip_bytes` accepts.
+fn make_zip(files: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut offset: u32 = 0;
+    let mut central = Vec::new();
+    let mut entries = 0u16;
+    for (name, data) in files {
+        let name_bytes = name.as_bytes();
+        let crc = crc32(data);
+        let mut local = Vec::new();
+        local.extend_from_slice(&0x04034b50u32.to_le_bytes());
+        local.extend_from_slice(&20u16.to_le_bytes()); // version needed
+        local.extend_from_slice(&0u16.to_le_bytes()); // flags
+        local.extend_from_slice(&0u16.to_le_bytes()); // method store
+        local.extend_from_slice(&0u16.to_le_bytes()); // time
+        local.extend_from_slice(&0u16.to_le_bytes()); // date
+        local.extend_from_slice(&crc.to_le_bytes());
+        local.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        local.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        local.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        local.extend_from_slice(&0u16.to_le_bytes()); // extra
+        local.extend_from_slice(name_bytes);
+        local.extend_from_slice(data);
+        out.extend_from_slice(&local);
+
+        let mut cen = Vec::new();
+        cen.extend_from_slice(&0x02014b50u32.to_le_bytes());
+        cen.extend_from_slice(&20u16.to_le_bytes());
+        cen.extend_from_slice(&20u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&crc.to_le_bytes());
+        cen.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        cen.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        cen.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u16.to_le_bytes());
+        cen.extend_from_slice(&0u32.to_le_bytes());
+        cen.extend_from_slice(&offset.to_le_bytes());
+        cen.extend_from_slice(name_bytes);
+        central.extend_from_slice(&cen);
+        offset += local.len() as u32;
+        entries += 1;
+    }
+    let central_offset = out.len() as u32;
+    out.extend_from_slice(&central);
+    let central_size = central.len() as u32;
+    out.extend_from_slice(&0x06054b50u32.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out.extend_from_slice(&entries.to_le_bytes());
+    out.extend_from_slice(&entries.to_le_bytes());
+    out.extend_from_slice(&central_size.to_le_bytes());
+    out.extend_from_slice(&central_offset.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out
+}
+
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFF_FFFF;
+    for b in data {
+        crc ^= u32::from(*b);
+        for _ in 0..8 {
+            let mask = (!(crc & 1)).wrapping_add(1);
+            crc = (crc >> 1) ^ (0xEDB8_8320 & mask);
+        }
+    }
+    !crc
+}
+
+/// Strings that only a remote plugin marketplace client would need: the
+/// catalog and resolve host, the mirror host, the catalog override, and the
+/// resolve endpoint. Built with `concat!` so this file does not match itself.
+const MARKETPLACE_NEEDLES: &[&str] = &[
+    concat!("plugins", ".aiuo.net"),
+    concat!("cnb", ".cool"),
+    concat!("PI_DESKTOP_PLUGIN", "_MARKET_URL"),
+    concat!("download", "/resolve"),
+];
+
+/// What the removed resolve call derived and sent about this machine.
+const DEVICE_ID_NEEDLES: &[&str] = &[
+    concat!("device", "Id"),
+    concat!("device", "_id"),
+    concat!("machine", "_id"),
+    concat!("IOPlatform", "UUID"),
+    concat!("Machine", "Guid"),
+];
+
+fn rust_sources(path: &Path, out: &mut Vec<PathBuf>) {
+    if path.is_dir() {
+        for entry in fs::read_dir(path).unwrap() {
+            rust_sources(&entry.unwrap().path(), out);
+        }
+    } else if path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
+        out.push(path.to_path_buf());
+    }
+}
+
+fn source_hits(roots: &[PathBuf], needles: &[&str]) -> Vec<String> {
+    let mut files = Vec::new();
+    for root in roots {
+        rust_sources(root, &mut files);
+    }
+    assert!(!files.is_empty());
+    let mut hits = Vec::new();
+    for file in files {
+        let text = fs::read_to_string(&file).unwrap();
+        for needle in needles {
+            if text.contains(needle) {
+                hits.push(format!("{} contains {needle}", file.display()));
+            }
+        }
+    }
+    hits
+}
+
+/// Regression guard for ADR fork-removes-plugin-marketplace: host-core has
+/// no code that can reach a plugin marketplace, and the plugin module derives
+/// no device identifier.
+#[test]
+fn host_core_has_no_plugin_marketplace_client() {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let hits = source_hits(std::slice::from_ref(&src), MARKETPLACE_NEEDLES);
+    assert!(
+        hits.is_empty(),
+        "marketplace client code is back: {hits:#?}"
+    );
+    let hits = source_hits(
+        &[src.join("plugins"), src.join("plugins.rs")],
+        DEVICE_ID_NEEDLES,
+    );
+    assert!(
+        hits.is_empty(),
+        "plugin device identifier is back: {hits:#?}"
+    );
+}
+
+/// Building a manager on a fresh data directory is local-only: it registers
+/// nothing, writes no catalog, and creates no marketplace or device state.
+#[test]
+fn a_new_manager_on_an_empty_data_dir_stays_local() {
+    let dir = tempdir().unwrap();
+    let mgr = PluginManager::new(dir.path());
+    assert!(mgr.list().is_empty());
+    assert!(dir.path().join("plugins/installed").is_dir());
+    assert!(
+        !dir.path().join("plugins/market").exists(),
+        "no marketplace cache directory is created"
+    );
+}
+
+/// A profile from a build that had the marketplace keeps working: the cached
+/// catalog and device file are left untouched, a marketplace-installed plugin
+/// stays registered, and the stale update/withdrawal state is not carried.
+#[test]
+fn legacy_marketplace_state_is_ignored_and_preserved() {
+    let dir = tempdir().unwrap();
+    let market = dir.path().join("plugins/market");
+    fs::create_dir_all(&market).unwrap();
+    let catalog = r#"{"schemaVersion":2,"plugins":[{"id":"acme.todo"}]}"#;
+    fs::write(market.join("catalog.json"), catalog).unwrap();
+    fs::write(market.join("cache-meta.json"), r#"{"sourceUrl":"x"}"#).unwrap();
+    fs::write(market.join("device.json"), r#"{"id":"legacy"}"#).unwrap();
+
+    let installed = dir.path().join("plugins/installed/acme.todo");
+    write_plugin(
+        &installed,
+        json!({
+            "schemaVersion": 1,
+            "id": "acme.todo",
+            "name": "Todo",
+            "version": "1.0.0",
+            "main": "main.js",
+            "permissions": ["ui.panel"],
+        }),
+        &[],
+    );
+    let registry = json!([{
+        "id": "acme.todo",
+        "name": "Todo",
+        "version": "1.0.0",
+        "enabled": true,
+        "source": "marketplace",
+        "status": "ready",
+        "permissions": ["ui.panel"],
+        "path": installed.to_string_lossy(),
+        "marketplace": { "providerId": "official", "shasum": "abc" },
+        "autoUpdate": true,
+        "updateAvailable": {
+            "version": "1.1.0",
+            "shasum": "def",
+            "url": "https://example.invalid/todo.piplug",
+            "permissionDiff": []
+        },
+        "yanked": { "version": "1.0.0", "reason": "old" }
+    }]);
+    fs::write(
+        dir.path().join("plugins/registry.json"),
+        serde_json::to_string(&registry).unwrap(),
+    )
+    .unwrap();
+
+    let mut mgr = PluginManager::new(dir.path());
+    let plugin = mgr.get("acme.todo").expect("marketplace install survives");
+    assert!(plugin.enabled);
+    assert_eq!(plugin.source, "marketplace");
+    assert_eq!(
+        plugin.marketplace.as_ref().map(|m| m.provider_id.as_str()),
+        Some("official")
+    );
+
+    mgr.set_enabled("acme.todo", false).unwrap();
+    let saved = fs::read_to_string(dir.path().join("plugins/registry.json")).unwrap();
+    for stale in ["autoUpdate", "updateAvailable", "yanked"] {
+        assert!(!saved.contains(stale), "{stale} is not written back");
+    }
+
+    assert_eq!(
+        fs::read_to_string(market.join("catalog.json")).unwrap(),
+        catalog
+    );
+    assert!(market.join("cache-meta.json").is_file());
+    assert!(market.join("device.json").is_file());
+}
+
+/// An upgrade from a build that bundled `pi.file-manager` drops its builtin
+/// row without disturbing the plugins this build still ships.
+#[test]
+fn a_previously_bundled_file_manager_is_dropped_on_upgrade() {
+    let old_ship = tempdir().unwrap();
+    for id in ["pi.file-manager", "pi.browser"] {
+        write_plugin(
+            &old_ship.path().join(id),
+            json!({
+                "schemaVersion": 1,
+                "id": id,
+                "name": id,
+                "version": "1.0.0",
+                "main": "main.js",
+                "permissions": ["ui.view"],
+            }),
+            &[],
+        );
+    }
+    let data = tempdir().unwrap();
+    let mut mgr = PluginManager::new(data.path());
+    mgr.sync_builtin(Some(old_ship.path())).unwrap();
+    assert!(mgr.get("pi.file-manager").unwrap().bundled);
+
+    fs::remove_dir_all(old_ship.path().join("pi.file-manager")).unwrap();
+    let mut mgr = PluginManager::new(data.path());
+    mgr.sync_builtin(Some(old_ship.path())).unwrap();
+    assert!(mgr.get("pi.file-manager").is_none());
+    let browser = mgr.get("pi.browser").expect("other bundled plugins stay");
+    assert!(browser.bundled);
+    assert!(browser.enabled);
+}
+
+#[test]
+fn plugin_versions_order_by_semver() {
+    assert_eq!(compare_plugin_versions("0.5.1", "0.5.0"), Ordering::Greater);
+    assert_eq!(
+        compare_plugin_versions("0.5.1", "0.5.1-beta.1"),
+        Ordering::Greater
+    );
+    assert_eq!(compare_plugin_versions("v1.0", "1.0.0"), Ordering::Equal);
 }

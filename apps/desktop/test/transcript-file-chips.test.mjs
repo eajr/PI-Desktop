@@ -55,23 +55,25 @@ test("a file chip is routed by where the reference resolved, never optimisticall
   assert.match(hook, /resolved\.primary &&/);
   assert.match(hook, /isHtmlFilePath\(resolved\.relativePath\)/);
   assert.match(hook, /openUrl\(resolved\.relativePath\)/);
-  // Plain project files prefer the bundled file view. A path:line reference
-  // uses the host file tab because the bundled view has no line-navigation API.
+  // Plain project files prefer a user-installed file view when one is
+  // launchable. No file manager ships with the app, so a click never enables
+  // or reloads one on the user's behalf. A path:line reference uses the host
+  // file tab because the plugin view has no line-navigation API.
   assert.match(hook, /FILE_MANAGER_PLUGIN_TAB/);
   const resolvedRefIndex = hook.indexOf("const resolved = await resolveRef(path, baseDir)");
-  const livePluginViewIndex = hook.indexOf("ensureFileManagerView(workspacePath)", resolvedRefIndex);
+  const livePluginViewIndex = hook.indexOf("fileManagerViewAvailable()", resolvedRefIndex);
   assert.ok(
     livePluginViewIndex > resolvedRefIndex,
-    "actively ensure the bundled file view after async path resolution",
+    "check the file view after async path resolution",
   );
   assert.match(hook, /api\.listPluginViews\(\)/);
-  assert.match(hook, /api\.enablePlugin\(fileManager\.id\)/);
-  assert.match(hook, /api\.reloadPlugin\(fileManager\.id\)/);
-  assert.match(hook, /isActiveInProject\(/);
+  assert.doesNotMatch(hook, /api\.enablePlugin\(/);
+  assert.doesNotMatch(hook, /api\.reloadPlugin\(/);
+  assert.doesNotMatch(hook, /chat\.fileManagerUnavailable/);
   assert.doesNotMatch(hook, /const pluginViews = useAppStore\(\(s\) => s\.pluginViews\)/);
   assert.match(hook, /const hasPosition = line !== undefined \|\| column !== undefined/);
   assert.match(hook, /!hasPosition[\s\S]*?isHtmlFilePath/);
-  assert.match(hook, /!hasPosition[\s\S]*?ensureFileManagerView/);
+  assert.match(hook, /!hasPosition[\s\S]*?fileManagerViewAvailable/);
   assert.match(hook, /fileManagerPluginTab\(resolved\.path\)/);
   assert.match(filesTab, /data-line=\{i \+ 1\}/);
   assert.match(filesTab, /viewerBodyRef\.current\?\.querySelector/);

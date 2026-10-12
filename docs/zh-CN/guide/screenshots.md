@@ -95,11 +95,9 @@ URL、浏览器预览或计划审批工件打开自己的选项卡时出现。�
 
 ## 插件
 
-已安装插件、插件市场和打包流程都在插件页上。
+已安装插件和本地打包流程都在插件页上。
 
 ![已安装的插件](../../public/screenshots/app/zh/plugins-live.webp)
-
-![插件市场](../../public/screenshots/app/zh/plugins-market.webp)
 
 ![插件页菜单](../../public/screenshots/app/zh/plugins-menu.webp)
 

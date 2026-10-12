@@ -1,5 +1,12 @@
 # 15. Plugin Center
 
+> **Status: removed in this build.** PI-Desktop no longer contains a
+> marketplace client. It fetches no catalog, sends no resolve request or device
+> identifier, and downloads no packages over the network. Plugins install only
+> from a local package or folder, or ship bundled. See
+> [ADR fork-removes-plugin-marketplace](../../adr/fork-removes-plugin-marketplace.md).
+> The publishing side below no longer has a client in this build.
+
 > Management repository: [vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)
 > Distribution repository: [vastsa/pi-desktop-plugins](https://github.com/vastsa/pi-desktop-plugins)
 > Decision record: [ADR 0102](../../adr/0102-publisher-owned-plugin-source-and-git-hosted-artifacts.md)

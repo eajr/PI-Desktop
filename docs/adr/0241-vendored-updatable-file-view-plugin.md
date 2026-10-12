@@ -1,6 +1,10 @@
 # ADR 0241: Ship the file view as a vendored, updatable plugin
 
-- Status: Accepted (supersedes ADR 0105; issue #304)
+> Superseded 2026-10-12 by [ADR fork-removes-plugin-marketplace](fork-removes-plugin-marketplace.md):
+> `pi.file-manager` is no longer bundled, and project files open in the host
+> file tab. The text below is historical.
+
+- Status: Superseded by ADR fork-removes-plugin-marketplace (supersedes ADR 0105; issue #304)
 - Date: 2026-09-13
 - Deciders: PI-Desktop core
 - Related: [ADR 0104](0104-plugin-contributed-work-panel-views.md) ·

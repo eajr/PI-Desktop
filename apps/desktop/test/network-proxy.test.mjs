@@ -41,8 +41,9 @@ test("sidecar reconfigures undici without a restart", () => {
   assert.match(nodeProxy, /setGlobalDispatcher/);
 });
 
-test("host-core marketplace curl uses --proxy and Bash does not inherit env", () => {
-  assert.match(hostProxy, /curl_proxy_args/);
-  assert.match(hostProxy, /"--proxy"/);
+test("host-core spawns no curl download and Bash does not inherit env", () => {
+  // The plugin marketplace downloader was the only curl caller (ADR
+  // fork-removes-plugin-marketplace).
+  assert.doesNotMatch(hostProxy, /curl_proxy_args|"--proxy"/);
   assert.match(hostProcess, /stripProxyEnv\(process\.env\)/);
 });

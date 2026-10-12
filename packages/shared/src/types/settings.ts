@@ -108,9 +108,9 @@ export type AppSettings = {
   keybindings?: KeybindingOverrides;
   /** Unlocks the devtools console (settings button, F12, macOS View menu). */
   developerMode?: boolean;
-  /** @deprecated Retained for persisted settings compatibility; the marketplace always uses the official source. */
+  /** @deprecated Retained for persisted settings compatibility; there is no plugin marketplace. */
   pluginMarketSource?: PluginMarketSource;
-  /** @deprecated Retained for persisted settings compatibility and ignored by the marketplace. */
+  /** @deprecated Retained for persisted settings compatibility and ignored. */
   pluginMarketCustomUrl?: string;
   /**
    * Outbound proxy for app-owned HTTP (D340). Absent means System: Chromium

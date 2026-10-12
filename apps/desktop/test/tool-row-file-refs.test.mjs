@@ -187,7 +187,7 @@ function projectMatch(overrides = {}) {
   };
 }
 
-test("a project file a tool surface names opens in the bundled file view", async () => {
+test("a project file a tool surface names opens in an installed file view", async () => {
   reset({ pluginView: true });
   nextMatch = projectMatch();
   await click({ kind: "file", path: "src/dir/a.ts" });
@@ -215,86 +215,29 @@ test("a Windows tool path reaches resolution intact and opens its exact project 
   assert.deepEqual(calls.toasts, []);
 });
 
-test("a project file still falls back when the bundled manager is absent", async () => {
+test("a project file opens on the host file tab when no file view is installed", async () => {
   reset();
-  pluginSummary = { ...pluginSummary, bundled: false };
   nextMatch = projectMatch();
   await click({ kind: "file", path: "src/dir/a.ts" });
   assert.deepEqual(calls.tabs, []);
   assert.equal(calls.files.length, 1);
   assert.equal(calls.files[0][0], "src/dir/a.ts");
-  assert.equal(calls.toasts[0][0], "chat.fileManagerUnavailable:");
-});
-
-test("a project file click enables the bundled file manager before opening it", async () => {
-  reset();
-  pluginSummary = { ...pluginSummary, enabled: false, status: "disabled" };
-  nextMatch = projectMatch();
-  await click({ kind: "file", path: "src/dir/a.ts" });
-  assert.deepEqual(calls.enabled, ["pi.file-manager"]);
-  assert.deepEqual(calls.tabs, [
-    {
-      id: "plugin:pi.file-manager/manager",
-      kind: "plugin",
-      resource: "pi.file-manager/manager",
-      location: "src/dir/a.ts",
-    },
-  ]);
-  assert.deepEqual(calls.files, []);
-});
-
-test("a project file click retries a bundled view missing during startup", async () => {
-  reset();
-  nextMatch = projectMatch();
-  await click({ kind: "file", path: "src/dir/a.ts" });
-  assert.deepEqual(calls.reloaded, ["pi.file-manager"]);
-  assert.equal(calls.tabs[0].resource, "pi.file-manager/manager");
-  assert.deepEqual(calls.files, []);
-});
-
-test("simultaneous file clicks share one bundled view startup", async () => {
-  reset();
-  nextMatch = projectMatch();
-  await clickTwice({ kind: "file", path: "src/dir/a.ts" });
-  assert.deepEqual(calls.reloaded, ["pi.file-manager"]);
-  assert.equal(calls.tabs.length, 2);
-});
-
-test("a project-scoped file manager is not enabled outside its selected projects", async () => {
-  reset();
-  pluginSummary = {
-    ...pluginSummary,
-    enabled: false,
-    status: "disabled",
-    scope: { mode: "projects", projects: ["C:/another-project"] },
-  };
-  nextMatch = projectMatch();
-  await click({ kind: "file", path: "src/dir/a.ts" });
-  assert.deepEqual(calls.enabled, []);
-  assert.equal(calls.files[0][0], "src/dir/a.ts");
-  assert.equal(calls.toasts[0][0], "chat.fileManagerUnavailable:");
-});
-
-test("a missing ui.view grant is not restored by a file click", async () => {
-  reset();
-  pluginSummary = { ...pluginSummary, enabled: false, status: "disabled", permissions: [] };
-  nextMatch = projectMatch();
-  await click({ kind: "file", path: "src/dir/a.ts" });
+  // No file manager ships with the app, so its absence is not an error.
+  assert.deepEqual(calls.toasts, []);
   assert.deepEqual(calls.enabled, []);
   assert.deepEqual(calls.reloaded, []);
-  assert.equal(calls.files[0][0], "src/dir/a.ts");
-  assert.equal(calls.toasts[0][0], "chat.fileManagerUnavailable:");
 });
 
-test("a failed file-manager start reports the fallback and opens the host viewer", async () => {
+test("a file click never enables or reloads a disabled file-manager plugin", async () => {
   reset();
-  pluginSummary = { ...pluginSummary, enabled: false, status: "disabled" };
-  pluginOperationFails = true;
+  pluginSummary = { ...pluginSummary, bundled: false, enabled: false, status: "disabled" };
   nextMatch = projectMatch();
-  await click({ kind: "file", path: "src/dir/a.ts" });
-  assert.deepEqual(calls.enabled, ["pi.file-manager"]);
-  assert.equal(calls.toasts[0][0], "chat.fileManagerUnavailable:");
-  assert.equal(calls.files[0][0], "src/dir/a.ts");
+  await clickTwice({ kind: "file", path: "src/dir/a.ts" });
+  assert.deepEqual(calls.enabled, []);
+  assert.deepEqual(calls.reloaded, []);
+  assert.deepEqual(calls.tabs, []);
+  assert.equal(calls.files.length, 2);
+  assert.deepEqual(calls.toasts, []);
 });
 
 test("a scratch or attachment file a tool surface names opens on the host file tab", async () => {

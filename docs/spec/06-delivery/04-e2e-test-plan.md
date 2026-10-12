@@ -3272,7 +3272,41 @@ identify the platform validation still needed.
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: dispatch roundtrip host->runner->host; in-app JS execution via PluginRuntime)
 
+#### E2E-PLUGIN-no-remote-marketplace: Plugins install locally and nothing is fetched
+
+- **Preconditions**: A fresh profile, and a profile upgraded from a build that
+  had the marketplace. The upgraded profile has a `plugins/market/` directory
+  (cached catalog, `device.json`), a plugin installed from the marketplace, and
+  a bundled `pi.file-manager` registry row.
+- **Steps**:
+  1. Open Extensions while capturing the app's outbound network traffic.
+  2. Install a `.piplug` file through Install package.
+  3. Click a project file reference in chat.
+- **Expected**:
+  - The page lists installed plugins only, with no Marketplace tab, update
+    check, or auto-update control.
+  - No request goes to `plugins.aiuo.net`, `cnb.cool`, or a catalog URL, and
+    no device identifier is derived or sent.
+  - The local install goes through the permission review.
+  - The legacy `plugins/market/` files are left untouched.
+  - The marketplace-installed plugin still loads.
+  - `pi.file-manager` is gone from the list, and `pi.browser` stays bundled.
+  - The file reference opens in the host file tab with no error toast.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`, ADR
+  fork-removes-plugin-marketplace
+- **Acceptance**: G (plugins), Privacy
+- **Status**: Unit-covered (`host-core` tests
+  `host_core_has_no_plugin_marketplace_client`,
+  `legacy_marketplace_state_is_ignored_and_preserved`,
+  `a_previously_bundled_file_manager_is_dropped_on_upgrade`;
+  `apps/desktop/test/extensions-page.test.mjs`,
+  `apps/desktop/test/tool-row-file-refs.test.mjs`). The packaged UI journey
+  with traffic capture is Draft.
+
 #### E2E-024G: Marketplace detail sheet shows README, permissions, versions
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: Official marketplace catalog available.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Open details for `demo.workspace-summary`. 3) Inspect README / risk-grouped permissions / version rows. 4) Pick a version and install after permission review. 5) Dismiss the sheet with Escape and by clicking the scrim.
@@ -3285,6 +3319,9 @@ identify the platform validation still needed.
 
 #### E2E-024F: Refresh the official marketplace catalog
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: Network available to `plugins.aiuo.net`.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Use the header Refresh marketplace action. 3) Confirm the official catalog refreshes and the card grid updates.
 - **Expected**: The marketplace uses `plugins.aiuo.net/catalog.json`; the page has no source selector; the cached official catalog remains available if refresh fails.
@@ -3293,6 +3330,9 @@ identify the platform validation still needed.
 - **Status**: Documented / host-core unit covered
 
 #### E2E-024P: The marketplace ignores legacy source settings
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: Profiles can be seeded with legacy `pluginMarketSource` values `github`, `mirror`, and `custom`, including a custom URL. Network or a local request stub is available for the official catalog.
 - **Steps**: 1) Start the app with each seeded profile. 2) Open Extensions → Marketplace and refresh. 3) Inspect the catalog request. 4) Install a published plugin from the marketplace.
@@ -3326,6 +3366,9 @@ identify the platform validation still needed.
 
 #### E2E-024B: Marketplace install with permission review
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: App running; official market catalog available.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Install `demo.workspace-notes`. 3) Read the risk-tiered permission dialog. 4) Accept high-risk permissions.
 - **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; the review dialog mounts on the viewport overlay host above the expanded sidebar; the host refreshes marketplace metadata immediately before download so a stale UI cache cannot pair an old checksum with a current package; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the installed tab and risk-grouped rows reflect the new plugin without a separate overview card row.
@@ -3334,6 +3377,9 @@ identify the platform validation still needed.
 - **Status**: Documented / host-core covered by unit tests + protocol methods
 
 #### E2E-024R: Install a center-published plugin from the official marketplace
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A `schemaVersion: 2` catalog served from the distribution repository, with one plugin carrying provenance and an approved review verdict, its package under `packages/`. A second fixture declares `artifactBaseUrl` for the mirror/enterprise case.
 - **Steps**: 1) Open a plugin's detail sheet. 2) Read the Source section. 3) Install the selected version through the official resolve path. 4) Repeat with a local resolve stub that returns no source, exercising the official catalog URL fallback and an `artifactBaseUrl` fixture.
@@ -3380,6 +3426,9 @@ identify the platform validation still needed.
 
 #### E2E-024C: Plugin package install and auto-update path
 
+> **Changed in this build:** local package install still applies; the
+> marketplace auto-update half is retired (ADR fork-removes-plugin-marketplace).
+
 - **Preconditions**: Marketplace catalog has a newer version or local `.piplug`.
 - **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Reopen Extensions while the marketplace is slow or unavailable and confirm the Installed surface and Marketplace tab remain usable. 4) Confirm the installed list refreshes update metadata from the local catalog. 5) Run Check for updates, then Apply automatic updates.
 - **Expected**: The Extensions surface does not wait for a remote request during its silent cache-only check; the row moves to Updates available and the update banner reports the count; the highest semantic version is selected even when the catalog version array is not newest-first; the explicit check fetches the current catalog and uses the cached catalog offline; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
@@ -3388,6 +3437,9 @@ identify the platform validation still needed.
 - **Status**: Documented
 
 #### E2E-024Q: Marketplace update diagnosis and release-data gate
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A catalog fixture contains an installed `0.5.0` plugin, a
   `0.5.1` version, and either unsorted version entries or intentionally missing
@@ -3666,6 +3718,9 @@ window; opening a normal panel afterward must still work.
   `plugins-page-style.test.mjs`); visual scenario Draft
 
 #### E2E-024O: Marketplace hides development-only sample plugins
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: App running; the official catalog contains the
   development fixtures `demo.hello` or `demo.workspace-summary` and at least
@@ -9278,6 +9333,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 
 #### E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: A build that ships a bundled plugin whose marketplace entry
   offers a newer version, and a data directory the user can install into.
 - **Steps**:
@@ -13086,9 +13144,12 @@ are withdrawn with ADR 0165.
   (`apps/desktop/test/transcript-file-chips.test.mjs` for the wiring and
   `apps/desktop/test/tool-row-file-refs.test.mjs` for the work-panel entry each
   shape of resolution produces). The isolated Electron renderer journey in
-  `scripts/e2e-file-ref-line-scroll.mjs` verifies a Markdown link enables the
-  File Manager on demand and a positioned reference still opens in the host
-  viewer; the full packaged UI journey remains Draft.
+  `scripts/e2e-file-ref-line-scroll.mjs` verifies a Markdown link opens a
+  user-installed File Manager view without enabling or reloading any plugin,
+  and a positioned reference still opens in the host viewer; the full packaged
+  UI journey remains Draft. No file manager is bundled (ADR
+  fork-removes-plugin-marketplace); without one, a project file opens in the
+  host file tab with no error toast.
 
 #### E2E-CHAT-mp4-attachment-opens-in-system-player
 
@@ -16461,6 +16522,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   unmarked record, and the dropped unknown marker. The end-to-end settings journey
 #### E2E-PLUGIN-official-channel-resolves-through-the-platform: An official-channel install uses platform mirrors when resolve answers promptly
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: A clean profile on the official channel, a plugin present in `plugins.aiuo.net/catalog.json`, and a request log for the platform and both mirror hosts (a local stub may stand in for each).
 - **Steps**: 1) Open Extensions → Marketplace and confirm the catalog loads. 2) Capture the catalog request and verify it used `plugins.aiuo.net`. 3) Install the plugin. 4) Capture the request the platform received. 5) Inspect which mirror served the package. 6) Install a second plugin, then install the same version of the first one again.
 - **Expected**: The marketplace UI has no source selector; exactly one `POST /api/v1/download/resolve` is sent per install or update, with a JSON body carrying `deviceId`, `pluginId`, and the version when one was picked; when resolve answers within three seconds, the package comes from the first entry in `downloads` that answers, and its bytes match the returned `sha256` and `sizeBytes` before anything is extracted; a mirror that is unreachable or fails is abandoned and the next one is used without user interaction; if resolve exceeds its deadline, the install switches to the catalog URL and verifies its catalog digest; reinstalling the same version issues a fresh resolve call rather than reusing the earlier answer, because the response is never cached; the installed plugin passes the ordinary permission review and its record names the official channel as its provider.
@@ -16500,6 +16564,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Draft
 
 #### E2E-PLUGIN-install-progress-shows-phases-and-mirror: An official-channel install reports its phases and the mirror it is using, then completes
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A clean profile on the official channel, a plugin whose resolve answer lists at least two entries, a first mirror that fails or is slow so a second attempt is observable, and a renderer subscribed to `plugin.installProgress`.
 - **Steps**: 1) Start a manual install from the marketplace detail sheet. 2) Record the reports that arrive while it runs. 3) Hover the dialog after the install succeeds. 4) Look at the installed plugin once the install ends. 5) Install again with a large package and count the reports over a window of at least one second.
@@ -17293,12 +17360,12 @@ renderer's durable transcript reads. No real model or provider is contacted.
 #### E2E-262: Transcript path:line opens and scrolls the host file viewer
 
 - **Preconditions:** Isolated Electron/Chromium, an active workspace and session,
-  the bundled file-manager view available, and deterministic filesystem IPC
-  fixtures.
+  a user-installed file-manager view available, and deterministic filesystem
+  IPC fixtures.
 - **Steps:** Render a real transcript `path:line:column` reference followed by
   sentence punctuation; click its verified file chip and wait for the host file
   viewer to load.
-- **Expected:** Despite the bundled file-manager view being available, the
+- **Expected:** Despite the file-manager view being available, the
   positioned reference opens in the host's read-only file tab. The file request
   retains its line and column, and the viewer scrolls the requested line into
   the visible center area. The path and file contents remain the same as the

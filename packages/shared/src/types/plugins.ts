@@ -3,36 +3,19 @@ import type { ActivationScope } from "../activation.js";
 import type { TrustedExtensionDiagnostic } from "../trusted-extensions.js";
 
 /**
- * Legacy persisted marketplace-source values. The application ignores these
- * values and always uses the official plugin center, but the union remains so
+ * Legacy persisted marketplace-source values. This application has no plugin
+ * marketplace (ADR fork-removes-plugin-marketplace); the union remains so
  * existing settings can be read without a schema migration.
  */
 export type PluginMarketSource = "official" | "github" | "mirror" | "custom";
 
-export type PluginUpdateInfo = {
-  version: string;
-  changelog?: string;
-  shasum: string;
-  url: string;
-  permissionDiff?: string[];
-};
-
 /**
- * Trust tier the host is willing to render for a catalog entry.
- *
- * Issued by the plugin center, never asserted by a publisher: the host
- * downgrades a `verified` claim from any source other than the configured
- * official one, and renders an unrecognised tier as `unknown` (ADR 0102).
+ * Trust tier a marketplace install recorded. Read-only: no install writes it
+ * any more (ADR fork-removes-plugin-marketplace).
  */
 export type MarketTrust = "verified" | "community" | "unknown";
 
-/**
- * Source pin recorded for a published version.
- *
- * Evidence for a human decision before install, not an integrity control — it
- * is only as trustworthy as the catalog it came from, and the checksum stays
- * the mechanism that decides whether bytes are accepted.
- */
+/** Source pin a marketplace install recorded for the installed version. */
 export type MarketProvenance = {
   /** Canonical https URL of the publisher's own repository. */
   sourceRepository: string;
@@ -46,20 +29,10 @@ export type MarketProvenance = {
   builtAt?: string;
 };
 
-/** Publish verdict issued by the center's policy evaluator. */
-export type MarketReview = {
-  decision?: string;
-  risk?: string;
-  policyVersion?: string;
-  reviewedAt?: string;
-};
-
-/** Distribution-side withdrawal of the exact version installed here. */
-export type PluginYankNotice = {
-  version: string;
-  reason?: string;
-};
-
+/**
+ * Distribution metadata of a plugin installed from the plugin marketplace an
+ * older build had. Kept so such installs stay readable; nothing writes it.
+ */
 export type PluginMarketplaceMeta = {
   providerId: string;
   shasum?: string;
@@ -329,8 +302,9 @@ export type PluginSummary = {
   source: "builtin" | "installed" | "dev" | "marketplace";
   /**
    * True while this application build ships the plugin from
-   * `resources/plugins`. A bundled plugin cannot be uninstalled, but it can be
-   * updated, and this flag follows that update (ADR 0241).
+   * `resources/plugins`. A bundled plugin cannot be uninstalled, but the user
+   * can install their own copy over it, and this flag follows that copy
+   * (ADR 0241).
    */
   bundled?: boolean;
   status: "ready" | "error" | "disabled" | "load_error";
@@ -350,14 +324,6 @@ export type PluginSummary = {
   installedAt?: string;
   updatedAt?: string;
   marketplace?: PluginMarketplaceMeta;
-  autoUpdate?: boolean;
-  updateAvailable?: PluginUpdateInfo;
-  /**
-   * Set when the catalog withdrew the exact version installed here. The host
-   * surfaces it and leaves the plugin running; withdrawal is a distribution
-   * signal, not consent to disable working software.
-   */
-  yanked?: PluginYankNotice;
   ui?: PluginUiMeta;
   /** Declared file scope, so the page can show it next to the permissions. */
   fs?: PluginFsPolicy;
@@ -410,30 +376,8 @@ export type PluginWorkspaceInfo = {
   roots?: PluginWorkspaceRoot[];
 };
 
-/** One mirror an install tried, and what it answered. */
-export type PluginInstallMirror = {
-  source: string;
-  url: string;
-  error?: string | null;
-};
-
-/**
- * What an install is doing, reported while it runs.
- *
- * The install is a single request, so without these the interface has nothing
- * to show between the click and the answer. `error` is set on the report that
- * ends a failed install; `receivedBytes`/`totalBytes` are a progress pair and
- * `totalBytes` is 0 when nothing announced a size.
- */
-export type PluginInstallProgress = {
-  pluginId: string;
-  version: string;
-  phase: "resolve" | "download" | "verify" | "install" | "enable";
-  source?: string | null;
-  attempt?: number;
-  attempts?: number;
-  receivedBytes?: number;
-  totalBytes?: number;
-  tried?: PluginInstallMirror[];
-  error?: string | null;
+export type PluginInstallResult = {
+  plugin: PluginSummary;
+  upgraded: boolean;
+  permissionDiff: string[];
 };

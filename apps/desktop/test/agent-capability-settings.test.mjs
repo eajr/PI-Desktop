@@ -31,11 +31,11 @@ const styles = await loadStyles();
 
 // Keep this suite source-oriented like the neighboring desktop contracts: it
 // catches IA regressions without requiring an Electron window or a native picker.
-test("agent settings have three independent destinations and extensions have two tabs", () => {
+test("agent settings have three independent destinations and plugins have no tabs", () => {
   assert.match(settingsPage, /tab === "skills" && <AgentSkillsPage \/>/);
   assert.match(settingsPage, /tab === "mcp" && <AgentMcpPage \/>/);
   assert.match(settingsPage, /tab === "subagents" && <AgentSubagentsPage \/>/);
-  assert.match(pluginsPage, /type TabId = "installed" \| "market"/);
+  assert.doesNotMatch(pluginsPage, /role="tablist"|type TabId/);
   assert.doesNotMatch(pluginsPage, /plugins-(?:tab|panel)-(?:mcp|skills|subagents)/);
 });
 

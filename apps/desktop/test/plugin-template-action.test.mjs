@@ -94,7 +94,7 @@ test("the renderer template list mirrors the devkit catalogue", () => {
 });
 
 test("the template action is reachable from the menu and the empty state", () => {
-  assert.match(pageSrc, /\{ key: "installPackage", run: installPackage \}/);
+  assert.match(pageSrc, /onClick=\{\(\) => void installPackage\(\)\}/);
   assert.match(pageSrc, /key: "newFromTemplate"/);
   assert.match(pageSrc, /onClick=\{\(\) => setTemplatePick\(TEMPLATE_IDS\[0\]\)\}/);
   for (const key of [
@@ -114,7 +114,7 @@ test("the template action is reachable from the menu and the empty state", () =>
 test("the scaffolded folder is opened as the project", () => {
   const create = pageSrc.slice(
     pageSrc.indexOf("const createFromTemplate ="),
-    pageSrc.indexOf("const checkUpdates ="),
+    pageSrc.indexOf("const overflowActions ="),
   );
   // Opening the folder is independent of the grant: the sources land in the
   // workspace whether the review is accepted or dismissed.
@@ -139,7 +139,7 @@ test("the scaffolded folder is opened as the project", () => {
 test("a canceled folder picker is not reported as a success", () => {
   const create = pageSrc.slice(
     pageSrc.indexOf("const createFromTemplate ="),
-    pageSrc.indexOf("const checkUpdates ="),
+    pageSrc.indexOf("const overflowActions ="),
   );
   assert.ok(
     create.indexOf("if (created.canceled) return;") <

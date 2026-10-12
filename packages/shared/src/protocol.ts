@@ -296,7 +296,6 @@ export const IPC = {
     pluginDisable: "pi-desktop/plugin/disable",
     pluginSetScope: "pi-desktop/plugin/setScope",
     pluginUninstall: "pi-desktop/plugin/uninstall",
-    pluginSetAutoUpdate: "pi-desktop/plugin/setAutoUpdate",
     pluginSettingsGet: "pi-desktop/plugin/settings/get",
     pluginSettingsSet: "pi-desktop/plugin/settings/set",
     pluginOpenPanel: "pi-desktop/plugin/openPanel",
@@ -351,13 +350,6 @@ export const IPC = {
     subagentSetScope: "pi-desktop/subagent/setScope",
     subagentSetBuiltinEnabled: "pi-desktop/subagent/setBuiltinEnabled",
     subagentReveal: "pi-desktop/subagent/reveal",
-    marketRefresh: "pi-desktop/market/refresh",
-    marketSearch: "pi-desktop/market/search",
-    marketGetDetail: "pi-desktop/market/getDetail",
-    marketInstall: "pi-desktop/market/install",
-    marketCheckUpdates: "pi-desktop/market/checkUpdates",
-    marketApplyUpdates: "pi-desktop/market/applyUpdates",
-    marketCancelInstall: "pi-desktop/market/cancelInstall",
     commandPaletteSearch: "pi-desktop/commandPalette/search",
     commandPaletteExecute: "pi-desktop/commandPalette/execute",
     logOpenFolder: "pi-desktop/log/openFolder",
@@ -397,8 +389,6 @@ export const IPC = {
   },
   event: {
     pluginChanged: "pi-desktop/event/pluginChanged",
-    /** Progress of an install or update, while it is still running. */
-    pluginInstallProgress: "pi-desktop/plugin/event/installProgress",
     /** Host-originated app settings mutation (e.g. plugin `app.setTheme`). */
     settingsChanged: "pi-desktop/app/event/settingsChanged",
     configSyncChanged: "pi-desktop/configSync/event/changed",

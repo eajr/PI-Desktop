@@ -1,5 +1,4 @@
 import {
-  readMainModuleSync,
   readPluginsSourceSync,
   readStoreModuleSync,
   readMainSourceSync,
@@ -26,13 +25,10 @@ const panelSrc = readFileSync(join(desktopRoot, "electron/main/plugin-panel-host
 const mainSrc = readMainSourceSync();
 const pageSrc = readPluginsSourceSync();
 const protocolSrc = readFileSync(join(repoRoot, "packages/shared/src/protocol.ts"), "utf8");
-const marketIpcSrc = readMainModuleSync("ipc/market-ipc.ts");
 const catalogSliceSrc = readStoreModuleSync("slices/catalog-slice.ts");
 const registrySrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/registry.rs"), "utf8");
-const marketplaceSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/marketplace.rs"), "utf8");
 const validationSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/validation.rs"), "utf8");
 const installSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/install.rs"), "utf8");
-const modelSrc = readFileSync(join(repoRoot, "crates/host-core/src/plugins/model.rs"), "utf8");
 
 test("plugin runtime exposes gated high-risk host APIs", () => {
   for (const token of [
@@ -133,135 +129,50 @@ test("plugin panels use sandboxed isolated host windows", () => {
   assert.match(runtimeSrc, /desktop\.invoke/);
 });
 
-test("plugins page includes marketplace install and auto-update controls", () => {
-  assert.match(pageSrc, /tabMarket/);
-  assert.match(pageSrc, /marketInstall/);
-  assert.match(pageSrc, /applyAutoUpdates|marketApplyUpdates|checkUpdates/);
+// This build has no remote plugin marketplace (ADR
+// fork-removes-plugin-marketplace): plugins arrive bundled, from a local
+// package, or from a development folder, and nothing is fetched to find,
+// install, or update one.
+test("plugins page offers local installs and no marketplace", () => {
+  assert.match(pageSrc, /api\.installPluginFromPackage\(\)/);
   assert.match(pageSrc, /permissionReview|grantedPermissions/);
+  assert.doesNotMatch(
+    pageSrc,
+    /api\.market[A-Z]|tabMarket|applyAutoUpdates|checkUpdates|setPluginAutoUpdate|onPluginInstallProgress/,
+  );
 });
 
-test("plugins page refreshes installed update metadata when it opens", () => {
-  assert.match(pageSrc, /useEffect\(\(\) => \{[\s\S]*api\.marketCheckUpdates\(false\)[\s\S]*refreshPlugins\(\)/);
-  assert.match(
-    marketIpcSrc,
-    /IPC\.invoke\.marketCheckUpdates[\s\S]*refreshRemote: payload\?\.refreshRemote \?\? true/,
-  );
+test("the installed-plugin refresh is shared, not duplicated", () => {
   assert.match(
     catalogSliceSrc,
     /const existing = catalogRuntime\.getPluginRefresh\(\);\s*if \(existing\) return existing/,
   );
 });
 
-test("shared protocol declares marketplace and package install IPC", () => {
+test("shared protocol declares package install IPC and no marketplace IPC", () => {
+  for (const channel of ["pluginInstallFromPackage", "pluginOpenPanel"]) {
+    assert.match(protocolSrc, new RegExp(channel));
+  }
   for (const channel of [
-    "pluginInstallFromPackage",
     "marketSearch",
+    "marketGetDetail",
     "marketInstall",
+    "marketCancelInstall",
     "marketCheckUpdates",
     "marketApplyUpdates",
     "marketRefresh",
-    "pluginOpenPanel",
     "pluginSetAutoUpdate",
+    "pluginInstallProgress",
   ]) {
-    assert.match(protocolSrc, new RegExp(channel));
+    assert.doesNotMatch(protocolSrc, new RegExp(`\\b${channel}\\b`));
   }
 });
 
-
-test("plugins page can refresh the official marketplace repository", () => {
-  assert.match(pageSrc, /marketRefresh|refreshMarket|refreshRemote/);
-  assert.doesNotMatch(pageSrc, /MarketplaceSourceSettings|marketSource/);
-});
-
-
-test("marketplace detail pane renders readme changelog and versions", () => {
-  assert.match(pageSrc, /marketGetDetail/);
-  assert.match(pageSrc, /viewDetails|detailTitle|readmeMarkdown|versions/);
-  assert.match(pageSrc, /installVersion|selectedVersion|changelog/);
-});
-
-// A publisher can list a version before uploading its package. The host then
-// refuses the download, so the UI must not offer an install that can only end
-// in PLUGIN_MARKET_INVALID.
-test("marketplace blocks install for a version with no published package", () => {
-  assert.match(pageSrc, /function versionInstallable\(/);
-  assert.match(pageSrc, /const packagePending = item\.installable === false/);
-  assert.match(pageSrc, /disabled=\{busyId === item\.id \|\| packagePending\}/);
-  assert.match(pageSrc, /disabled=\{busyId === detail\.id \|\| detailPackagePending\}/);
-  assert.match(pageSrc, /t\("plugins\.packagePending"\)/);
-  assert.match(pageSrc, /t\("plugins\.packagePendingHint", \{/);
-
-  const hostSrc = marketplaceSrc;
-  assert.match(hostSrc, /fn has_package_metadata\(version: &MarketVersion\) -> bool/);
-  // `installable` is the single answer every install affordance reads, so it
-  // has to cover every reason the host would refuse the download: no package
-  // yet, a host too old for the version, or a package URL off the allowlist.
-  assert.match(hostSrc, /installable: latest_version\s*\n\s*\.map\(\|version\| \{/);
-  assert.match(hostSrc, /has_package_metadata\(version\)\s*\n\s*&& host_supports_version\(version\)/);
-  assert.match(hostSrc, /package_host_allowed\(&version\.url, &catalog_url\)\.is_ok\(\)/);
-  for (const catalog of Object.values(catalogs)) {
-    assert.equal(typeof catalog.plugins.packagePending, "string");
-    assert.equal(typeof catalog.plugins.packagePendingHint, "string");
-  }
-});
-
-// Plugin source now lives in publisher repositories, so a package URL is no
-// longer guaranteed to sit under one repository the project controls. The
-// download boundary is what keeps a catalog entry from aiming a request
-// anywhere it likes.
-test("marketplace package downloads stay inside the host allowlist", () => {
+test("host-core plugin install has no network download path", () => {
   const hostSrc = validationSrc + "\n" + installSrc;
-  assert.match(
-    hostSrc,
-    /const PACKAGE_HOST_ALLOWLIST: &\[&str\] = &\["github\.com", "githubusercontent\.com", "cnb\.cool"\]/,
-  );
-  assert.match(hostSrc, /fn package_host_allowed\(package_url: &str, catalog_url: &str\) -> Result<\(\)>/);
-  // Refuse before the request leaves the machine, then hold the redirect
-  // chain to the same rule: a release asset always redirects. Every package
-  // URL passes through this one path, whichever channel named it — the
-  // official channel's mirror list included.
-  assert.match(hostSrc, /package_host_allowed\(url, &catalog_url\)\?;/);
-  // The observed downloader is the same boundary: it refuses an off-allowlist
-  // host before the request and re-checks the effective URL after redirects.
-  assert.match(
-    hostSrc,
-    /download_url_observed\(\s*url,\s*Some\(&catalog_url\),\s*expected_size,\s*report\)/,
-  );
-  assert.match(hostSrc, /"--proto-redir"\.into\(\)/);
-  assert.match(hostSrc, /"%\{url_effective\}"\.into\(\)/);
-  assert.match(hostSrc, /must not embed credentials/);
-});
-
-// A withdrawn version is a distribution signal, not permission to disable
-// software somebody is relying on.
-test("a withdrawn version is never offered and never silently disabled", () => {
-  const hostSrc = marketplaceSrc + "\n" + modelSrc;
-  assert.match(hostSrc, /\.filter\(\|version\| !version\.yanked\)/);
-  assert.match(hostSrc, /PLUGIN_MARKET_YANKED/);
-  assert.match(hostSrc, /PLUGIN_HOST_TOO_OLD/);
-  assert.match(hostSrc, /pub struct PluginYankNotice/);
-
-  assert.match(pageSrc, /function versionWithdrawn\(/);
-  assert.match(pageSrc, /const detailWithdrawn = versionWithdrawn\(activeVersion\)/);
-  assert.match(pageSrc, /t\("plugins\.withdrawnHint", \{ version: installTarget \}\)/);
-  for (const catalog of Object.values(catalogs)) {
-    assert.equal(typeof catalog.plugins.withdrawn, "string");
-    assert.equal(typeof catalog.plugins.withdrawnHint, "string");
-    assert.equal(typeof catalog.plugins.withdrawnReason, "string");
-  }
-});
-
-// The verified shield is a claim about a publisher, so it must come from the
-// center rather than from text a publisher can write.
-test("verified trust is not something a catalog entry can grant itself", () => {
-  const hostSrc = marketplaceSrc;
-  assert.match(hostSrc, /fn resolve_trust\(&self, entry: &MarketCatalogEntry\) -> String/);
-  assert.match(hostSrc, /"verified" if self\.is_trusted_channel\(\) => "verified"/);
-  assert.match(hostSrc, /"verified" => "community"/);
-
-  assert.match(pageSrc, /function showsVerifiedBadge\(/);
-  assert.match(pageSrc, /\{showsVerifiedBadge\(item\) \?/);
-  assert.match(pageSrc, /\{showsVerifiedBadge\(detail\) \?/);
+  assert.doesNotMatch(hostSrc, /PACKAGE_HOST_ALLOWLIST|package_host_allowed|download_url/);
+  assert.doesNotMatch(hostSrc, /Command::new\("curl"\)|TcpStream/);
+  assert.match(installSrc, /pub fn install_from_path\(/);
 });
 
 test("PERMISSION_RISK mirrors every permission tier in the permissions matrix (#1480)", () => {

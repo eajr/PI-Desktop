@@ -17,7 +17,7 @@
 | [04-plugin-security.md](/zh-CN/spec/07-plugins/04-plugin-security) | 插件安全 |
 | [05-plugin-lifecycle.md](/zh-CN/spec/07-plugins/05-plugin-lifecycle) | 生命周期 |
 | [06-plugin-packaging.md](/zh-CN/spec/07-plugins/06-plugin-packaging) | 包装及安装 |
-| [07-plugin-marketplace.md](/zh-CN/spec/07-plugins/07-plugin-marketplace) | 插件市场 |
+| [07-plugin-marketplace.md](/zh-CN/spec/07-plugins/07-plugin-marketplace) | 插件市场（本构建已移除） |
 | [08-plugin-signing-updates.md](/zh-CN/spec/07-plugins/08-plugin-signing-updates) | 签名和更新 |
 | [09-plugin-command-palette.md](/zh-CN/spec/07-plugins/09-plugin-command-palette) | 命令面板 |
 | [10-plugin-devex.md](/zh-CN/spec/07-plugins/10-plugin-devex) | 开发者经验 |

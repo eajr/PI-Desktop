@@ -159,99 +159,10 @@ pub fn parse_proxy_url(raw: &str) -> Result<String, String> {
     Ok(trimmed.to_string())
 }
 
-/// Extra curl arguments so marketplace downloads honor the selected route
-/// without mutating host-core process env (Bash must not inherit credentials).
-pub fn curl_proxy_args() -> Vec<String> {
-    let mode = MARKET_PROXY
-        .read()
-        .map(|guard| guard.clone())
-        .unwrap_or_default();
-    match mode {
-        ProxyMode::System => SYSTEM_PROXY_RELAY
-            .read()
-            .ok()
-            .and_then(|guard| guard.clone())
-            .map(|url| vec!["--proxy".into(), url.replacen("socks5://", "socks5h://", 1)])
-            .unwrap_or_default(),
-        ProxyMode::Direct => vec!["--noproxy".into(), "*".into()],
-        ProxyMode::Custom { url, bypass } => {
-            let noproxy = bypass
-                .split(',')
-                .map(str::trim)
-                .filter(|part| !part.is_empty() && *part != "<local>")
-                .collect::<Vec<_>>()
-                .join(",");
-            let mut args = vec!["--proxy".into(), url];
-            if !noproxy.is_empty() {
-                args.push("--noproxy".into());
-                args.push(noproxy);
-            }
-            args
-        }
-    }
-}
-
-/// Keep Windows Schannel downloads working when a revocation distribution
-/// point is offline, while retaining normal certificate verification. Older
-/// curl versions used best-effort revocation checks by default; newer ones
-/// expose this flag explicitly.
-#[cfg(windows)]
-pub(crate) fn curl_tls_args() -> Vec<String> {
-    let (version, help) = curl_version_and_help();
-    curl_tls_args_for(&version, &help)
-}
-
-#[cfg(not(windows))]
-pub(crate) fn curl_tls_args() -> Vec<String> {
-    Vec::new()
-}
-
-#[cfg(any(windows, test))]
-fn curl_tls_args_for(version: &[u8], help: &[u8]) -> Vec<String> {
-    let version = String::from_utf8_lossy(version).to_ascii_lowercase();
-    let option = b"--ssl-revoke-best-effort";
-    let supported = help.windows(option.len()).any(|window| window == option);
-    if version.contains("schannel") && supported {
-        vec![String::from_utf8_lossy(option).into_owned()]
-    } else {
-        Vec::new()
-    }
-}
-
-#[cfg(windows)]
-fn curl_version_and_help() -> (Vec<u8>, Vec<u8>) {
-    use std::process::Command;
-    use std::sync::OnceLock;
-
-    static CURL_TLS_ARGS: OnceLock<(Vec<u8>, Vec<u8>)> = OnceLock::new();
-    CURL_TLS_ARGS
-        .get_or_init(|| {
-            let version = Command::new("curl")
-                .arg("--version")
-                .output()
-                .ok()
-                .filter(|output| output.status.success())
-                .map(|output| output.stdout)
-                .unwrap_or_default();
-            let help = Command::new("curl")
-                .args(["--help", "all"])
-                .output()
-                .ok()
-                .filter(|output| output.status.success())
-                .map(|output| output.stdout)
-                .unwrap_or_default();
-            (version, help)
-        })
-        .clone()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
-    use std::sync::Mutex;
-
-    static TEST_STATE_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn parse_accepts_http_and_socks5() {
@@ -279,31 +190,7 @@ mod tests {
     }
 
     #[test]
-    fn curl_args_follow_applied_settings() {
-        let _guard = TEST_STATE_LOCK.lock().unwrap();
-        apply_from_settings(Some(&json!({
-            "networkProxy": { "mode": "custom", "url": "socks5://127.0.0.1:1080" }
-        })));
-        let args = curl_proxy_args();
-        assert_eq!(args[0], "--proxy");
-        assert_eq!(args[1], "socks5://127.0.0.1:1080");
-        assert!(args.contains(&"--noproxy".to_string()));
-
-        apply_from_settings(Some(&json!({
-            "networkProxy": { "mode": "direct" }
-        })));
-        assert_eq!(curl_proxy_args(), vec!["--noproxy", "*"]);
-
-        apply_from_settings(Some(&json!({})));
-        assert!(curl_proxy_args().is_empty());
-    }
-
-    #[test]
-    fn system_relay_requires_authenticated_loopback_and_routes_curl() {
-        let _guard = TEST_STATE_LOCK.lock().unwrap();
-        let token = "a".repeat(64);
-        let relay_url = format!("socks5://system-auto:{token}@127.0.0.1:43210");
-
+    fn system_relay_requires_authenticated_loopback() {
         for invalid in [
             "socks5://system-http:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@127.0.0.1:43210",
             "socks5://system-auto:short@127.0.0.1:43210",
@@ -312,31 +199,5 @@ mod tests {
         ] {
             assert!(set_system_proxy_relay(invalid).is_err());
         }
-
-        set_system_proxy_relay(&relay_url).unwrap();
-        apply_from_settings(Some(&json!({})));
-        let args = curl_proxy_args();
-        if let Ok(mut relay) = SYSTEM_PROXY_RELAY.write() {
-            *relay = None;
-        }
-
-        assert_eq!(
-            args,
-            vec![
-                "--proxy".to_string(),
-                format!("socks5h://system-auto:{token}@127.0.0.1:43210")
-            ]
-        );
-    }
-
-    #[test]
-    fn curl_tls_args_only_use_supported_schannel_best_effort_revocation() {
-        let option = b"--ssl-revoke-best-effort";
-        assert_eq!(
-            curl_tls_args_for(b"curl 8.13.0 Schannel", option),
-            vec!["--ssl-revoke-best-effort"]
-        );
-        assert!(curl_tls_args_for(b"curl 8.13.0 OpenSSL", option).is_empty());
-        assert!(curl_tls_args_for(b"curl 7.55.1 Schannel", b"--ssl-no-revoke").is_empty());
     }
 }

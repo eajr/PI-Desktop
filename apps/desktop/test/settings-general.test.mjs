@@ -486,13 +486,12 @@ test("settings rail uses short parallel labels and descriptive page titles", () 
   assert.match(settingsPageSource, /titleKey: entry\.titleKey/);
 });
 
-test("Plugins marketplace keeps official refresh without source settings", () => {
+test("Plugins page has no marketplace and no marketplace source settings", () => {
   assert.doesNotMatch(
     pluginsPageSource,
     /MarketplaceSourceSettings|pluginMarketSource|pluginMarketCustomUrl|marketProvider|marketCustomUrl|marketSource/,
   );
-  assert.match(pluginsPageSource, /api\.marketRefresh\(true\)/);
-  assert.match(pluginsPageSource, /refreshMarket\(query, \{ refreshRemote: true \}\)/);
+  assert.doesNotMatch(pluginsPageSource, /api\.market[A-Z]|refreshMarket/);
   assert.doesNotMatch(settingsPageSource, /ExtensionMarketSection/);
   assert.doesNotMatch(settingsPageSource, /tab === "extensions"/);
 });

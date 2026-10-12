@@ -17,14 +17,11 @@ const resolveRefs: string[] = [];
 const readPaths: string[] = [];
 const scrollCalls: Array<{ line: string | undefined; block?: string }> = [];
 const pluginEnableCalls: string[] = [];
-let pluginViews: Array<{ pluginId: string; viewId: string }> = [];
-let fileManagerPlugin = {
-  id: "pi.file-manager",
-  bundled: true,
-  enabled: false,
-  permissions: ["ui.view"],
-  scope: { mode: "global", projects: [] as string[] },
-};
+// A file manager the user installed and enabled themselves: the app ships
+// none, and a click must never enable one on the user's behalf.
+const pluginViews: Array<{ pluginId: string; viewId: string }> = [
+  { pluginId: "pi.file-manager", viewId: "manager" },
+];
 
 window.piDesktop = {
   platform: "darwin",
@@ -52,14 +49,8 @@ window.piDesktop = {
     if (channel === IPC.invoke.pluginViews) {
       return { ok: true, data: pluginViews };
     }
-    if (channel === IPC.invoke.pluginList) {
-      return { ok: true, data: { plugins: [fileManagerPlugin] } };
-    }
-    if (channel === IPC.invoke.pluginEnable) {
-      const pluginId = String(args[0] ?? "");
-      pluginEnableCalls.push(pluginId);
-      fileManagerPlugin = { ...fileManagerPlugin, enabled: true };
-      pluginViews = [{ pluginId, viewId: "manager" }];
+    if (channel === IPC.invoke.pluginEnable || channel === IPC.invoke.pluginReload) {
+      pluginEnableCalls.push(String(args[0] ?? ""));
       return { ok: true, data: undefined };
     }
     if (channel === IPC.invoke.fsList) {
@@ -136,15 +127,14 @@ void i18n
       markdownLink.click();
       const managerStarted = await until(
         () =>
-          pluginEnableCalls.length === 1 &&
           useAppStore.getState().workPanelTabs.some(
             (tab) => tab.id === "plugin:pi.file-manager/manager",
           ),
-        "on-demand File Manager tab",
+        "installed File Manager tab",
       );
       if (!managerStarted) {
         throw new Error(
-          `Markdown click did not start the File Manager: ${JSON.stringify({
+          `Markdown click did not open the File Manager: ${JSON.stringify({
             pluginEnableCalls,
             workPanelTabs: useAppStore.getState().workPanelTabs,
           })}`,
