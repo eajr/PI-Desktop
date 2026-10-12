@@ -27,6 +27,7 @@ Each ADR includes:
 | composer-mcp-invocations | [Composer MCP Invocations](composer-mcp-invocations.md) | Accepted |
 | chronological-system-transcript | [Preserve chronological model system state](chronological-system-transcript.md) | Accepted |
 | mcp-tool-approval-risk | [User MCP tools keep the normal approval path](mcp-tool-approval-risk.md) | Accepted |
+| jev-classify-permission-gate | [JevClassify passes the host-core permission gate](jev-classify-permission-gate.md) | Accepted |
 | models-dev-catalog-authority | [models.dev owns published model metadata](models-dev-catalog-authority.md) | Accepted for implementation |
 | pi-ai-core-0991-authority | [Pi 0.99.1 account model authority](pi-ai-core-0991-authority.md) | Superseded for chat model metadata |
 | plan-tool-declarations-and-execution-denials | [Keep known tool declarations while denying contract-mode execution](plan-tool-declarations-and-execution-denials.md) | Accepted for implementation |

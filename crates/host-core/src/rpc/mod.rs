@@ -1,4 +1,6 @@
 mod config_sync_rpc;
+#[cfg(test)]
+mod egress_gate_tests;
 mod remote_tools;
 mod scheduled_rpc;
 mod scheduled_tools;
@@ -3796,6 +3798,7 @@ async fn handle_request(
             // an approval wait as well as an already-spawned process.
             let cancellation_receiver = if remote_workspace.is_some()
                 || matches!(p.tool_name.as_str(), "Bash" | "GenerateImages")
+                || crate::permissions::egress::is_third_party_egress_tool(&p.tool_name)
             {
                 let mut st = state.lock().await;
                 match st.register_bash_cancellation(&p.session_id, &p.tool_call_id) {
@@ -3928,8 +3931,12 @@ async fn handle_request(
                             command_shell_id.clone(),
                         )
                     } else {
+                        let egress_reason =
+                            crate::permissions::egress::permission_reason(&p.tool_name);
                         let reason = if external_path_permission {
                             "Accesses a path outside the session workspace"
+                        } else if let Some(reason) = egress_reason.as_deref() {
+                            reason
                         } else {
                             match p.tool_name.as_str() {
                                 "Write" | "Edit" => "Modifies files in your workspace",
@@ -3948,7 +3955,11 @@ async fn handle_request(
                                 session_id: &p.session_id,
                                 tool_call_id: &p.tool_call_id,
                                 tool_name: &p.tool_name,
-                                args_preview: p.args.clone(),
+                                args_preview: crate::permissions::egress::permission_preview(
+                                    &p.tool_name,
+                                    &p.args,
+                                )
+                                .unwrap_or_else(|| p.args.clone()),
                                 reason,
                                 declared_risk: p.declared_risk.as_deref(),
                                 command_shell_id: command_shell_id.as_deref(),

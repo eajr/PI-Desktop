@@ -4,6 +4,8 @@ use uuid::Uuid;
 
 use crate::db::{ms_to_ts, now_ms};
 
+pub mod egress;
+
 /// Longest string leaf kept in a permission request's args preview. Full args
 /// (e.g. a Write's whole file content) would otherwise cross every stdio/IPC
 /// hop and stall the renderer right as the dialog opens.
@@ -121,6 +123,8 @@ impl PermissionManager {
         match tool_name {
             "Read" | "Glob" | "Grep" | "ScheduledTaskList" | "TodoWrite" => Risk::Low,
             "Write" | "Edit" | "Bash" | "GenerateImages" => Risk::High,
+            // Third-party egress: the payload leaves the machine.
+            name if egress::is_third_party_egress_tool(name) => Risk::High,
             name if name.starts_with("plugin_") => match declared {
                 Some("low") => Risk::Low,
                 Some("high") => Risk::High,
