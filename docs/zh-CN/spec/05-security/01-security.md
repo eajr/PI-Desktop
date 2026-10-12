@@ -50,9 +50,29 @@
   图像元素在 SVG 到达 DOM 之前被删除。无效或
   过大的输入无法关闭转义源文本。
 
+### 打包二进制加固（ADR electron-fuses-and-packaged-code-paths）
+
+- electron-builder 显式设置全部 Electron 熔断器（`build.electronFuses`）：
+  - **开启：** Cookie 加密、内嵌 `app.asar` 完整性校验（macOS / Windows）、
+    `onlyLoadAppFromAsar`。
+  - **关闭：** 主进程 `--inspect`。
+  - **暂保持开启：**
+    - `runAsNode`：sidecar 依赖它（D008）。
+    - `NODE_OPTIONS`：关闭会同时丢弃 `NODE_EXTRA_CA_CERTS`。
+    - `grantFileProtocolExtraPrivileges`：渲染器经 `file://` 加载模块脚本。
+- macOS entitlements 仅保留 `allow-jit`、`disable-library-validation`、
+  `device.audio-input`，不再授予 `allow-unsigned-executable-memory`。
+- 打包版只从 `process.resourcesPath` 解析 host-core 与内置插件目录。
+  `PI_DESKTOP_HOST_BIN` 与继承的 `PI_DESKTOP_BUILTIN_PLUGINS_DIR` 仅在未打包时
+  生效。`PI_DESKTOP_DATA_DIR` 不变。
+- 残余风险：本地进程仍可借 `ELECTRON_RUN_AS_NODE` / `NODE_OPTIONS` 启动已签名
+  二进制。
+
 ### 未来强化（跟踪、MVP 后）
 
-- 封装时 Electron 熔断器（`runAsNode`、`nodeCliInspect` 关闭）
+- sidecar 不再依赖 `ELECTRON_RUN_AS_NODE` 后，关闭 `runAsNode` 与
+  `NODE_OPTIONS` 熔断器
+- 渲染器改由自定义协议提供后，关闭 `grantFileProtocolExtraPrivileges`
 - 自动安全 e2e 中的 `webSecurity` 断言
 
 远程控制的安全边界是独立的 MVP 后规格：见
@@ -218,6 +238,7 @@ MCP 市场只接受无凭据的公网 HTTPS 源和目录端点。Main 在每一�
 | 渲染器中的恶意网页内容 | 无 Node、沙箱、导航锁、CSP |
 | 即时注入破坏性工具的使用 | 主机拥有的持久模式策略、权限确认、路径边界、秘密隔离 |
 | 依赖性中毒 | 锁定文件、几个 dep、本机模块审查 |
+| 本地恶意软件替换应用代码或可执行文件 | asar 完整性 + `onlyLoadAppFromAsar`，打包版忽略可执行路径环境变量；`RunAsNode` 仍开启（ADR electron-fuses-and-packaged-code-paths） |
 | 恶意本地插件 | 声明的权限、无秘密访问、MVP 后跟踪的进程隔离 (ADR 0008) |
 | 技能市场 SSRF（用户源 URL） | 主进程公网 HTTPS 分类器 + DNS + 逐跳 redirect；渲染层 CSP 禁止该 fetch（ADR 0243） |
 

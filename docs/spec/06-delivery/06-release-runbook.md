@@ -60,8 +60,9 @@ when macOS `iconutil` is available, without overwriting the canonical source.
 ## 3. What the build ships
 
 - Electron app with hardened runtime + entitlements
-  (`build/entitlements.mac.plist`: V8 JIT, unsigned-executable-memory,
-  library-validation disable for Electron helpers and plugin native addons,
+  (`build/entitlements.mac.plist`: V8 JIT, library-validation disable for
+  native addons that user-installed pi packages and plugins load into the
+  sidecar and plugin hosts,
   and microphone input for plugin capture after user grant — ADR 0257), plus
   `NSLocalNetworkUsageDescription` and `NSMicrophoneUsageDescription` in
   Info.plist (via `apps/desktop/package.json` → `mac.extendInfo`). The local
@@ -70,6 +71,10 @@ when macOS `iconutil` is available, without overwriting the canonical source.
   agent sidecar — without it, LAN provider requests from the sidecar fail with
   `EHOSTUNREACH` even though the main process's Test Provider fetch succeeds
   (issue #573).
+- Electron fuses from `build.electronFuses`, flipped by electron-builder
+  before signing (ADR electron-fuses-and-packaged-code-paths). To check a
+  built app, run `npx @electron/fuses read --app <path to .app/.exe/binary>`.
+  On macOS, `Info.plist` must carry `ElectronAsarIntegrity`.
 - `Resources/bin/pi-desktop-host-core` — Rust host binary (release build).
 - Windows NSIS builds include an x64 `pi-desktop-host-core.exe` statically
   linked to the MSVC CRT, so a clean Windows x64 or Windows 11 ARM64

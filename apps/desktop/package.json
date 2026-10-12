@@ -287,6 +287,17 @@
     ],
     "asar": {
       "smartUnpack": false
+    },
+    "electronFuses": {
+      "runAsNode": true,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": true,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": true,
+      "resetAdHocDarwinSignature": true
     }
   }
 }

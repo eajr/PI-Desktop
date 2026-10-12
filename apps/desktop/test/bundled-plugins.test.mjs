@@ -167,6 +167,7 @@ test("bundled plugins are packaged and located at runtime", () => {
   // host-core cannot know whether it runs from resources/ or a checkout, so
   // Electron resolves the directory and hands it over.
   assert.match(hostProcessSource, /function resolveBuiltinPluginsDir\(\)/);
-  assert.match(hostProcessSource, /PI_DESKTOP_BUILTIN_PLUGINS_DIR/);
-  assert.match(hostProcessSource, /join\(process\.resourcesPath \|\| "", "plugins"\)/);
+  assert.match(hostProcessSource, /\[BUILTIN_PLUGINS_DIR_ENV\]: builtinPlugins \?\? undefined/);
+  assert.match(hostProcessSource, /resourcesPath: process\.resourcesPath \|\| ""/);
+  // Packaged-path resolution itself is covered by packaged-code-paths.test.mjs.
 });

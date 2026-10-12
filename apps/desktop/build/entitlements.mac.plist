@@ -2,14 +2,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <!-- V8 / Chromium cannot run under Hardened Runtime without JIT. -->
+    <!-- V8 / Chromium cannot run under Hardened Runtime without JIT. V8 maps
+         its code space with MAP_JIT, which this entitlement covers, so
+         com.apple.security.cs.allow-unsigned-executable-memory is not granted
+         (the @electron/osx-sign default app entitlements carry allow-jit
+         only). ADR electron-fuses-and-packaged-code-paths. -->
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
-    <!-- V8 on Apple Silicon also needs unsigned executable memory. -->
-    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-    <true/>
-    <!-- Electron helpers and plugin-loaded native addons are not all signed by
-         Team DUV63RKYTW; library validation would refuse them. -->
+    <!-- The main executable doubles as the agent sidecar's Node runtime
+         (ELECTRON_RUN_AS_NODE, D008) and plugin hosts run in Electron utility
+         helpers. Both may load native addons from user-installed pi packages
+         and plugins, which are not signed by Team DUV63RKYTW; library
+         validation would refuse them. The app's own bundled addons and the
+         Electron helpers are re-signed with the team identity and would not
+         need this on their own. -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
     <!-- Isolated plugin panels may capture microphone after the user grants
