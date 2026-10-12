@@ -1051,6 +1051,22 @@
   gap: 12px;
 }
 
+.settings-remote-host-hostkey {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-remote-host-hostkey-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.settings-remote-host-hostkey-list dd {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
 @media (max-width: 720px) {
   .settings-remote-host-form-row,
   .settings-remote-host-form-row.is-narrow-port {

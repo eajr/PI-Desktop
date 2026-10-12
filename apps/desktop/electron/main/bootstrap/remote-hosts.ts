@@ -9,6 +9,7 @@ import {
   type CommandShellOption, isCommandShellOption,
   type WorkspaceFilesRequest,
 } from "@pi-desktop/shared";
+import { join } from "node:path";
 import { wsClientTransport } from "@pi-desktop/racp";
 import type { HostRpcPort } from "@pi-desktop/agent-host";
 import type { BackendRouter } from "../remote/backend-router.js";
@@ -16,6 +17,7 @@ import { makeRemoteSessionId, parseRemoteSessionId } from "../remote/backend-rou
 import { createRacpRemoteHostClient, exchangePairingToken, type RacpRemoteHostClient } from "../remote/racp-remote-host-client.js";
 import { createSshBootstrap, type SshBootstrapDeps } from "../remote/ssh-bootstrap.js";
 import { createSshTunnelManager, type SshTunnelManager } from "../remote/ssh-tunnel.js";
+import { APP_KNOWN_HOSTS_FILE } from "../remote/ssh-host-keys.js";
 import { createRemoteHostConnection, type RemoteHostConnection } from "../remote/remote-host-connection.js";
 import { createRemoteHostRegistry, type EncryptionPort, type RemoteHostRecord, type RemoteHostRegistry } from "../remote/remote-host-registry.js";
 import { sshMetadataOf, sshHostRecord, transportOf } from "../remote/remote-host-metadata.js";
@@ -86,14 +88,18 @@ function unavailable(): Error {
 function requiresUserAction(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const fields = error as { errorCode?: string; code?: string };
-  return ["HOST_AUTH_FAILED", "REMOTE_AUTH_FAILED", "HOST_VERSION_MISMATCH", "CAPABILITY_UNAVAILABLE"]
+  return ["HOST_AUTH_FAILED", "REMOTE_AUTH_FAILED", "HOST_VERSION_MISMATCH", "CAPABILITY_UNAVAILABLE",
+    "SSH_HOST_KEY_UNKNOWN", "SSH_HOST_KEY_CHANGED"]
     .includes(fields.errorCode ?? fields.code ?? "");
 }
 
 export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHostsBoot {
   const log = options.log ?? (() => undefined);
   const registry = createRemoteHostRegistry({ dataDir: options.dataDir, encryption: options.encryption, log });
-  const tunnels = options.tunnels ?? createSshTunnelManager({ log });
+  // The app-managed known_hosts: only user-confirmed host keys land here, and
+  // every SSH connection consults it before the user's own files (ADR 0327).
+  const knownHostsFile = join(options.dataDir, APP_KNOWN_HOSTS_FILE);
+  const tunnels = options.tunnels ?? createSshTunnelManager({ log, knownHostsFile });
   const opened = new Map<string, OpenHost>();
   const actionRequired = new Set<string>();
   const openingHosts = new Set<OpenHost>();
@@ -162,7 +168,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
   const bootstrap = createSshBootstrap({
     version: options.clientInfo.version,
     exchangePairing: ({ url, pairingToken, label, expectedHostId }) => exchangePairingToken({ url, pairingToken, label, expectedHostId, clientInfo: options.clientInfo, requireWorkspace: true, log }),
-    log, ...options.sshBootstrap,
+    log, knownHostsFile, ...options.sshBootstrap,
   });
 
   function closeHost(host: OpenHost): Promise<void> {
@@ -189,7 +195,15 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
     if (record.metadata?.transport === "ssh" && !ssh) {
       throw Object.assign(new Error("invalid SSH host metadata"), { errorCode: "INVALID_ARGUMENT" });
     }
-    const url = ssh ? (await tunnels.open(record.hostKey, ssh, record.sshSecret)).url : record.url;
+    let url = record.url;
+    if (ssh) {
+      try { url = (await tunnels.open(record.hostKey, ssh, record.sshSecret)).url; }
+      catch (error) {
+        // A host-key refusal needs the user, not another automatic retry.
+        if (requiresUserAction(error)) actionRequired.add(record.hostKey);
+        throw error;
+      }
+    }
     if (closed) { await tunnels.close(record.hostKey); throw unavailable(); }
     const adapter = buildAdapter({ ...record, url });
     const connection = createRemoteHostConnection({
@@ -383,7 +397,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
         if (!record) throw unavailable();
         const host = options.getLocalHost?.();
         if (!host) throw unavailable();
-        return syncRemoteProviders(input, record, host);
+        return syncRemoteProviders(input, record, host, { knownHostsFile });
       });
     },
     addHost: (record) => serial(record.hostKey, () => addRecord(record)),

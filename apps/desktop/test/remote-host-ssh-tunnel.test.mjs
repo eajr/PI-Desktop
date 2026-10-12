@@ -103,7 +103,10 @@ test("the descriptor becomes an ssh argv that never prompts", () => {
   const hasOption = (name, value) => args.some((arg, index) => arg === name && args[index + 1] === value);
   // There is no terminal behind the spawn, so a password prompt would hang.
   assert.ok(hasOption("-o", "BatchMode=yes"));
-  assert.ok(hasOption("-o", "StrictHostKeyChecking=accept-new"));
+  // An unknown or changed host key fails; trust is only added after the user
+  // confirms a fingerprint (ADR 0327).
+  assert.ok(hasOption("-o", "StrictHostKeyChecking=yes"));
+  assert.ok(!args.includes("StrictHostKeyChecking=accept-new"));
   // A forward that cannot be set up must fail the connection, not linger.
   assert.ok(hasOption("-o", "ExitOnForwardFailure=yes"));
   assert.ok(hasOption("-p", "2222"));

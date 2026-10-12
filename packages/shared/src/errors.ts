@@ -240,6 +240,14 @@ export const ErrorCodes = {
   REMOTE_CONNECTION_FAILED: "REMOTE_CONNECTION_FAILED",
   /** The transport's port forward could not be set up. */
   REMOTE_FORWARD_FAILED: "REMOTE_FORWARD_FAILED",
+  /**
+   * The SSH host presented a key no known_hosts file trusts yet. `details`
+   * carries `host`, optional `port`, and `keys` (type + SHA256 fingerprint)
+   * when the desktop could learn them, so the user can confirm (ADR 0327).
+   */
+  SSH_HOST_KEY_UNKNOWN: "SSH_HOST_KEY_UNKNOWN",
+  /** The SSH host key contradicts a trusted one; never accepted automatically. */
+  SSH_HOST_KEY_CHANGED: "SSH_HOST_KEY_CHANGED",
   /** A Host-side path does not exist. */
   REMOTE_PATH_NOT_FOUND: "REMOTE_PATH_NOT_FOUND",
   /** A Host-side path is outside what the principal may reach. */

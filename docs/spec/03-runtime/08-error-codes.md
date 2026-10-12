@@ -307,6 +307,8 @@ codes surface through the same error object as any other call.
 | `REMOTE_AUTH_FAILED` | no | the device or pairing token was rejected on the RACP-WS upgrade |
 | `REMOTE_CONNECTION_FAILED` | yes | the RACP-WS transport could not connect (non-loopback URL, refused socket) |
 | `REMOTE_FORWARD_FAILED` | yes | the SSH loopback port forward could not be established |
+| `SSH_HOST_KEY_UNKNOWN` | no | the SSH host presented a key no consulted known_hosts file trusts; `details` carries `host`, optional `port`, and, when learned, `keys` (`type`, `SHA256:` fingerprint) for the user to confirm (ADR 0327) |
+| `SSH_HOST_KEY_CHANGED` | no | the SSH host key contradicts a trusted one; the desktop never accepts it and the user must resolve it outside the app (ADR 0327) |
 | `REMOTE_PATH_NOT_FOUND` | no | a remote project/workspace path does not exist on the host |
 | `REMOTE_PATH_FORBIDDEN` | no | a remote path is outside the host's permitted roots |
 | `PAIRING_FAILED` | no | `connection/pair` could not mint a device credential |

@@ -158,7 +158,10 @@ Bootstrap runs over the user's own SSH session, never over RACP:
    login password MAY be supplied instead of a key (ADR 0293): it is handed to
    the `ssh` client through an askpass helper, never as an argument, and is
    stored encrypted in the desktop's secure storage so the host can reconnect
-   after a restart.
+   after a restart. Host keys are checked strictly (ADR 0327): before anything
+   authenticates, an unknown host's key type and SHA-256 fingerprint are shown
+   for the user to confirm, and only a confirmed key is recorded, in the
+   app-managed `<dataDir>/ssh_known_hosts`; a changed key is refused.
 2. It resolves the matching Desktop version and published Linux target, fetches
    the named release SHA-256 over HTTPS, and uploads a small bootstrap script.
    Remote download is preferred. Only `download-failed` permits one bounded,

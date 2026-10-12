@@ -60,6 +60,8 @@ export type SshTunnelManagerOptions = {
   buildTransport?: (ssh: RemoteHostSshMetadata, sshSecret?: string) => SshTransport;
   /** Reserve the loopback port `-L` binds. Injectable for deterministic tests. */
   reservePort?: () => Promise<number>;
+  /** App-managed known_hosts file the default transport consults first. */
+  knownHostsFile?: string;
   log?: (level: "info" | "warn" | "error", message: string, data?: unknown) => void;
 };
 
@@ -90,6 +92,7 @@ export function createSshTunnelManager(options: SshTunnelManagerOptions = {}): S
     options.buildTransport ??
     ((ssh: RemoteHostSshMetadata, sshSecret?: string) =>
       createSystemSshTransport(sshTargetOf(ssh, sshSecret), {
+        knownHostsFile: options.knownHostsFile,
         log: (level, message, data) => log(level, message, data),
       }));
   const reservePort = options.reservePort ?? reserveLocalPort;

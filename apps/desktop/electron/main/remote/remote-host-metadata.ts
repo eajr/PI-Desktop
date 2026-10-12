@@ -1,10 +1,10 @@
 import type { RemoteHostSshMetadata, RemoteHostTransport } from "@pi-desktop/shared";
 import type { RemoteHostRecord } from "./remote-host-registry.js";
-import { assertSshArgument } from "./ssh-transport.js";
+import { assertSshArgument, assertSshDestinationField } from "./ssh-transport.js";
 
-function safeSshField(value: unknown): string | null {
+function safeSshField(value: unknown, destination = false): string | null {
   if (typeof value !== "string") return null;
-  try { return assertSshArgument(value, "ssh field"); } catch { return null; }
+  try { return destination ? assertSshDestinationField(value, "ssh field") : assertSshArgument(value, "ssh field"); } catch { return null; }
 }
 function safeSshPort(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 65_535 ? value : null;
@@ -16,9 +16,9 @@ export function sshMetadataOf(record: RemoteHostRecord): RemoteHostSshMetadata |
   const ssh = record.metadata.ssh;
   if (typeof ssh !== "object" || ssh === null) return null;
   const candidate = ssh as Partial<RemoteHostSshMetadata>;
-  const host = safeSshField(candidate.host);
+  const host = safeSshField(candidate.host, true);
   if (host === null) return null;
-  const user = candidate.user === undefined ? null : safeSshField(candidate.user);
+  const user = candidate.user === undefined ? null : safeSshField(candidate.user, true);
   if (user === null && candidate.user !== undefined) return null;
   const identityFile = candidate.identityFile === undefined ? null : safeSshField(candidate.identityFile);
   if (identityFile === null && candidate.identityFile !== undefined) return null;

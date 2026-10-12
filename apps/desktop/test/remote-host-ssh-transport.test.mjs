@@ -183,10 +183,12 @@ test("exec passes the command as one argv entry behind the common options", { ti
   // A single argv entry: `uname -s` must never split into two arguments.
   assert.equal(argv.at(-1), "uname -s");
   assert.equal(argv.at(-2), "remote.example", "the command follows the destination");
+  assert.equal(argv.at(-3), "--", "option parsing ends before the destination");
+  assert.ok(!argv.includes("StrictHostKeyChecking=accept-new"), "no silent trust on first use");
   const command = argv.length - 1;
   for (const [name, value] of [
     ["-o", "BatchMode=yes"],
-    ["-o", "StrictHostKeyChecking=accept-new"],
+    ["-o", "StrictHostKeyChecking=yes"],
     ["-o", "ExitOnForwardFailure=yes"],
   ]) {
     const index = pairIndex(argv, name, value);
