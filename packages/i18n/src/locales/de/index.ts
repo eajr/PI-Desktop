@@ -1117,6 +1117,18 @@ sklm: {
     "mcpAdded": "Hinzugefügt {{name}}",
     "mcpSaved": "Gespeichert {{name}}",
     "mcpDuplicate": "Ein MCP-Server mit dieser ID oder diesem Namen ist auf dieser Ebene bereits vorhanden.",
+    "mcpApproval": {
+      "pending": "Freigabe erforderlich",
+      "changed": "Seit Freigabe geändert",
+      "pendingNotice": "Dieser Server stammt aus dem Ordner .agents/servers des Projekts. Er läuft erst, wenn du genau das freigibst, was er startet oder womit er sich verbindet.",
+      "changedNotice": "Die Konfiguration dieses Servers wurde nach deiner Freigabe geändert. Er läuft erst nach einer erneuten Prüfung.",
+      "command": "Befehl",
+      "url": "URL",
+      "env": "Umgebung",
+      "headers": "Header",
+      "approve": "Freigeben und aktivieren",
+      "approved": "{{name}} freigegeben",
+    },
     "mcpMarket": {
       browse: "Market",
       back: "Meine Server",

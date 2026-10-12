@@ -1119,6 +1119,18 @@ sklm: {
     mcpAdded: "{{name}} eklendi",
     mcpSaved: "{{name}} kaydedildi",
     mcpDuplicate: "Bu düzeyde bu kimlik veya adla bir MCP sunucusu zaten var.",
+    mcpApproval: {
+      pending: "Onay gerekiyor",
+      changed: "Onaydan sonra değişti",
+      pendingNotice: "Bu sunucu projenin .agents/servers klasöründen geliyor. Başlattığı veya bağlandığı şeyi tam olarak onaylayana kadar çalışmaz.",
+      changedNotice: "Bu sunucunun yapılandırması onayınızdan sonra değişti. Yeniden incelenene kadar çalışmaz.",
+      command: "Komut",
+      url: "URL",
+      env: "Ortam",
+      headers: "Başlıklar",
+      approve: "Onayla ve etkinleştir",
+      approved: "{{name}} onaylandı",
+    },
     mcpProjectSubtitle: "Yalnızca {{project}} içinde etkin.",
     mcpEmpty: "Bu klasörde MCP sunucusu yok",
     mcpMarket: {

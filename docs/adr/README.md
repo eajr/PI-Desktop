@@ -375,6 +375,7 @@ Each ADR includes:
 | 0324 | [Make Composer Prompt Enhancement an Optional Plugin](0324-plugin-owned-composer-prompt-enhancement.md) | Accepted (D653; supersedes ADR 0121) |
 | 0325 | [Smooth Windows main-window corner compositing](0325-windows-window-corner-compositing.md) | Proposed (implementation candidate; Windows E2E pending) |
 | 0326 | [Verified SSH Host installation and daily startup](0326-verified-ssh-host-installation.md) | Accepted for experimental implementation (amends ADR 0292; Linux SSH qualification and publication pending) |
+| project-mcp-server-approval | [Project MCP servers run only after content-bound approval](project-mcp-server-approval.md) | Accepted (D659; amends ADR 0056, ADR 0112, D193) |
 | plugin-fetch-redirect-policy | [Host-enforced plugin fetch redirect policy](plugin-fetch-redirect-policy.md) | Accepted (implementation candidate for #1475) |
 | external-mcp-import-secret-custody | [Keep external MCP import secrets in Electron main](external-mcp-import-secret-custody.md) | Accepted |
 | launchable-files-reveal-instead-of-open | [Reveal launchable files instead of opening them](launchable-files-reveal-instead-of-open.md) | Accepted (implementation candidate; amends ADR 0109) |

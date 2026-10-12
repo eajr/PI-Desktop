@@ -6,6 +6,7 @@ use crate::agent_capabilities::{
 };
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Deserializer, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -46,8 +47,29 @@ pub struct McpServerRecord {
     pub enabled: bool,
     #[serde(default)]
     pub scope: ActivationScope,
+    /// Project records only: hash of what the server would execute or reach.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_hash: Option<String>,
+    /// Project records only: whether the user approved this exact content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<McpApproval>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// Trust state of a project-level server.
+///
+/// A project's `.agents/servers` arrives with whatever repository the user
+/// opened, so its servers never run until the user approves the exact
+/// command/args/env/url/headers. The approval is bound to `config_hash`; an
+/// edit to the file after approval reads as `Changed` and runs nothing until
+/// the user approves again.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum McpApproval {
+    Approved,
+    Pending,
+    Changed,
 }
 
 /// JSON stored in `.agents/servers/<id>.json`. Activation fields never enter
@@ -189,6 +211,36 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
     }
 }
 
+/// The execution-relevant part of a server document, in a fixed field order.
+///
+/// Identity and presentation (`id`, `label`, `description`) and the timeout are
+/// left out: they do not change what runs or where it connects, and a move that
+/// renames a server must not void the user's approval.
+#[derive(Serialize)]
+struct ApprovalSubject<'a> {
+    transport: &'a str,
+    command: Option<&'a str>,
+    args: &'a [String],
+    env: &'a BTreeMap<String, String>,
+    url: Option<&'a str>,
+    headers: &'a BTreeMap<String, String>,
+}
+
+fn config_hash(config: &McpConfig) -> String {
+    let subject = ApprovalSubject {
+        transport: &config.transport,
+        command: config.command.as_deref(),
+        args: &config.args,
+        env: &config.env,
+        url: config.url.as_deref(),
+        headers: &config.headers,
+    };
+    // Every field is a string, a list or a BTreeMap, so serialization is
+    // deterministic and cannot fail.
+    let canonical = serde_json::to_vec(&subject).unwrap_or_default();
+    format!("sha256:{}", hex::encode(&Sha256::digest(&canonical)[..]))
+}
+
 fn merge_active_records(
     global: Vec<McpServerRecord>,
     project: Vec<McpServerRecord>,
@@ -241,9 +293,29 @@ impl McpServerRegistry {
                 continue;
             }
             let updated_at = file_timestamp(&path);
-            let enabled = self
+            let switched_on = self
                 .state
                 .enabled(MCP_KIND, level, &config.id, effective_project);
+            // Global documents live in the user's own home directory and keep
+            // their default-on meaning. A project document came with the
+            // repository, so it runs only once the user approved this content.
+            let (config_hash, approval) = match level {
+                CapabilityLevel::Global => (None, None),
+                CapabilityLevel::Project => {
+                    let hash = config_hash(&config);
+                    let approval =
+                        match self
+                            .state
+                            .approval(MCP_KIND, level, &config.id, effective_project)
+                        {
+                            Some(approved) if approved == hash => McpApproval::Approved,
+                            Some(_) => McpApproval::Changed,
+                            None => McpApproval::Pending,
+                        };
+                    (Some(hash), Some(approval))
+                }
+            };
+            let enabled = switched_on && approval.is_none_or(|a| a == McpApproval::Approved);
             records.push(McpServerRecord {
                 id: config.id,
                 label: config.label,
@@ -260,6 +332,8 @@ impl McpServerRegistry {
                 timeout_seconds: config.timeout_seconds,
                 enabled,
                 scope: scope_for(level, owner_project_path.as_deref()),
+                config_hash,
+                approval,
                 created_at: updated_at.clone(),
                 updated_at,
             });
@@ -477,6 +551,26 @@ impl McpServerRegistry {
         let path = directory.join(format!("{}.json", config.id));
         fs::write(&path, serde_json::to_string_pretty(&config)?)
             .with_context(|| format!("write {}", path.display()))?;
+        // A project server the user writes through the app is content the user
+        // authored, so it is approved as written, and an edit to an approved
+        // server stays approved. Editing a server that is still awaiting review
+        // does not approve it: fields the edit left out are carried over from a
+        // document the user may never have looked at. A new server saved as
+        // disabled (a credential-less config-sync copy, for one) also waits for
+        // review, so switching it on later always shows what it runs.
+        let approve_written = match current {
+            None => input.enabled != Some(false),
+            Some(record) => record.approval == Some(McpApproval::Approved),
+        };
+        if level == CapabilityLevel::Project && approve_written {
+            self.state.approve(
+                MCP_KIND,
+                level,
+                &config.id,
+                project_path.as_deref(),
+                &config_hash(&config),
+            )?;
+        }
         if let Some(enabled) = input.enabled {
             self.state.set_enabled(
                 MCP_KIND,
@@ -528,6 +622,16 @@ impl McpServerRegistry {
             .map(|value| CapabilityLevel::parse(Some(value)))
             .transpose()?
             .unwrap_or(CapabilityLevel::Global);
+        if enabled
+            && record
+                .approval
+                .is_some_and(|approval| approval != McpApproval::Approved)
+        {
+            bail!(
+                "MCP_INVALID: project server \"{}\" must be approved before it can run",
+                record.id
+            );
+        }
         self.state.set_enabled(
             MCP_KIND,
             record_level,
@@ -539,6 +643,39 @@ impl McpServerRegistry {
             &record.id,
             Some(record_level),
             project_path.or(record.project_path.as_deref()),
+        )
+    }
+
+    /// Approve one project server's current document and switch it on.
+    ///
+    /// `config_hash` is the hash the user was shown. If the file changed since,
+    /// the approval is refused rather than applied to content nobody reviewed.
+    pub fn approve(
+        &mut self,
+        id: &str,
+        project_path: &str,
+        config_hash: &str,
+    ) -> Result<Option<McpServerRecord>> {
+        let Some(record) = self.find(id, Some(CapabilityLevel::Project), Some(project_path))?
+        else {
+            return Ok(None);
+        };
+        if record.config_hash.as_deref() != Some(config_hash) {
+            bail!(
+                "MCP_INVALID: project server \"{id}\" changed since it was reviewed; review it again"
+            );
+        }
+        self.state.approve(
+            MCP_KIND,
+            CapabilityLevel::Project,
+            &record.id,
+            Some(project_path),
+            config_hash,
+        )?;
+        self.find(
+            &record.id,
+            Some(CapabilityLevel::Project),
+            Some(project_path),
         )
     }
 
@@ -636,6 +773,18 @@ impl McpServerRegistry {
             &target_id,
             source.enabled,
         )?;
+        // A server that was running where it came from is one the user already
+        // trusts; moving it into a project must not demote it to "pending". A
+        // source that was off or unapproved arrives unapproved.
+        if to.level == CapabilityLevel::Project && source.enabled {
+            self.state.approve(
+                MCP_KIND,
+                CapabilityLevel::Project,
+                &target_id,
+                to.project_path.as_deref(),
+                &config_hash(&config),
+            )?;
+        }
         self.find(&target_id, Some(to.level), to.project_path.as_deref())?
             .ok_or_else(|| anyhow::anyhow!("MCP_INVALID: moved server was not found"))
     }

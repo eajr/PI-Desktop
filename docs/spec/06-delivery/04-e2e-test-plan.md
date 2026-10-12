@@ -16002,6 +16002,29 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Draft; Rust and renderer unit regressions cover the data/query
   boundaries. Full rendered E2E requires an explicitly authorized run.
 
+#### E2E-MCP-project-server-requires-approval: A project's MCP server never runs before the user approves its exact content
+
+- **Preconditions**: Disposable data dir and HOME. Project A is registered and
+  contains `<project A>/.agents/servers/probe.json` (stdio, a command that
+  writes a marker file when started). No approval exists in
+  `<data>/agent-capabilities/mcp.json`.
+- **Steps**:
+  1. Open project A, open the composer command list, and start a session. The
+     marker file is never created and no `mcp_probe_*` tool is offered.
+  2. Open Settings > Agent > MCP with project A selected. The `probe` row shows
+     "Needs approval", the full command line and environment, and no enable
+     switch or Test connection.
+  3. Choose "Approve and enable". The row becomes enabled; a new session
+     connects the server (marker file appears).
+  4. Edit `probe.json` on disk to change an argument. Reload the page: the row
+     shows "Changed since approval", the server is disconnected for new
+     sessions, and approving again restores it.
+  5. Restart the app: the approval for the unchanged content persists.
+- **Status**: Draft. Host-core unit tests cover pending/approved/changed
+  state, persistence and stale-hash refusal; `apps/desktop/test/user-mcp.test.mjs`
+  proves the runtime never spawns an unapproved project record; the rendered
+  journey requires an explicitly authorized run.
+
 ### MCP market scenarios (`pnpm test:e2e:mcp-market`, headless protocol-level)
 
 | ID | Scenario | Verification |

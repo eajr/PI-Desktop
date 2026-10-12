@@ -7664,3 +7664,27 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `apps/pi-host/src/pairing-issue.test.ts`, and
   `apps/desktop/test/remote-device-repair.test.mjs`. See ADR
   racp-device-token-lifetime.
+## 2026-10-12 — Project MCP servers need content-bound approval (D659)
+
+- D659 amends D193, ADR 0056, and ADR 0112: a project-level MCP server
+  (`<project>/.agents/servers/*.json`) is runnable only after the user approves
+  a SHA-256 of its transport, command, args, env, url, and headers. Approvals
+  live app-locally in the `approvals` map of
+  `<data>/agent-capabilities/mcp.json`; a project server with no stored state
+  now reads as `pending` instead of enabled, an explicit off stays off, and a
+  changed file reads as `changed` until re-approved. Global servers are
+  unchanged.
+- `mcp.approve({ id, projectPath, configHash })` approves the hash the user was
+  shown and refuses a stale one; `mcp.setEnabled(true)` refuses an unapproved
+  project server. Content the user writes through the app is approved as
+  written. Electron Main's MCP runtime also refuses to connect unapproved
+  project records.
+- Native Pi continuation passes Pi's stored project trust decision as
+  `projectTrusted` instead of `true`.
+- Project skills keep default-on catalog listing; content-bound approval for
+  them is a tracked follow-up (security §4.4 residual risk).
+- Covered by host-core `mcp_servers` tests, `apps/desktop/test/user-mcp.test.mjs`,
+  `apps/desktop/test/mcp-project-approval.test.mjs`, and
+  `packages/agent-runtime/src/native-pi-session.test.ts`. See
+  `docs/adr/project-mcp-server-approval.md` and
+  E2E-MCP-project-server-requires-approval.

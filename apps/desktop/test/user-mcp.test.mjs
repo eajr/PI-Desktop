@@ -313,6 +313,40 @@ test("a disabled server contributes nothing and is never connected", async (t) =
   assert.equal(rt.statusFor("stub").state, "idle");
 });
 
+test("an unapproved project server is never spawned, even if marked enabled", async (t) => {
+  const dir = stubDir();
+  const projectPath = projectDir();
+  const spawned = [];
+  const rt = runtime(t, {
+    spawnImpl: (...args) => {
+      spawned.push(args[0]);
+      throw new Error("must not spawn an unapproved project server");
+    },
+  });
+  const project = {
+    level: "project",
+    projectPath,
+    scope: { mode: "projects", projects: [projectPath] },
+    configHash: "sha256:reviewed",
+  };
+  for (const approval of ["pending", "changed", undefined]) {
+    // `enabled: true` stands for a stale or forged record: the runtime must
+    // not trust the host's enabled bit alone for repository-provided config.
+    rt.setRecords([stubRecord(dir, { ...project, approval, enabled: true })]);
+    assert.deepEqual(await rt.toolsForProject(projectPath), []);
+    const status = await rt.test("stub");
+    assert.equal(status.state, "failed");
+    assert.match(status.message, /approved/);
+  }
+  assert.deepEqual(spawned, []);
+  assert.equal(rt.statusFor("stub").state, "idle");
+
+  // Once approved, the same record runs.
+  const approvedRuntime = runtime(t);
+  approvedRuntime.setRecords([stubRecord(dir, { ...project, approval: "approved", enabled: true })]);
+  assert.equal((await approvedRuntime.toolsForProject(projectPath)).length, 2);
+});
+
 // Scope has to hold at dispatch too: a session assembled before the user
 // narrowed the scope still remembers the tool name.
 test("a call is refused once the server no longer applies to the session", async (t) => {

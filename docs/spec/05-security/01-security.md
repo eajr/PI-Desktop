@@ -247,6 +247,33 @@ service or replay an old valid head to a fresh device with no trusted history.
 Per-file atomic replacement and import journaling do not constitute a
 whole-filesystem transaction.
 
+## 4.4 Project-provided capabilities
+
+A project directory is untrusted input: it arrives with whatever repository the
+user opened. Capability documents under `<project>/.agents/` must not execute
+code merely because the project was opened.
+
+- **MCP servers** (`<project>/.agents/servers/*.json`) never connect or spawn
+  until the user approves the exact execution-relevant content — transport,
+  command, args, env, url, headers — in Settings > Agent > MCP. host-core binds
+  the approval to a SHA-256 of those fields, stores it app-locally in
+  `<data>/agent-capabilities/mcp.json`, and reports the server disabled while
+  the hash differs; an edited file reads as "changed" and stops running until
+  re-approved. Approval requests echo the displayed hash, so a file changed
+  during review is refused. Electron Main's MCP runtime independently refuses
+  to connect an unapproved project record (ADR project-mcp-server-approval,
+  D659). Global servers in the user's home directory are unaffected.
+- **Native Pi resources** (`.pi/` settings and extensions, `.agents/skills`
+  read by the Pi SDK) load only for a cwd the user trusted in Pi's own trust
+  store; see §12.
+- **Residual risk — project skills.** Skill documents under
+  `<project>/.agents/skills` are still listed in the session's skill catalog by
+  default (name and description) and their body is loaded on demand through the
+  `Skill` tool. They execute no code by themselves, but they are an untrusted
+  prompt-injection surface that can steer the model toward tool calls; those
+  calls still pass the normal permission path. Content-bound approval for
+  project skills is a tracked follow-up.
+
 ## 5. Command execution
 
 - Bash requires confirmation by default (risk-tiered permission cards); in
@@ -392,6 +419,7 @@ host-core. They do not change the loopback-only rule above.
 | Local malware swapping app code or executables | asar integrity + `onlyLoadAppFromAsar`, packaged builds ignore executable-path env overrides; `RunAsNode` still open (ADR electron-fuses-and-packaged-code-paths) |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
 | Agent- or repo-written launcher opened from the UI | `openPathOrReveal` reveals launchable files instead of opening them (§2a) |
+| Cloned repository ships a project MCP server | content-hash-bound approval before any spawn/connect; changed file needs re-approval; Main refuses unapproved project records (§4.4) |
 | Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 
 ## 11. Security acceptance gates
@@ -413,6 +441,9 @@ host-core. They do not change the loopback-only rule above.
 10. Local MCP control is loopback-only, bearer-authenticated, opt-in, bounded,
     excludes secret writes and native pickers, and requires confirmation for
     session permission-mode changes
+11. A project MCP server with no approval, or whose execution-relevant content
+    changed since approval, is never spawned or connected (host-core unit tests
+    and `apps/desktop/test/user-mcp.test.mjs`)
 
 ## 12. Native Pi session boundary (ADR 0254)
 
@@ -430,6 +461,11 @@ for a provably dead process on the same host when the target is unchanged or is 
 complete same-file append-only extension with the original byte prefix and a
 continuous parent chain. This lease is not treated as proof that Pi Web/CLI is absent because those
 clients do not yet share its protocol.
+
+Native continuation creates its settings manager with `projectTrusted` set to
+Pi's stored trust decision for the session cwd (never unconditionally `true`),
+so project `.pi/` and `.agents/skills` resources load only for a project the
+user trusted in Pi, even if they appear after the open-time trust check.
 
 Native continuation passes `noTools: "all"` to the SDK: no built-in or extension
 model tools are exposed, including filesystem/shell tools. `permissionMode:

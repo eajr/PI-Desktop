@@ -4158,3 +4158,49 @@
 .sklm-page-jump::placeholder {
   color: var(--ds-text-muted);
 }
+
+/* Review block for a project MCP server awaiting approval. */
+.agent-capability-approval {
+  display: flex;
+  flex: 1 1 100%;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: var(--radius-2xs);
+  padding: 8px 10px;
+}
+
+.agent-capability-approval-notice {
+  margin: 0;
+  color: var(--ds-text-muted);
+  font-size: var(--text-2xs);
+}
+
+.agent-capability-approval-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+}
+
+.agent-capability-approval-field dt {
+  color: var(--ds-text-muted);
+  font-size: var(--text-3xs);
+}
+
+.agent-capability-approval-field dd {
+  margin: 0;
+}
+
+.agent-capability-approval-field code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: var(--radius-3xs);
+  background: var(--ds-bg-chip);
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-3xs);
+}

@@ -1110,6 +1110,18 @@ sklm: {
     mcpAdded: "已新增 {{name}}",
     mcpSaved: "已保存 {{name}}",
     mcpDuplicate: "此级别已存在相同 ID 或名称的 MCP 服务器。",
+    mcpApproval: {
+      pending: "需要批准",
+      changed: "批准后已更改",
+      pendingNotice: "此服务器来自项目的 .agents/servers 文件夹。在你批准它启动或连接的确切内容之前，它不会运行。",
+      changedNotice: "此服务器的配置在你批准后已更改。重新审核之前它不会运行。",
+      command: "命令",
+      url: "URL",
+      env: "环境变量",
+      headers: "请求头",
+      approve: "批准并启用",
+      approved: "已批准 {{name}}",
+    },
     mcpProjectSubtitle: "仅在 {{project}} 中生效。",
     mcpEmpty: "此目录中没有 MCP 服务器",
     mcpMarket: {

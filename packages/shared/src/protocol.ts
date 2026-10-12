@@ -316,6 +316,7 @@ export const IPC = {
     mcpUpsert: "pi-desktop/mcp/upsert",
     mcpRemove: "pi-desktop/mcp/remove",
     mcpSetEnabled: "pi-desktop/mcp/setEnabled",
+    mcpApprove: "pi-desktop/mcp/approve",
     mcpSetScope: "pi-desktop/mcp/setScope",
     mcpTransfer: "pi-desktop/mcp/transfer",
     mcpTest: "pi-desktop/mcp/test",

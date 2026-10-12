@@ -110,6 +110,26 @@ handle(IPC.invoke.mcpList, async (query: Partial<AgentCapabilityQuery> = {}) => 
     },
   );
 
+  /**
+   * Approve one project server's reviewed content. The renderer echoes the
+   * hash it displayed, so a file edited while the review was open is refused
+   * by host-core instead of approving content the user never saw.
+   */
+  handle(
+    IPC.invoke.mcpApprove,
+    async (payload: { id: string; projectPath: string; configHash: string }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call<{ server: McpServerRecord | null }>("mcp.approve", {
+        id: payload?.id,
+        projectPath: payload?.projectPath,
+        configHash: payload?.configHash,
+      });
+      await refreshUserMcp(currentWorkspacePath());
+      sendToRenderer(IPC.event.pluginChanged, { reason: "mcp", pluginId: payload?.id });
+      return res;
+    },
+  );
+
   handle(
     IPC.invoke.mcpSetScope,
     async (payload: { id: string; scope: ActivationScope }) => {

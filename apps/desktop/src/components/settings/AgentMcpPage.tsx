@@ -35,6 +35,7 @@ import {
   type McpDraft,
 } from "../extensions/McpEditorSheet";
 import { McpMarketPanel } from "./McpMarketPanel";
+import { McpApprovalReview, mcpAwaitingApproval } from "./McpApprovalReview";
 import { AgentMcpImportPanel } from "../../features/settings/imports/AgentMcpImportPanel";
 import { ImportToggleButton } from "../../features/settings/import-workbench";
 import {
@@ -224,6 +225,26 @@ export function AgentMcpPage() {
       );
     } catch (error) {
       patchRow(level, server.id, { enabled: server.enabled });
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const approve = async (server: McpServerRecord) => {
+    const key = rowKey("project", server.id);
+    if (busyId || !selectedProjectPath || !server.configHash) return;
+    setBusyId(key);
+    try {
+      await api.approveMcpServer(server.id, selectedProjectPath, server.configHash);
+      await load();
+      showToast(t("settings.mcpApproval.approved", { name: server.label || server.id }), {
+        variant: "success",
+      });
+    } catch (error) {
+      // A refusal usually means the file changed while it was on screen;
+      // reloading shows the content that would actually run.
+      await load();
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
       setBusyId(null);
@@ -427,6 +448,7 @@ export function AgentMcpPage() {
     const testing = testingId === server.id;
     const authorizing = authorizingId === server.id;
     const isArmed = armed === key;
+    const awaitingApproval = mcpAwaitingApproval(server);
     const isHttp = server.transport === "http";
     const hasAuthHeader = Boolean(
       server.headers &&
@@ -438,7 +460,7 @@ export function AgentMcpPage() {
       !hasAuthHeader &&
       Boolean(status?.authRequired);
     const items: CapabilityMenuItem[] = [
-      {
+      ...(awaitingApproval ? [] : [{
         key: "test",
         label: t("extensions.mcp.test"),
         icon: <IconPlay size={14} />,
@@ -447,8 +469,8 @@ export function AgentMcpPage() {
           setMenuFor(null);
           void testConnection(server, level);
         },
-      },
-      ...(isOAuth
+      } satisfies CapabilityMenuItem]),
+      ...(isOAuth && !awaitingApproval
         ? [
             {
               key: "authorize",
@@ -531,6 +553,13 @@ export function AgentMcpPage() {
                   : t(`extensions.mcp.state.${status.state}`)}
               </span>
             ) : null}
+            {awaitingApproval ? (
+              <span className="agent-capability-badge is-status is-failed">
+                {server.approval === "changed"
+                  ? t("settings.mcpApproval.changed")
+                  : t("settings.mcpApproval.pending")}
+              </span>
+            ) : null}
             {needsAuth ? (
               <span className="agent-capability-badge is-status is-failed">
                 {t("extensions.mcp.authRequired")}
@@ -543,6 +572,15 @@ export function AgentMcpPage() {
           </>
         }
         description={server.description || t("settings.noCapabilityDescription")}
+        meta={
+          awaitingApproval ? (
+            <McpApprovalReview
+              server={server}
+              busy={busy}
+              onApprove={() => void approve(server)}
+            />
+          ) : undefined
+        }
         actions={
           <>
             {needsAuth ? (
@@ -577,12 +615,14 @@ export function AgentMcpPage() {
                 if (!open) setArmed(null);
               }}
             />
-            <CapabilityToggle
-              checked={server.enabled}
-              busy={busy || testing}
-              label={t("settings.toggleCapability", { name })}
-              onChange={() => void toggle(server, level)}
-            />
+            {awaitingApproval ? null : (
+              <CapabilityToggle
+                checked={server.enabled}
+                busy={busy || testing}
+                label={t("settings.toggleCapability", { name })}
+                onChange={() => void toggle(server, level)}
+              />
+            )}
           </>
         }
       />

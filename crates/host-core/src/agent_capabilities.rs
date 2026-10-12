@@ -39,6 +39,13 @@ impl CapabilityLevel {
 struct StateFile {
     #[serde(default)]
     values: BTreeMap<String, bool>,
+    /// Content hashes the user approved, keyed like `values`.
+    ///
+    /// Added after `values`; a state file written before it has no approvals,
+    /// which reads as "nothing approved yet". A build that predates the field
+    /// drops it on its next save, which also fails closed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    approvals: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +60,7 @@ struct StateKey {
 pub struct CapabilityState {
     path: PathBuf,
     values: BTreeMap<String, bool>,
+    approvals: BTreeMap<String, String>,
 }
 
 impl CapabilityState {
@@ -60,12 +68,15 @@ impl CapabilityState {
         let path = data_dir
             .join("agent-capabilities")
             .join(format!("{kind}.json"));
-        let values = fs::read_to_string(&path)
+        let file = fs::read_to_string(&path)
             .ok()
             .and_then(|raw| serde_json::from_str::<StateFile>(&raw).ok())
-            .map(|file| file.values)
             .unwrap_or_default();
-        Self { path, values }
+        Self {
+            path,
+            values: file.values,
+            approvals: file.approvals,
+        }
     }
 
     fn key(kind: &str, level: CapabilityLevel, id: &str, project_path: Option<&str>) -> String {
@@ -145,6 +156,40 @@ impl CapabilityState {
         self.save()
     }
 
+    /// The content hash the user approved for one record, if any.
+    ///
+    /// Approval is separate from the enabled switch: a record can be approved
+    /// and switched off, and a record whose document changed after approval
+    /// keeps its old hash here so callers can tell "changed" from "new".
+    pub fn approval(
+        &self,
+        kind: &str,
+        level: CapabilityLevel,
+        id: &str,
+        project_path: Option<&str>,
+    ) -> Option<&str> {
+        self.approvals
+            .get(&Self::key(kind, level, id, project_path))
+            .map(String::as_str)
+    }
+
+    /// Record that the user approved the document whose content hashes to
+    /// `hash`, and clear any explicit "off" so the approval takes effect.
+    pub fn approve(
+        &mut self,
+        kind: &str,
+        level: CapabilityLevel,
+        id: &str,
+        project_path: Option<&str>,
+        hash: &str,
+    ) -> Result<()> {
+        let path = project_path.map(normalize_project_path);
+        let key = Self::key(kind, level, id, path.as_deref());
+        self.values.remove(&key);
+        self.approvals.insert(key, hash.to_string());
+        self.save()
+    }
+
     /// Every id of `kind` at `level` whose stored value is an explicit `false`.
     ///
     /// Global records default on, so the state file holds only what a user
@@ -177,8 +222,7 @@ impl CapabilityState {
         ids: &std::collections::HashSet<String>,
     ) -> Result<()> {
         let normalized_project = project_path.map(normalize_project_path);
-        let before = self.values.len();
-        self.values.retain(|raw_key, _| {
+        let keep = |raw_key: &String| {
             let Ok(key) = serde_json::from_str::<StateKey>(raw_key) else {
                 return false;
             };
@@ -196,8 +240,11 @@ impl CapabilityState {
                     _ => false,
                 },
             }
-        });
-        if before != self.values.len() {
+        };
+        let before = (self.values.len(), self.approvals.len());
+        self.values.retain(|raw_key, _| keep(raw_key));
+        self.approvals.retain(|raw_key, _| keep(raw_key));
+        if before != (self.values.len(), self.approvals.len()) {
             self.save()?;
         }
         Ok(())
@@ -218,8 +265,7 @@ impl CapabilityState {
         id: &str,
         project_path: Option<&str>,
     ) -> Result<()> {
-        let before = self.values.len();
-        self.values.retain(|raw_key, _| {
+        let keep = |raw_key: &String| {
             let Ok(key) = serde_json::from_str::<StateKey>(raw_key) else {
                 return false;
             };
@@ -234,8 +280,11 @@ impl CapabilityState {
                     _ => true,
                 },
             }
-        });
-        if before != self.values.len() {
+        };
+        let before = (self.values.len(), self.approvals.len());
+        self.values.retain(|raw_key, _| keep(raw_key));
+        self.approvals.retain(|raw_key, _| keep(raw_key));
+        if before != (self.values.len(), self.approvals.len()) {
             self.save()?;
         }
         Ok(())
@@ -247,6 +296,7 @@ impl CapabilityState {
         }
         let file = StateFile {
             values: self.values.clone(),
+            approvals: self.approvals.clone(),
         };
         fs::write(&self.path, serde_json::to_string_pretty(&file)?)?;
         Ok(())

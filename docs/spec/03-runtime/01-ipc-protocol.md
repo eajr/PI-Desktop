@@ -1521,6 +1521,23 @@ application-local `<data>/agent-capabilities/mcp.json` state file.
 - `mcp.setEnabled({ id, enabled, level, projectPath? })`
 - `mcp.setScope` remains a compatibility-shaped call; the Settings page uses
   the explicit capability level and local state instead
+- `mcp.approve({ id, projectPath, configHash })` → `{ server }` approves and
+  switches on one project server (D659). `configHash` must equal the record's
+  current hash or the call fails with `MCP_INVALID`. Desktop IPC:
+  `pi-desktop/mcp/approve`.
+
+Project records additionally carry `configHash` (SHA-256 of transport,
+command, args, env, url, headers) and `approval`
+(`approved` | `pending` | `changed`). A project record is `enabled` only when
+its switch is on and its approval matches `configHash`; a project server with
+no stored state is `pending`, not enabled. `mcp.setEnabled({ enabled: true })`
+on an unapproved project record fails with `MCP_INVALID`. `mcp.upsert`
+approves a new project server it writes (unless saved disabled) and keeps an
+approved one approved; editing a pending one leaves it pending. A transfer into
+a project approves the arriving server only if it was running at its source.
+Global records carry neither field and keep their default-on meaning.
+Approvals live in the `approvals` map of `<data>/agent-capabilities/mcp.json`
+and are excluded from configuration-sync payloads.
 
 A project-level request without `projectPath` is invalid. `mcp.active` removes
 project records from the global set by id or case-insensitive label before it
