@@ -1,5 +1,4 @@
 import { app, BrowserWindow, nativeTheme, screen, type Tray } from "electron";
-import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { getModuleDirectory } from "../module-path";
@@ -763,47 +762,15 @@ export async function createWindow({
     logger.app("diagnostics", "warn", "blocked navigation attempt", { data: { url } });
   });
 
-  // Codex-like default footprint. CG bounds are truth under Stage Manager.
+  // Codex-like default footprint used when recovering a collapsed window.
+  // Shelf detection relies on Electron bounds only. The former CG helper was
+  // an unshipped dev binary executed from world-writable /tmp (D657), so
+  // nothing here may spawn an external process.
   const CODEX_BOUNDS = { x: 40, y: 30, width: 1200, height: 800 } as const;
   let boundsGuard = false;
   let boundsTimer: NodeJS.Timeout | null = null;
   let pinUntil = 0;
   let captureViewportOverride = false;
-  let lastCgAt = 0;
-  let lastCg: { x: number; y: number; width: number; height: number } | null = null;
-  let missingCgStreak = 0;
-  // The CG helper is dev tooling; without it, CG-based shelf detection must
-  // stay inert or every machine would look permanently "shelved".
-  const cgHelperPath = "/tmp/pi-window-bounds";
-  const cgHelperAvailable = existsSync(cgHelperPath);
-
-  const readCgBounds = (): { x: number; y: number; width: number; height: number } | null => {
-    if (!cgHelperAvailable) return null;
-    // Cache briefly — Stage Manager checks should not spawn tools every frame.
-    if (Date.now() - lastCgAt < 700) return lastCg;
-    try {
-      const out = execFileSync(cgHelperPath, [String(process.pid)], {
-        encoding: "utf8",
-        timeout: 800,
-      }).trim();
-      lastCgAt = Date.now();
-      if (!out) {
-        lastCg = null;
-        return null;
-      }
-      const [x, y, w, h] = out.split(",").map((n: string) => Number(n));
-      if (![x, y, w, h].every((n: number) => Number.isFinite(n))) {
-        lastCg = null;
-        return null;
-      }
-      lastCg = { x, y, width: w, height: h };
-      return lastCg;
-    } catch {
-      lastCgAt = Date.now();
-      lastCg = null;
-      return null;
-    }
-  };
 
   const ensureStableBounds = (force = false) => {
     if (
@@ -819,17 +786,9 @@ export async function createWindow({
       return;
     }
     const electronBounds = window.getBounds();
-    const cg = readCgBounds();
-    if (!cg && cgHelperAvailable) missingCgStreak += 1;
-    else missingCgStreak = 0;
-    // Tiny/offscreen CG footprint is Stage Manager shelf. Missing CG alone is not
-    // conclusive (alwaysOnTop can change window layer); require a short streak.
-    const shelved =
-      (!!cg && (cg.width < 500 || cg.height < 400 || cg.x < -40)) ||
-      (!cg && cgHelperAvailable && missingCgStreak >= 3);
     const electronTiny =
       electronBounds.width < 500 || electronBounds.height < 400;
-    if (!force && !shelved && !electronTiny) return;
+    if (!force && !electronTiny) return;
 
     boundsGuard = true;
     try {
@@ -839,18 +798,12 @@ export async function createWindow({
         screen.getDisplayMatching(electronBounds).workArea,
       );
       window.setMinimumSize(minimum.width, minimum.height);
-      // Prefer normal layer so CG helpers and Stage Manager stay stable.
+      // Prefer normal layer so Stage Manager stays stable.
       window.setAlwaysOnTop(false);
       window.show();
       window.focus();
       window.moveTop();
-      if (shelved) {
-        window.hide();
-        window.setBounds({ ...CODEX_BOUNDS }, false);
-        window.show();
-      } else {
-        window.setBounds({ ...CODEX_BOUNDS }, false);
-      }
+      window.setBounds({ ...CODEX_BOUNDS }, false);
       window.setSize(CODEX_BOUNDS.width, CODEX_BOUNDS.height, false);
       window.setPosition(CODEX_BOUNDS.x, CODEX_BOUNDS.y, false);
       const restoredBounds = window.getBounds();
@@ -862,20 +815,15 @@ export async function createWindow({
       windowState.workPanelUserMovePending = false;
       applyWorkPanelReservation();
       // Brief pin only when actively recovering from a shelf.
-      if (shelved || electronTiny) {
+      if (electronTiny) {
         window.setAlwaysOnTop(true, "floating");
         pinUntil = Date.now() + 4000;
       } else {
         pinUntil = 0;
       }
-      // bust CG cache after mutation
-      lastCgAt = 0;
       console.log("BOUNDS_RESTORE", {
         electron: electronBounds,
-        cg,
-        shelved,
         afterElectron: window.getBounds(),
-        afterCg: readCgBounds(),
       });
     } finally {
       setTimeout(() => {
@@ -1013,9 +961,8 @@ export async function createWindow({
     })();
   });
 
-  // Stage Manager recovery is macOS-only. On other platforms readCgBounds is
-  // always null and cgHelperAvailable is false, so the periodic tick would only
-  // call setAlwaysOnTop(false). Under Mutter (GNOME/Linux) meta_window_unmake_above
+  // Stage Manager recovery is macOS-only. On other platforms the periodic tick
+  // would only call setAlwaysOnTop(false). Under Mutter (GNOME/Linux) meta_window_unmake_above
   // unconditionally raises the window, which causes the window to periodically
   // steal focus (see issue #568). Skip the watchdog entirely off macOS.
   const boundsWatchdog: NodeJS.Timeout | null = process.platform === "darwin"
@@ -1024,9 +971,8 @@ export async function createWindow({
       if (boundsWatchdog) clearInterval(boundsWatchdog);
       return;
     }
-    // Stage Manager recovery is macOS-only: the CG bounds helper it reads
-    // exists there alone (D039, D053, D083), and the minimum window size makes
-    // the tiny-bounds test unreachable elsewhere. On Windows/Linux this
+    // Stage Manager recovery is macOS-only (D039, D083), and the minimum
+    // window size makes the tiny-bounds test unreachable elsewhere. On Windows/Linux this
     // interval had nothing to recover and only cleared the window layer every
     // 1.5s — and Mutter answers that repeated `_NET_WM_STATE` removal by
     // raising the window (`meta_window_unmake_above` → `meta_window_raise`),
@@ -1036,16 +982,10 @@ export async function createWindow({
       if (boundsWatchdog) clearInterval(boundsWatchdog);
       return;
     }
-    const cg = readCgBounds();
     const electronBounds = window.getBounds();
-    if (!cg && cgHelperAvailable) missingCgStreak += 1;
-    else missingCgStreak = 0;
-    const shelved =
-      (!!cg && (cg.width < 500 || cg.height < 400 || cg.x < -40)) ||
-      (!cg && cgHelperAvailable && missingCgStreak >= 3);
     const electronTiny =
       electronBounds.width < 500 || electronBounds.height < 400;
-    if (shelved || electronTiny) {
+    if (electronTiny) {
       ensureStableBounds(true);
       return;
     }
