@@ -1553,16 +1553,24 @@ desktop is listed as a placeholder because it has no public configuration path
 yet.
 
 - `pi-desktop/mcp/importScan` — `{ projectPath? }` →
-  `{ candidates: ExternalMcpCandidate[], sources: ExternalMcpSourceReport[] }`.
+  `{ scanId, candidates: ExternalMcpCandidate[], sources: ExternalMcpSourceReport[] }`.
   Missing files, ENOENT and parse errors surface on `sources[].error`; one bad
   source never fails the scan. Per-source de-duplication keeps the cross-source
-  copies so the user can pick which install to import.
-- `pi-desktop/mcp/importRun` — `{ items: ExternalMcpImportItem[] }` →
-  `{ imported, skipped, failed }`. Main calls `mcp.upsert` once per item,
-  omitting `disabled` from the server payload and following up with
+  copies so the user can pick which install to import. Candidate `env` and
+  `headers` are redacted to `Array<{ name, hasValue }>`: secret values never
+  cross IPC. Main keeps the full candidates in memory under the opaque
+  `scanId` (bounded count, 10-minute lifetime) until an import consumes them.
+- `pi-desktop/mcp/importRun` — `{ scanId, level?, projectPath?, items:
+  Array<{ source, sourcePath, id }> }` → `{ imported, skipped, failed }`.
+  Main resolves each selection against the retained scan, ignores any other
+  renderer-supplied field, and consumes the handle; selections for an unknown,
+  expired or already-consumed scan land in `failed` and the user rescans. Main
+  calls `mcp.upsert` once per resolved candidate with its real `env` /
+  `headers`, omitting `disabled` from the server payload and following up with
   `mcp.setEnabled({ enabled: false })` when the source marked the server
   disabled. One failure never blocks the rest; conflicts land in `skipped`
-  and every other error lands in `failed`.
+  and every other error lands in `failed`. Result rows echo only the
+  selection. The DTOs live in `@pi-desktop/shared` (`external-mcp-import.ts`).
 
 ```ts
 type McpServerStatus = {

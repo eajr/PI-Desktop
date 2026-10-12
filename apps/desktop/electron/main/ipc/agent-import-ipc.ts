@@ -7,11 +7,24 @@
  * one at a time and bucket the results into `imported / skipped / failed`, so a
  * single bad entry does not abort the batch.
  *
- * `runSkillImport` and `runMcpImport` are exported so the unit test can drive
- * them against a stub host without booting a real sidecar.
+ * MCP candidates can carry API tokens in `env` / `headers`, so the MCP scan
+ * returns a redacted projection plus a `scanId`; the full candidates stay in
+ * an in-memory `McpScanCache` and `importRun` resolves the user's selections
+ * against it. Secret values never reach the renderer.
+ *
+ * `runSkillImport`, `runMcpImport`, `scanMcpForRenderer` and
+ * `runMcpImportFromScan` are exported so the unit test can drive them against
+ * a stub host without booting a real sidecar.
  */
-import { IPC } from "@pi-desktop/shared";
+import {
+  IPC,
+  type ExternalMcpImportPayload,
+  type ExternalMcpImportRunResult,
+  type ExternalMcpImportSelection,
+  type ExternalMcpScanResult,
+} from "@pi-desktop/shared";
 import type { HostProcess } from "../host-process";
+import { McpScanCache, redactMcpCandidate } from "../importers/agent-mcp-scan-cache";
 import {
   scanExternalMcp,
   type McpCandidate,
@@ -240,6 +253,74 @@ function scanErrorReport(error: unknown): ScanErrorReport {
   };
 }
 
+/**
+ * Run a scan, retain its full candidates in `cache`, and return the redacted
+ * projection the renderer may see. A scan that throws becomes a synthetic
+ * error source row with an empty (still valid) scan handle.
+ */
+export async function scanMcpForRenderer(
+  cache: McpScanCache,
+  scan: () => Promise<McpScanResult>,
+): Promise<ExternalMcpScanResult> {
+  let raw: McpScanResult | ScanErrorReport;
+  try {
+    raw = await scan();
+  } catch (error) {
+    raw = scanErrorReport(error);
+  }
+  const candidates: McpCandidate[] = raw.candidates;
+  const scanId = cache.put(candidates);
+  return { scanId, candidates: candidates.map(redactMcpCandidate), sources: raw.sources };
+}
+
+function selectionOf(value: unknown): ExternalMcpImportSelection | null {
+  if (!value || typeof value !== "object") return null;
+  const { source, sourcePath, id } = value as Record<string, unknown>;
+  if (typeof source !== "string" || typeof sourcePath !== "string" || typeof id !== "string") {
+    return null;
+  }
+  return { source: source as ExternalMcpImportSelection["source"], sourcePath, id };
+}
+
+/**
+ * Resolve the renderer's selections against the retained scan and import the
+ * full candidates (including their real `env` / `headers`). The scan handle is
+ * consumed; selections that do not match a live scan land in `failed`.
+ */
+export async function runMcpImportFromScan(
+  hostCall: HostCall,
+  cache: McpScanCache,
+  payload: ExternalMcpImportPayload,
+): Promise<ExternalMcpImportRunResult> {
+  const selections = (Array.isArray(payload?.items) ? payload.items : [])
+    .map(selectionOf)
+    .filter((entry): entry is ExternalMcpImportSelection => entry !== null);
+  const { found, missing } = cache.take(payload?.scanId, selections);
+  // `runMcpImport` echoes back the item objects it was given, so key the
+  // renderer-safe selection by object identity.
+  const selectionByItem = new Map<McpImportRunItem, ExternalMcpImportSelection>();
+  for (const { selection, candidate } of found) {
+    const { warnings: _warnings, ...item } = candidate;
+    selectionByItem.set(item, selection);
+  }
+  const level = payload?.level === "project" ? "project" : "global";
+  const run = await runMcpImport(hostCall, {
+    level,
+    ...(typeof payload?.projectPath === "string" ? { projectPath: payload.projectPath } : {}),
+    items: [...selectionByItem.keys()],
+  });
+  const toSelection = (item: McpImportRunItem): ExternalMcpImportSelection =>
+    selectionByItem.get(item) ?? { source: item.source, sourcePath: item.sourcePath, id: item.id };
+  return {
+    imported: run.imported.map(({ item, server }) => ({ item: toSelection(item), server })),
+    skipped: run.skipped.map(({ item, reason }) => ({ item: toSelection(item), reason })),
+    failed: [
+      ...run.failed.map(({ item, error }) => ({ item: toSelection(item), error })),
+      ...missing.map((item) => ({ item, error: "scan expired or unknown; scan again" })),
+    ],
+  };
+}
+
 /** Register the four `*importScan` / `*importRun` handlers. */
 export function registerAgentImportIpc({
   registrar,
@@ -270,22 +351,19 @@ export function registerAgentImportIpc({
     return result;
   });
 
+  const mcpScans = new McpScanCache();
+
   registrar.handle(
     IPC.invoke.mcpImportScan,
-    async ({ projectPath }: { projectPath?: string } = {}) => {
-      try {
-        return await scanExternalMcp({ projectPath });
-      } catch (error) {
-        return scanErrorReport(error);
-      }
-    },
+    async ({ projectPath }: { projectPath?: string } = {}) =>
+      scanMcpForRenderer(mcpScans, () => scanExternalMcp({ projectPath })),
   );
 
-  registrar.handle(IPC.invoke.mcpImportRun, async (payload: McpImportRunPayload) => {
+  registrar.handle(IPC.invoke.mcpImportRun, async (payload: ExternalMcpImportPayload) => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
     const hostCall: HostCall = (method, params) => host.call(method, params);
-    const result = await runMcpImport(hostCall, payload);
+    const result = await runMcpImportFromScan(hostCall, mcpScans, payload);
     if (result.imported.length) {
       if (refreshUserMcp && currentWorkspacePath) {
         await refreshUserMcp(currentWorkspacePath()).catch(() => undefined);

@@ -12,6 +12,7 @@ export * from "./inline-attachments.js";
 export * from "./session-link.js";
 export * from "./fuzzy.js";
 export * from "./mcp-import.js";
+export * from "./external-mcp-import.js";
 export * from "./mcp-catalog.js";
 export * from "./mcp-catalog-builtin.js";
 export {
