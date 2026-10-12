@@ -1,5 +1,9 @@
 # Live Work v2.1 Manual Device Acceptance
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 Status: **NOT RUN**. These cases need isolated real accounts and audio
 hardware. No account, paid endpoint, user project, or running Electron
 instance was used for the automated work in this candidate. A fixture pass is

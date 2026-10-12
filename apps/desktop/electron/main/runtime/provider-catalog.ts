@@ -4,7 +4,6 @@ import {
   defaultCommandShellForPlatform,
   isCommandShellId,
   validateNetworkProxy,
-  validateSpeechSettings,
   type CommandShellId,
   type ModelBinding,
   type SessionThinkingLevel,
@@ -252,11 +251,6 @@ export function createProviderCatalogRuntime({
         });
       }
       value.networkProxy = proxy.value;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, "speech")) {
-      (value as T & { speech?: unknown }).speech = validateSpeechSettings(
-        (value as { speech?: unknown }).speech,
-      );
     }
     return settings;
   };

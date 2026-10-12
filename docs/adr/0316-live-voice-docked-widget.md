@@ -1,5 +1,9 @@
 # ADR 0316: The Live Voice call bar is a docked desktop widget window
 
+> Superseded 2026-10-12 by [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md)
+> (D662): this build has no Live Voice or Live Work. The text below is
+> historical.
+
 - Status: Accepted
 - Date: 2026-10-01
 - Deciders: PI-Desktop core

@@ -45,9 +45,9 @@
 - [17-asktool-questions.md](/zh-CN/spec/03-runtime/17-asktool-questions)
 - [18-line-anchored-edit-contract.md](/zh-CN/spec/03-runtime/18-line-anchored-edit-contract)
 - [19-remote-agent-control-protocol.md](/zh-CN/spec/03-runtime/19-remote-agent-control-protocol)
-- [20-speech.md](/zh-CN/spec/03-runtime/20-speech)
-- [live-voice.md](/zh-CN/spec/03-runtime/live-voice)
-- [live-work-session.md](/zh-CN/spec/03-runtime/live-work-session)
+- [20-speech.md](/zh-CN/spec/03-runtime/20-speech)（已移除，D662）
+- [live-voice.md](/zh-CN/spec/03-runtime/live-voice)（已移除，D662）
+- [live-work-session.md](/zh-CN/spec/03-runtime/live-work-session)（已移除，D662）
 - [21-image-generation.md](/zh-CN/spec/03-runtime/21-image-generation)
 - [22-config-sync.md](/zh-CN/spec/03-runtime/22-config-sync)
 - [svg-attachment-input.md](/zh-CN/spec/03-runtime/svg-attachment-input)

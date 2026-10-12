@@ -1,7 +1,11 @@
 # Live Voice v1 Progress
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 - Implemented public settings/IPC DTOs, validation, error codes and the
-  `voice-runtime/live` pure PCM and wire-protocol entry.
+  `voice-runtime/live` (now `@pi-desktop/live-voice-protocol`, D662) pure PCM and wire-protocol entry.
 - Implemented Main authentication/provider resolution, Codex WebRTC
   negotiation, Gemini and Realtime WebSocket adapters, bounded PCM bridge,
   capture lease, owner checks, settings/provider invalidation and lifecycle

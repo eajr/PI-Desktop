@@ -2,7 +2,6 @@ import {
   app,
   BrowserWindow,
   ipcMain,
-  powerMonitor,
   session,
 } from "electron";
 import { join } from "node:path";
@@ -51,12 +50,7 @@ import { hasSingleInstanceLock, isDevelopmentBuild } from "./installation";
 import { getStorageBootstrap } from "./storage/bootstrap";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import { registerIpcHandlers } from "./ipc/register";
-import { createVoiceService } from "./voice-service";
-import { MicrophoneLeaseRegistry } from "./live-voice/microphone-lease";
-import { createLiveCallService } from "./live-voice/runtime";
-import { createLiveVoiceWidget } from "./live-voice/widget-window";
-import { getActiveRemoteHostsBoot } from "./bootstrap/remote-hosts";
-import { installLiveMicrophonePermissionHandlers } from "./live-voice/microphone-permissions";
+import { installDefaultSessionPermissionHandlers } from "./default-session-permissions";
 import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
@@ -344,7 +338,6 @@ const {
   pluginViews,
   browserHost,
   announceTurnEnded,
-  speech,
 } = pluginServices;
 
 const providerCatalogRuntime = createProviderCatalogRuntime({
@@ -800,47 +793,6 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, bootBackends } = runtimeLifecycle;
 
-let voiceServiceReference: ReturnType<typeof createVoiceService> | null = null;
-const microphoneLeases = new MicrophoneLeaseRegistry(() => {
-  const phase = voiceServiceReference?.getState().phase;
-  return phase === "preparing" || phase === "starting" || phase === "listening" || phase === "transcribing" || phase === "cancelling";
-});
-const voiceService = createVoiceService(
-  dataDir + "/voice-models",
-  getMainWindow,
-  (token) => microphoneLeases.acquire("dictation", token),
-);
-voiceServiceReference = voiceService;
-// The docked call widget: a desktop-level window that shows the call chrome
-// wherever the user put it and sends every action back to this window, which
-// stays the Live Voice owner (media, microphone lease, work scope).
-const liveVoiceWidget = createLiveVoiceWidget({
-  getMainWindow,
-  dataDir,
-  safeOpenExternal,
-  log: (message, data) => logger.app("diagnostics", "warn", message, data ? { data } : undefined),
-});
-
-const liveCallService = createLiveCallService({
-  getHost,
-  getMainWindow,
-  getAgentHostBridge: () => mainState.agentHostBridge,
-  getSidecar,
-  getBackendRouter: () => startupState.backendRouter,
-  getRemoteHosts: () => getActiveRemoteHostsBoot(),
-  vendorOAuth,
-  microphoneLeases,
-  resolveAgentRuntimeLaunch: (sessionId, session, settings, overrides) => {
-    if (!sessionLaunchRuntime) return Promise.reject(new Error("session launch runtime is not initialized"));
-    return sessionLaunchRuntime.resolveAgentRuntimeLaunch(sessionId, session, settings, {
-      ...overrides,
-      mode: "agent",
-    });
-  },
-  log: (level, message, data) => logger.app("provider", level, message, { data }),
-  onCallView: (view) => liveVoiceWidget.publish(view),
-});
-
 function registerIpc() {
   return registerIpcHandlers({
     restartForStorage: () => {
@@ -871,7 +823,6 @@ function registerIpc() {
     persistenceOutbox,
     logger,
     plugins,
-    speech,
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
@@ -941,9 +892,6 @@ function registerIpc() {
     getPluginPanelTheme: () => mainState.pluginPanelTheme,
     isDeveloperMode: () => mainState.developerMode,
     sendToRenderer,
-    voiceService,
-    liveCallService,
-    liveVoiceWidget,
   });
 }
 
@@ -958,38 +906,9 @@ app.on("web-contents-created", (_event, contents) => {
   });
 });
 
-const liveLifecycleWindows = new WeakSet<BrowserWindow>();
-app.on("browser-window-created", (_event, window) => {
-  queueMicrotask(() => {
-    if (getMainWindow() !== window || liveLifecycleWindows.has(window)) return;
-    liveLifecycleWindows.add(window);
-    const contentsId = window.webContents.id;
-    window.on("hide", () => {
-      void liveCallService.endForWebContents(contentsId, "window-hidden");
-    });
-    window.webContents.on("did-start-navigation", (_event, _url, _inPlace, isMainFrame) => {
-      if (isMainFrame) void liveCallService.endForWebContents(contentsId, "window-navigated", true);
-    });
-    window.webContents.once("render-process-gone", () => {
-      void liveCallService.endForWebContents(contentsId, "renderer-gone", true);
-    });
-    window.webContents.once("destroyed", () => {
-      void liveCallService.endForWebContents(contentsId, "renderer-gone", true);
-    });
-  });
-});
 void app.whenReady().then(() => {
-  installLiveMicrophonePermissionHandlers({
-    targetSession: session.defaultSession,
-    getMainWindow,
-    hasReservation: (owner) => liveCallService.hasMicrophoneReservation(owner),
-  });
-  powerMonitor.on("suspend", () => void liveCallService.endForLifecycle("app-suspended"));
-  powerMonitor.on("lock-screen", () => void liveCallService.endForLifecycle("app-suspended"));
+  installDefaultSessionPermissionHandlers(session.defaultSession);
 });
-
-// The widget is chrome for a call this window owns; it must never outlive the app.
-app.once("will-quit", () => liveVoiceWidget.close());
 
 registerApplicationStartup({
   hasSingleInstanceLock,
@@ -1048,7 +967,6 @@ registerShutdownHandlers({
   logger,
   confirmQuitDialog,
   disposePowerSaveBlockers,
-  liveCallService,
   disposeSystemProxyRelay,
 });
 

@@ -53,6 +53,7 @@ This log freezes previously open questions into concrete decisions.
 | D657 | Window bounds recovery never runs an external helper | **Supersede D053; amend D447. The main process no longer executes the `/tmp/pi-window-bounds` CoreGraphics helper (or any external process) to detect a Stage Manager shelf. Shelf detection in `bootstrap/window.ts` uses Electron bounds only (width < 500 or height < 400), which is what every build without that unshipped dev binary already did. The macOS watchdog cadence, `ensureStableBounds` triggers and the Codex footprint restore are unchanged.** | `/tmp` is world-writable, so any local user could plant that path and get code execution as the desktop user every 1.5s, including in packaged builds; nothing in the repository builds or ships the helper. |
 | D658 | RACP device tokens expire and re-pair over SSH | **Amend D448 / ADR 0285 / ADR remote-provider-import / security §3.4: a `pdt1.` device token is refused after 30 days unused or 180 days since issue (`RACP_DEVICE_TOKEN_IDLE_TTL_MS`, `RACP_DEVICE_TOKEN_MAX_LIFETIME_MS`); upgrade and connection close record use. An expired-but-valid token gets `401` with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED` (new non-retriable code); other refusals keep `REMOTE_AUTH_FAILED`. An SSH-managed desktop then runs `pi-host pairing-issue` over SSH (admin-socket `pairing.issue`, single-use, two-minute token), exchanges it with the Host id check, stores the new token, and retries once; no reinstall or restart, and revoked tokens are never re-paired. `credentials.json` becomes version 2 (`tokenIssuedAt`, persisted `lastSeenAt`); version 1 records start both windows at migration time. Failed upgrade authentications are throttled per address (10-failure bucket, one per 6 s, then `429` + `Retry-After` from 1 s doubling to 60 s), logged without token material. `applyCeilingToPairedDevices` stays off because the same default also governs the local desktop principal.** | A never-expiring `owner` credential stayed useful indefinitely once copied; SSH is the pairing root of trust, so renewal can be automatic without asking the user or restarting the Host. See ADR racp-device-token-lifetime. |
 | D660 | Confirm SSH host keys instead of trusting on first use | **Amend ADR 0292 / D453 through ADR 0328: every remote-host `ssh` child uses `StrictHostKeyChecking=yes` with `UserKnownHostsFile` listing the app-managed `<dataDir>/ssh_known_hosts` first and the user's default files after it. An unknown host fails with `SSH_HOST_KEY_UNKNOWN` carrying key type and SHA-256 fingerprint; Settings asks the user to confirm, and only a confirmed key is recorded in the app file. A changed key fails with `SSH_HOST_KEY_CHANGED` and is never accepted by the app. `RemoteHostBootstrapRequest.trustedHostKeys` and both error codes are additive; host/user argv values also reject whitespace and control characters, and the destination follows `--`. See `05-security/02-remote-control-security.md` §3.4 and E2E-REMOTE-HOST-ssh-host-key-confirmation.** | `accept-new` trusted a never-seen host silently, so an attacker at first connect could impersonate it and receive the SSH password and synced provider keys. |
+| D662 | Remove Live Voice, local Dictation and host speech | **Supersede ADRs 0281, 0291, 0311, 0313, 0315, 0316 through ADR fork-removes-voice-and-speech: delete `packages/voice-runtime`, its native and model-download dependencies, Live Voice and Live Work (main-process call service, provider adapters, docked widget, `packages/live-voice-protocol`, host-runtime `live-work`), every `pi-desktop/voice/*` and `pi-desktop/speech/*` IPC channel, `AppSettings.liveVoice` / `voice` / `speech`, the `LIVE_*` and `SPEECH_*` error codes, the voice shortcuts, and the Plugin SDK `speech.adapter.register` permission and `pi.speech` namespace. The default session refuses `media`. Stored values, `voiceOrigin` rows, and manifests that declare the permission still load.** | Users rely on system dictation and do not use real-time calls; the features shipped native addons, a model download path, provider protocol clients, a second window, IPC, and a plugin permission. |
 
 ## B. Secondary implementation defaults
 
@@ -7734,3 +7735,40 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `apps/desktop/test/skill-project-approval.test.mjs`. See
   `docs/adr/project-mcp-server-approval.md` and
   E2E-SKILL-project-skill-requires-approval.
+
+## 2026-10-12 — Remove Live Voice, local Dictation and host speech (D662)
+
+- D662 supersedes ADR 0281 and ADR 0291 through
+  `docs/adr/fork-removes-voice-and-speech.md`. Local Dictation
+  (`packages/voice-runtime`, `transcribe-cpp`, `@picovoice/pvrecorder-node`,
+  `@huggingface/hub`, `opencc-js`, Hugging Face model downloads) and the
+  provider-based host speech capability (transcribe/synthesize, the
+  `pi-desktop/speech/*` IPC, `AppSettings.speech`, and the `SPEECH_*` error
+  codes) are removed. Users of this build rely on system dictation.
+- Plugin SDK contract removal: `speech.adapter.register`, `pi.speech`, and the
+  `PluginSpeech*` types are gone. A manifest that still declares the permission
+  loads; the guest `pi.speech` stub fails at call time with `UNSUPPORTED`, and
+  `pi-plugin check` reports `permission.removed`.
+- A second stage also removes Live Voice and Live Work and supersedes ADRs
+  0311, 0313, 0315, and 0316: the main-process call service and provider
+  adapters (Codex Live, Gemini Live, OpenAI Realtime), the docked call widget,
+  `@pi-desktop/live-voice-protocol`, host-runtime `live-work`, the
+  `pi-desktop/voice/live/*` IPC, `AppSettings.liveVoice`, the `LIVE_*` error
+  codes, the Voice settings page, and the `voiceToggle` / `voiceCancel`
+  shortcuts. A new default-session permission handler refuses `media`, so the
+  main renderer does not fall back to Electron's grant-all default. The
+  microphone entitlement stays for plugin `ui.microphone` and
+  `audio.capture.background`.
+- Live Voice stored no credentials of its own. Stored `liveVoice` settings
+  are ignored, voice shortcut overrides are dropped on migration,
+  `live-voice-widget.json` is not deleted, and `voiceOrigin` /
+  `voice_origin_json` stays as dormant provenance with no schema change.
+- Stored `voice` / `speech` settings are neither read nor rewritten, so startup
+  needs no migration. `<dataDir>/voice-models` is not deleted. Config sync no
+  longer carries `speech`.
+- Covered by `apps/desktop/test/plugin-speech-removed.test.mjs`,
+  `packaging-footprint.test.mjs`, shared protocol tests, plugin-sdk and
+  plugin-devkit tests, host-core config-sync and settings tests, and
+  `apps/desktop/test/voice-removed.test.mjs`. See
+  E2E-PLUGIN-removed-speech-permission-still-loads and
+  E2E-VOICE-live-voice-removed-no-entry-points.

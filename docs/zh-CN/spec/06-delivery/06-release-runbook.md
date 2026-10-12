@@ -525,8 +525,4 @@ electron PI-Desktop-<version>-linux-<arch>.asar
   `ubuntu-22.04-arm` 运行器），因此 host-core 需要 glibc 2.35 或更高版本
   （Ubuntu 22.04、Debian 12、Fedora 36+）。每个标签作业都会运行
   `scripts/check-linux-host-glibc.mjs`，拒绝需要更新 glibc 的二进制文件。
-- Linux arm64 的麦克风采集仅在 Raspberry Pi 板卡上可用：
-  `@picovoice/pvrecorder-node` 按 `/proc/cpuinfo` 的 CPU part 判定 Linux
-  arm64。语音转写（`transcribe-cpp` 随附 `linux-arm64-cpu-vulkan` 包）以及
-  其余所有功能在任何 arm64 Linux 设备上都可用。
 - 回滚、分阶段部署和预发布渠道政策仍是开放的发布工作。现有未签名 macOS 安装可能需要先手动安装一次已签名 DMG，之后应用内更新才能成功。

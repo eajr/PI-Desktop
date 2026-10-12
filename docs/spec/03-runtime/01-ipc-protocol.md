@@ -35,7 +35,6 @@ Principles:
 | `menu` | Allowlisted application-menu commands and native editing/window actions |
 | `notification` | Durable inbox list/read/clear, new/activated events, and native-notification sound cues |
 | `stats` | Completed-turn token history (host RPC; dashboard is plugin-owned) |
-| `voice/live` | App-owned real-time calls, secret-free status/settings DTOs, and per-call media ports |
 
 ## 3. Channel Conventions
 
@@ -2294,17 +2293,6 @@ attachments. Electron main resolves the provider/model and credentials, so the
 renderer never receives a secret. Empty drafts, slash-command drafts, missing
 models, and provider failures return the common `Result` error envelope.
 
-### speech/getStatus, speech/transcribe, speech/synthesize
-
-```ts
-speech/getStatus() -> SpeechStatus
-speech/transcribe({ sessionId?, path, mimeType?, language? }) -> { text }
-speech/synthesize({ sessionId?, text, voice?, format? }) -> { path, mimeType, dataUrl? }
-```
-
-Host speech is independent of chat. Bindings live on `AppSettings.speech`.
-Audio bytes never enter the renderer. See spec `20-speech.md`.
-
 ### app/openFeedback (D313)
 
 ```ts
@@ -2547,52 +2535,9 @@ of many resource objects is therefore not an interface with nothing to show.
 Background polls report nothing, since only the manual path has a caller
 watching.
 
-## 16. Live Voice API
+## 16. Live Voice API (removed)
 
-Live Voice is an app-owned call path described in [live-voice.md](live-voice.md)
-whose ownership is bound to the main window. Its DTOs are defined in
-`packages/shared/src/types/live-voice.ts`; the preload exposes only the
-allowlisted channels below. Main derives the owner from the invoking trusted
-frame and sends call events only to that frame. No payload can supply an owner
-identity or credentials. The docked widget window draws the call chrome without
-owning the call, so its three channels are validated separately and never enter
-owner derivation.
-
-| IPC channel | Direction | contract |
-|---|---|---|
-| `pi-desktop/voice/live/status` | Renderer → Main | redacted feature status, binding readiness and settings revision |
-| `pi-desktop/voice/live/prepare` | Renderer → Main | idempotent call preparation by request ID; synchronously reserves the shared microphone lease |
-| `pi-desktop/voice/live/connect` | Renderer → Main | connects a prepared call; Codex may include a bounded SDP offer |
-| `pi-desktop/voice/live/setMuted` | Renderer → Main | sets mute state with a monotonically increasing capture epoch |
-| `pi-desktop/voice/live/reportMedia` | Renderer → Main | reports capture, connection and release lifecycle; release acknowledgement is required before lease reuse |
-| `pi-desktop/voice/live/reportPlayback` | Renderer → Main | bounded list of played PCM cursors used for interruption/truncation |
-| `pi-desktop/voice/live/reportDelegation` | Renderer → Main | reports a provider-requested delegation; v1 rejects execution and never forwards it to Agent/MCP |
-| `pi-desktop/voice/live/reportControlApplied` | Renderer → Main | acknowledges a supported provider control or a rejected unsupported action |
-| `pi-desktop/voice/live/end` | Renderer → Main | idempotently ends an active call or cancels its pending request |
-| `pi-desktop/voice/live/heartbeat` | Renderer → Main | keeps the owning call alive while its renderer is responsive |
-| `pi-desktop/voice/live/event/changed` | Main → Renderer | redacted call phase, error, notice and activity updates |
-| `pi-desktop/voice/live/event/port` | Main → Renderer | transfers exactly one call-scoped `MessagePort` with its call ID and one-time nonce |
-| `pi-desktop/voice/live/event/control` | Main → Renderer | provider control request, limited to the explicit v1 control vocabulary |
-| `pi-desktop/voice/live/event/transcript` | Main → Renderer | transient bounded transcript event for the current call |
-| `pi-desktop/voice/live/widget/visibility` | Widget → Main | the docked widget's own presentation decision and the content box it needs; Main shows or hides that window accordingly |
-| `pi-desktop/voice/live/widget/action` | Widget → Main | a call action pressed in the docked widget; Main validates the sender and forwards it to the owner frame, which runs it |
-| `pi-desktop/voice/live/widget/ownerState` | Main window → Main | what only the owner frame knows: its own failure code (for example a refused mute) and whether the bound work session waits on a decision; neither is in the call view |
-| `pi-desktop/voice/live/event/widgetState` | Main → Widget | the authoritative call view plus the owner's own failure code and waiting-decision flag, pushed to the docked widget window |
-| `pi-desktop/voice/live/event/widgetAction` | Main → Main window | the forwarded widget action the owner frame has to run |
-
-The `MessagePort` is provisioned only after successful owner validation, then
-relayed by preload to the renderer window. The owner echoes the per-call nonce
-in its first `hello`; Main accepts the port once and only after the call ID and
-nonce match the prepared call. Its binary frames are bounded PCM audio, capture
-epochs, release acknowledgements, playback cursors and protocol readiness
-signals. It is not a generic IPC tunnel: it carries no provider
-credentials, arbitrary commands, workspace paths, Agent messages or durable
-transcripts. A port is closed on call end or owner loss.
-
-The docked widget window is not a call owner and can never become one: it is
-refused on every owner-validated channel with `PERMISSION_DENIED`, exactly like
-any other renderer. Main answers its two channels only when the sender is that
-window, and the owner's own failure code arrives through the main window, which
-is the frame that ran the action. A widget action never changes call state by
-itself: it is forwarded to the owner frame, and the resulting state reaches the
-widget through the same authoritative view the owner receives.
+The fork removed Live Voice (ADR `fork-removes-voice-and-speech`, D662). No
+`pi-desktop/voice/live/*` channel, `onLiveVoicePort` preload API, or
+`LIVE_*` error code exists. The protocol test asserts that no `voice/` or
+`speech/` channel is exposed.

@@ -340,8 +340,7 @@ combined model × reasoning selection (§11).
 
 - Every control is keyboard-reachable with Tab
 - Composer stop control has `aria-label="Stop generating"`
-- The Composer renders no transcription or speech control; the host speech
-  capability is reachable only from IPC and plugins (ADR 0291).
+- The Composer renders no transcription or speech control (D662).
 - The topbar does not render a separate running-state indicator; the Composer
   submit control and transcript working feedback remain the running-state cues.
 
@@ -3241,86 +3240,9 @@ reasoning-level control.
   unknown/custom models without an explicit override, disabled image input, and
   oversized images use the existing canonical `@<path>` file-tool fallback.
   There are no visual previews in MVP.
-- No voice-to-draft input. The opt-in Live Voice path below is separate from
-  the Composer draft and does not restore the hidden Dictation entry.
-
-### 11.7.1 Live Voice preparation, compact call bar, and details
-
-Subject to the existing developer-mode and development-build gate, Live Voice
-has four presentation states:
-
-| State | Surface and allowed interaction |
-|---|---|
-| Disabled | No Live Voice or Live Work Composer icons. Enable only in Settings → Voice. |
-| Enabled, idle | One Live Voice icon opens preparation, not a call. Show the exact selected provider and its readiness cause, one default-off bounded-context consent checkbox, and an explicit Start action. The panel carries no explanatory prose: only a blocking cause is stated, because a paragraph of text pushes Start out of reach. |
-| Call in progress | One docked desktop widget window: Connecting with Cancel; connected with mute/unmute, End, and Details; Ending until Main and renderer cleanup both settle. |
-| Details open | Deliberately opened transcript/provider/work inspection surface; dismissing it does not end the call. |
-
-- The preparation popup uses shared controls and a localized accessible title.
-  Opening or dismissing it must not prepare a call, request microphone access,
-  initialize media, or contact a voice provider. Start is unavailable when the
-  exact selected binding is not ready, even if another binding is ready; show
-  the actual readiness cause and a Settings action instead of silently falling
-  back to another account. Beyond that it carries no explanatory prose.
-- Start defaults to muted and uses the current Composer session as the work
-  target after Main validates it against the fresh multi-backend catalog. No
-  per-call work-access checkbox or mandatory preselection is required. If there
-  is no current session, start unbound and let the user list/select a target by
-  voice. Voice target changes apply only to subsequent operations.
-- Bounded session-context sharing remains a separate, unchecked call consent.
-  It reads only the current target's bounded plain-text history and resets when
-  the call ends; it does not grant work permissions or approve actions.
-- The compact bar is its own frameless, transparent, always-on-top desktop
-  window, not AppShell chrome. It joins every Space and floats above other
-  applications, so a call stays visible and controllable while the user works
-  elsewhere; in-app navigation cannot hide it, because it is not inside the app
-  window at all. The window is dragged through the bar itself and sized to what
-  the bar draws, and its placement is remembered and clamped to the work area,
-  so a position saved on a wider display can never strand the controls. The
-  status row and its controls stay on one row — a folded status line would read
-  as two rows of chrome — so the bar reports the width it needs and the window
-  grows to it.
-- The widget is a view of the call, never its owner. Every press is forwarded to
-  the main window, which owns the microphone, the media and the call-scoped
-  work, and the resulting state returns through the same authoritative view the
-  owner receives. A failure only the owner frame can observe — a refused mute, a
-  playback retry that failed — is reported so the bar names it in place next to
-  its verbatim `LIVE_*` code; the bar is the only call chrome the user sees. The
-  same report carries whether the bound work session waits on a decision the user
-  has to make in that session's own card, which the widget window cannot see.
-- The main window draws no call bar. It keeps the details surface, which the
-  widget's Details action opens after bringing that window forward, and it stays
-  the frame that runs the actions. Feature disable hides the idle icon; the
-  widget disappears once the call and its renderer cleanup settle. Late Main
-  terminal events and renderer media release cannot briefly expose a second
-  Start. Unconfirmed media release remains visible, cannot be dismissed into a
-  reusable call slot, and suppresses another Start until restart.
-- Details never opens automatically during startup or connection. It owns the
-  bounded transient transcript (including an empty state), provider identity,
-  current work target, per-operation targets, work actions and results. Target
-  changes do not retarget existing operations. Close, outside press and Escape
-  dismiss the surface only and restore focus to an available trigger. The bar
-  remains usable, and dismissing Details never submits or stops work.
-- When the bound work session is waiting on the user, the bar keeps a
-  persistent waiting line and Details shows the pending request (the asktool
-  question as bounded plain text, the tool awaiting permission, or the plan
-  awaiting approval) with an action that opens the exact bound session and
-  closes Details. Another session's request is never attributed to the bound
-  session, and with no backend waiting evidence nothing is shown. These
-  surfaces carry no decision: nothing in the bar or Details can answer or
-  approve a permission, Plan, or AskTool request. The voice path may resolve
-  the bound session's single open AskTool question by selecting among that
-  question's own option labels; a permission or Plan/Goal approval is still
-  only ever made here, in the desktop UI.
-- The configurable toggle shortcut retains deliberate direct start from idle
-  and end during a call. Direct start also defaults to the current Composer
-  session and leaves bounded-context consent off. The startup-cancel shortcut
-  only acts when no popup has consumed the key; Escape never ends a connected
-  call.
-
-See [Live Voice](../03-runtime/live-voice.md) and
-[Live Work](../03-runtime/live-work-session.md) for the unchanged ownership,
-permission, and call-scoped work contracts.
+- No voice input of any kind. Live Voice and local Dictation were removed
+  (D662); the Composer has no call button, preparation popup, or call bar, and
+  no docked call widget window exists.
 
 ### 11.8 Slash commands, @ file references, and clipboard files (D123–D125, D197, D209, D262, D362, D397, ADR 0024, ADR 0059, ADR 0070, ADR 0131, ADR 0221, ADR 0222)
 

@@ -19,10 +19,6 @@ import type {
   UiMessage,
   MessageRevisionSummary,
   AgentPromptResponse,
-  SpeechStatus,
-  SpeechSynthesizeRequest,
-  SpeechSynthesizeResult,
-  SpeechTranscribeRequest,
   AgentStopResponse,
   AgentStopSubagentsRequest,
   AgentStopSubagentsResponse,
@@ -153,7 +149,6 @@ import {
   normalizeChatContentMaxWidth,
   validateNetworkPolicy,
   validateNetworkProxy,
-  validateSpeechSettings,
   JEV_API_KEY_SECRET_REF,
 } from "@pi-desktop/shared";
 
@@ -261,7 +256,6 @@ declare global {
     piDesktop?: {
       invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<Result<T>>;
       on: (channel: string, listener: (...args: unknown[]) => void) => () => void;
-      onLiveVoicePort?: () => () => void;
       channels: typeof IPC;
       platform: NodeJS.Platform;
       /** Authoritative OS locale passed from the main process at window creation. */
@@ -461,11 +455,6 @@ export function validateSettingsWrite(settings: AppSettings): AppSettings {
       });
     }
     value.networkPolicy = policy.value;
-  }
-  if (Object.prototype.hasOwnProperty.call(value, "speech")) {
-    (value as AppSettings).speech = validateSpeechSettings(
-      (value as { speech?: unknown }).speech,
-    );
   }
   return settings;
 }
@@ -924,11 +913,6 @@ export const api = {
     invoke<AgentPromptResponse>(IPC.invoke.agentSteer, req),
   prompt: (req: AgentPromptRequest) =>
     invoke<AgentPromptResponse>(IPC.invoke.agentPrompt, req),
-  speechStatus: () => invoke<SpeechStatus>(IPC.invoke.speechGetStatus),
-  speechTranscribe: (req: SpeechTranscribeRequest) =>
-    invoke<{ text: string }>(IPC.invoke.speechTranscribe, req),
-  speechSynthesize: (req: SpeechSynthesizeRequest) =>
-    invoke<SpeechSynthesizeResult>(IPC.invoke.speechSynthesize, req),
   compact: (req: AgentCompactRequest) =>
     invoke<AgentCompactResponse>(IPC.invoke.agentCompact, req),
   abort: (sessionId: string) =>

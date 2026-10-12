@@ -9,9 +9,6 @@ allowBuilds:
   esbuild: true
   node-pty: true
   protobufjs: true
-  # koffi (FFI of transcribe-cpp) loads the prebuilt @koromix/koffi-<platform>
-  # binary; its from-source install script was never approved and is not needed.
-  koffi: false
 # pnpm records exact-version exclusions for the current, explicitly requested
 # Pi 1.1.0 release while it is inside the minimum release age window. Keep these
 # entries exact; do not widen them to package names or ranges.

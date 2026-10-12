@@ -27,11 +27,9 @@ const pluginPanelPreloadSource = await readFile(
   "utf8",
 );
 
-test("packaging keeps native voice modules as runtime dependencies", () => {
+test("packaging ships only the updater as a runtime dependency", () => {
   assert.deepEqual(Object.keys(packageJson.dependencies).sort(), [
-    "@picovoice/pvrecorder-node",
     "electron-updater",
-    "transcribe-cpp",
   ]);
 
   for (const dependency of [
@@ -115,8 +113,9 @@ test("main bundles JavaScript dependencies and externalizes runtime modules", ()
   // jiti is listed so the trusted-extension loader's lazy import never
   // enters the main bundle; main itself never loads it (spec 16 §4.2).
   assert.match(viteConfigSource, /external:\s*\[/);
+  // The local voice native modules were removed with Dictation.
   for (const moduleName of ["@picovoice/pvrecorder-node", "transcribe-cpp"]) {
-    assert.match(viteConfigSource, new RegExp(`"${moduleName.replaceAll("/", "\\/")}"`));
+    assert.doesNotMatch(viteConfigSource, new RegExp(`"${moduleName.replaceAll("/", "\\/")}"`));
   }
   assert.doesNotMatch(viteConfigSource, /node-pty/);
   assert.doesNotMatch(JSON.stringify(packageJson.dependencies), /node-pty/);
@@ -263,14 +262,10 @@ test("macOS DMG remains a two-icon install and artifacts omit first-launch guida
   assert.equal(dmgBackgroundRetina.readUInt32BE(20), 880);
 });
 
-test("packaging keeps voice native payloads unpacked and excludes removed PTY payloads", () => {
+test("packaging unpacks no native payloads and excludes removed voice and PTY payloads", () => {
   assert.deepEqual(packageJson.build.asar, { smartUnpack: false });
-  assert.deepEqual(packageJson.build.asarUnpack, [
-    "node_modules/transcribe-cpp/**/*.node",
-    "node_modules/transcribe-cpp/**/bin/**",
-    "node_modules/@picovoice/pvrecorder-node/**/*.node",
-    "node_modules/@picovoice/pvrecorder-node/**/lib/**",
-  ]);
+  assert.equal(packageJson.build.asarUnpack, undefined);
+  assert.doesNotMatch(JSON.stringify(packageJson.build), /transcribe-cpp|pvrecorder/);
   assert.doesNotMatch(JSON.stringify(packageJson.build.files), /node-pty/);
   assert.doesNotMatch(JSON.stringify(packageJson.build.extraResources), /node-pty/);
 });

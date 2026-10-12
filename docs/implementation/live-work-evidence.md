@@ -1,5 +1,9 @@
 # Live Voice Work Integration Evidence
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 Implementation status: **COMPLETE** for Live Work v2.1. The task candidate is
 based on `origin/main` at
 `b360e04eb11edb8256b85ad314a8fdda7dc54e30`. No real provider account, paid
@@ -256,7 +260,7 @@ only the named seam and assertions, not a complete provider-to-device journey.
 - No-work-scope voice-only behavior and explicit work-scope forwarding:
   `apps/desktop/test/live-voice-service.test.mjs`.
 - Declared tool parsing and provider-specific receipt encoding:
-  `packages/voice-runtime/src/live/protocol.test.ts`.
+  `packages/live-voice-protocol/src/protocol.test.ts`.
 - Receipt-before-classification, no dispatch after receipt delivery failure,
   Host queue routing, stale steer rejection, duplicate request handling,
   early terminal correlation, query-result without a second turn, and call
@@ -282,7 +286,7 @@ only the named seam and assertions, not a complete provider-to-device journey.
 - Provider generation plus local Codex playback gating and shared-turn
   feedback status: `apps/desktop/test/live-voice-service.test.mjs`.
 - Codex local output signal threshold and strict playback-activity IPC:
-  `packages/voice-runtime/src/live/playback-monitor.test.ts` and
+  `packages/live-voice-protocol/src/playback-monitor.test.ts` and
   `apps/desktop/test/live-voice-ipc-media.test.mjs`.
 - Four-profile parser/encoder → `LiveWorkCoordinator` → actual
   `AgentHost.startTurn` / terminal event → feedback encoder fixture:

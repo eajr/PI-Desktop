@@ -15,8 +15,6 @@ export const KEYBOARD_SHORTCUT_IDS = [
   "zoomIn",
   "zoomOut",
   "toggleFullScreen",
-  "voiceToggle",
-  "voiceCancel",
 ] as const;
 
 export type KeyboardShortcutId = (typeof KEYBOARD_SHORTCUT_IDS)[number];
@@ -65,16 +63,6 @@ export const KEYBOARD_SHORTCUTS: readonly KeyboardShortcutDefinition[] = [
     defaultBinding: "F11",
     macDefaultBinding: "Mod+Ctrl+F",
   },
-  {
-    id: "voiceToggle",
-    group: "agent",
-    defaultBinding: "Mod+Shift+V",
-  },
-  {
-    id: "voiceCancel",
-    group: "agent",
-    defaultBinding: "Escape",
-  },
 ] as const;
 
 /**
@@ -98,6 +86,14 @@ const RETIRED_WINDOW_SHORTCUTS = [
   { id: "closeWindow", defaultBinding: "Mod+W" },
   { id: "summonWindow", defaultBinding: "Mod+Shift+W" },
 ] as const;
+
+/**
+ * Shortcut ids whose feature was removed: the Live Voice toggle and cancel
+ * (D662). A stored override for either is dropped by
+ * `migrateKeybindingOverrides`, so it neither reaches the settings page nor
+ * claims a key.
+ */
+const REMOVED_SHORTCUT_IDS = ["voiceToggle", "voiceCancel"] as const;
 
 /**
  * Defaults the window toggle shipped before the current one (D439). A stored
@@ -144,6 +140,7 @@ export function migrateKeybindingOverrides(
     // either, so it never reaches the migrated map.
     if (binding === undefined) continue;
     if (RETIRED_WINDOW_SHORTCUTS.some((retired) => retired.id === id)) continue;
+    if ((REMOVED_SHORTCUT_IDS as readonly string[]).includes(id)) continue;
     migrated[id] = binding;
   }
   // A stored toggle value that only repeats the current default or a superseded

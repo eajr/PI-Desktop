@@ -38,7 +38,6 @@
 | `menu` | 列入许可名单的应用程序菜单命令和本机 editing/window 操作 |
 | `notification` | 持久收件箱 list/read/clear 和 new/activated 事件 |
 | `stats` | 已完成回合的 token 历史（host RPC；仪表板由插件拥有） |
-| `voice/live` | 应用管理的实时语音通话、无凭证状态/设置 DTO 与每通电话专用媒体端口 |
 
 ## 3. 通道约定
 
@@ -1722,15 +1721,6 @@ prompt/enhance({
 提供商/模型和凭据，因此渲染器永远拿不到密钥。空草稿、斜杠命令草稿、缺失模型
 以及提供商失败都返回通用的 `Result` 错误包络。
 
-### speech/getStatus、speech/transcribe、speech/synthesize
-```ts
-speech/getStatus() -> SpeechStatus
-speech/transcribe({ sessionId?, path, mimeType?, language? }) -> { text }
-speech/synthesize({ sessionId?, text, voice?, format? }) -> { path, mimeType, dataUrl? }
-```
-
-宿主语音独立于聊天。绑定在 `AppSettings.speech`。音频字节不进入渲染器。见 `20-speech.md`。
-
 ### app/openFeedback（D313）
 
 ```ts
@@ -1897,32 +1887,8 @@ names stay stable. Inputs and results use the S3-only contract in
 Manual progress uses `capture`, `download`, `merge`, `upload`, and `apply` with
 unit and byte counts. There is no cleanup phase. Background polls stay silent.
 
-## 16. 实时语音 API
+## 16. 实时语音 API（已移除）
 
-实时语音是应用管理的通话通路，其所有权绑定在主窗口上，详见[live-voice.md](live-voice.md)。DTO 定义在 `packages/shared/src/types/live-voice.ts`；preload 只暴露下表列出的白名单通道。Main 从调用 IPC 的受信 frame 推导 owner，并只向该 frame 发送通话事件。payload 不能提供 owner 身份或凭证。停靠挂件窗口只绘制通话控件、不拥有通话，因此它的三条通道单独校验，且永不进入 owner 推导。
-
-| IPC 通道 | 方向 | 契约 |
-|---|---|---|
-| `pi-desktop/voice/live/status` | Renderer → Main | 脱敏功能状态、绑定就绪情况和设置版本 |
-| `pi-desktop/voice/live/prepare` | Renderer → Main | 按 request ID 幂等准备通话；同步保留共享麦克风租约 |
-| `pi-desktop/voice/live/connect` | Renderer → Main | 连接已准备的通话；Codex 可附带有界 SDP offer |
-| `pi-desktop/voice/live/setMuted` | Renderer → Main | 通过单调递增的 capture epoch 设置静音 |
-| `pi-desktop/voice/live/reportMedia` | Renderer → Main | 报告采集、连接和释放生命周期；只有确认释放后才能复用租约 |
-| `pi-desktop/voice/live/reportPlayback` | Renderer → Main | 有界的 PCM 已播放游标列表，供中断/截断使用 |
-| `pi-desktop/voice/live/reportDelegation` | Renderer → Main | 报告 Provider 请求的 delegation；v1 会拒绝执行，也不会转发给 Agent/MCP |
-| `pi-desktop/voice/live/reportControlApplied` | Renderer → Main | 确认受支持的 Provider 控制，或报告拒绝了不支持的操作 |
-| `pi-desktop/voice/live/end` | Renderer → Main | 幂等结束活动通话，或取消等待中的请求 |
-| `pi-desktop/voice/live/heartbeat` | Renderer → Main | Renderer 正常响应时维持 owner 通话 |
-| `pi-desktop/voice/live/event/changed` | Main → Renderer | 脱敏通话阶段、错误、提示和活动状态 |
-| `pi-desktop/voice/live/event/port` | Main → Renderer | 转交一个通话专用 `MessagePort`，附带 call ID 和一次性 nonce |
-| `pi-desktop/voice/live/event/control` | Main → Renderer | Provider 控制请求，仅包含 v1 明确允许的控制类型 |
-| `pi-desktop/voice/live/event/transcript` | Main → Renderer | 当前通话的临时、有界字幕事件 |
-| `pi-desktop/voice/live/widget/visibility` | 挂件 → Main | 挂件自身的展示决定与所需内容盒尺寸；Main 据此显示或隐藏该窗口 |
-| `pi-desktop/voice/live/widget/action` | 挂件 → Main | 在挂件中按下的通话操作；Main 校验发送方后转发给 owner frame 执行 |
-| `pi-desktop/voice/live/widget/ownerState` | 主窗口 → Main | 只有 owner frame 才知道的信息：它自身的错误码（例如被拒绝的静音）以及绑定工作会话是否在等待决策；两者都不在通话视图中 |
-| `pi-desktop/voice/live/event/widgetState` | Main → 挂件 | 权威通话视图加上 owner 自身的错误码与等待决策标记，推送给停靠挂件窗口 |
-| `pi-desktop/voice/live/event/widgetAction` | Main → 主窗口 | 需要 owner frame 执行的挂件操作 |
-
-只有 owner 验证成功后才会创建 `MessagePort`，之后由 preload 中继到 renderer 窗口。owner 在首个 `hello` 中回送每通电话独有的 nonce；Main 仅在 call ID 和 nonce 均匹配时接受该端口一次。二进制帧包含有界 PCM 音频、采集 epoch、释放确认、播放游标和协议就绪信号。它不是通用 IPC 隧道：不会传输 Provider 凭证、任意命令、工作区路径、Agent 消息或持久化字幕。通话结束或 owner 丢失时会关闭端口。
-
-停靠挂件窗口不是通话 owner，也不可能成为 owner：它在所有经过 owner 校验的通道上都会像任何其他 renderer 一样被以 `PERMISSION_DENIED` 拒绝。Main 只在该窗口作为发送方时响应它的两条通道；owner 自身的错误码经由主窗口传入，因为执行操作的是该 frame。挂件操作本身不会改变通话状态：它被转发给 owner frame，结果状态再通过 owner 收到的同一份权威视图回到挂件。
+本 fork 已移除实时语音（ADR `fork-removes-voice-and-speech`，D662）。不再存在
+任何 `pi-desktop/voice/live/*` 通道、`onLiveVoicePort` preload API 或 `LIVE_*`
+错误码。协议测试断言不暴露任何 `voice/` 或 `speech/` 通道。

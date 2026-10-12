@@ -220,7 +220,7 @@ test("app quit waits for one idempotent teardown before allowing the follow-up q
   assert.match(shutdownSource, /if \(state\.shutdownPromise\) return/);
   assert.ok(
     shutdownSource.indexOf('logger.app("lifecycle", "info", "app shutdown")') <
-      shutdownSource.indexOf("await liveCallService?.endForLifecycle"),
+      shutdownSource.indexOf("state.shutdownPromise = (async () => {"),
     "the confirmed shutdown boundary must be logged before awaited cleanup",
   );
   assert.ok(

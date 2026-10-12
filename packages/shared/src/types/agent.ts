@@ -39,7 +39,11 @@ export type AgentPromptRequest = {
    * mints its own.
    */
   messageId?: string;
-  /** Main-trusted source metadata for a Live Voice work admission. */
+  /**
+   * Main-trusted source metadata for a Live Voice work admission. Live Voice
+   * was removed (D662); the field stays so persisted queue rows keep loading,
+   * and nothing sets it any more.
+   */
   voiceOrigin?: VoiceOrigin;
   /**
    * Renderer snapshot of the chat session visible when the prompt was sent.

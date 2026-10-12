@@ -70,10 +70,13 @@ describe("Plan protocol contracts", () => {
     expect(IPC_WHITELIST.has(IPC.invoke.modelConfigImportRun)).toBe(true);
     expect(IPC.invoke.projectClone).toBe("pi-desktop/project/clone");
     expect(IPC_WHITELIST.has(IPC.invoke.projectClone)).toBe(true);
-    expect(IPC.invoke.speechTranscribe).toBe("pi-desktop/speech/transcribe");
-    expect(IPC_WHITELIST.has(IPC.invoke.speechTranscribe)).toBe(true);
-    expect(IPC_WHITELIST.has(IPC.invoke.speechSynthesize)).toBe(true);
-    expect(IPC_WHITELIST.has(IPC.invoke.speechGetStatus)).toBe(true);
+  });
+
+  it("exposes no voice or host speech channels", () => {
+    // Local Dictation, host STT/TTS and Live Voice were removed (D662).
+    const channels = [...Object.values(IPC.invoke), ...Object.values(IPC.event)];
+    expect(channels.filter((channel) => channel.startsWith("pi-desktop/speech/"))).toEqual([]);
+    expect(channels.filter((channel) => channel.startsWith("pi-desktop/voice/"))).toEqual([]);
   });
 
   it("exposes the vendor-account OAuth channels through the preload whitelist", () => {

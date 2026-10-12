@@ -190,6 +190,16 @@ describe("check", () => {
     expect((await check(dir)).errors.map((e) => e.code)).toContain("permission.unknown");
   });
 
+  it("names the removed speech permission instead of an unknown one", async () => {
+    const dir = await scaffolded("panel-basic");
+    await patchManifest(dir, (m) => {
+      m.permissions = ["ui.panel", "speech.adapter.register"];
+    });
+    const codes = (await check(dir)).errors.map((e) => e.code);
+    expect(codes).toContain("permission.removed");
+    expect(codes).not.toContain("permission.unknown");
+  });
+
   it("requires agent.tool.register for contributed tools", async () => {
     const dir = await scaffolded("agent-tool-basic");
     await patchManifest(dir, (m) => {

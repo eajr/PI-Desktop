@@ -62,11 +62,6 @@ const PluginLauncher = React.lazy(() =>
     default: module.PluginLauncher,
   })),
 );
-const LiveVoiceWidget = React.lazy(() =>
-  import("./features/voice/live/LiveVoiceWidget").then((module) => ({
-    default: module.LiveVoiceWidget,
-  })),
-);
 
 async function startRenderer(): Promise<void> {
   const root = ReactDOM.createRoot(rootContainer);
@@ -100,10 +95,6 @@ async function startRenderer(): Promise<void> {
           {rendererSurface === "plugin-launcher" ? (
             <ErrorBoundary>
               <PluginLauncher />
-            </ErrorBoundary>
-          ) : rendererSurface === "live-voice-widget" ? (
-            <ErrorBoundary>
-              <LiveVoiceWidget />
             </ErrorBoundary>
           ) : (
             <App />

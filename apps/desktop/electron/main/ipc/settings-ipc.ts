@@ -2,7 +2,6 @@ import { IPC, type UpdatePreference } from "@pi-desktop/shared";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
 import type { IpcRegistrar } from "./types";
-import type { LiveCallService } from "../live-voice/call-service";
 import type { AppSettings } from "@pi-desktop/shared";
 import { currentSystemProxyRelayUrl } from "../network-proxy";
 
@@ -27,7 +26,6 @@ export type SettingsIpcDependencies = {
   applyKeepAwakeWhileRunning: (settings?: { keepAwakeWhileRunning?: unknown } | null) => void;
   applyUpdatePreference: (preference: UpdatePreference) => void;
   resolveEffectiveCommandShell: () => Promise<unknown>;
-  liveCallService?: Pick<LiveCallService, "beginSettingsWrite" | "settingsWritten">;
 };
 
 /** Register app settings and command-shell channels. */
@@ -47,7 +45,6 @@ export function registerSettingsIpc({
   applyKeepAwakeWhileRunning,
   applyUpdatePreference,
   resolveEffectiveCommandShell,
-  liveCallService,
 }: SettingsIpcDependencies): void {
   let host: HostProcess | null = null;
   let sidecar: AgentSidecar | null = null;
@@ -72,18 +69,7 @@ export function registerSettingsIpc({
   handle(IPC.invoke.settingsSet, async (settings: unknown) => {
     if (!host) throw new Error("host unavailable");
     const validatedSettings = validateSettingsWrite(settings);
-    const currentSettings = await host.call<AppSettings>("settings.get");
-    const prospectiveSettings = validatedSettings && typeof validatedSettings === "object" && !Array.isArray(validatedSettings)
-      ? { ...currentSettings, ...(validatedSettings as Partial<AppSettings>) }
-      : currentSettings;
-    const releaseSettingsWrite = liveCallService?.beginSettingsWrite(prospectiveSettings);
-    let result: AppSettings;
-    try {
-      result = await host.call<AppSettings>("settings.set", validatedSettings);
-      await liveCallService?.settingsWritten(result);
-    } finally {
-      releaseSettingsWrite?.();
-    }
+    const result = await host.call<AppSettings>("settings.set", validatedSettings);
     const updatePreference = (validatedSettings as { updatePreference?: unknown })
       .updatePreference;
     if (updatePreference === "automatic" || updatePreference === "manual") {

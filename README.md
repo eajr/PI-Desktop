@@ -163,7 +163,7 @@ It can be an entire product:
 ```text
 Voice Agent
 ├── Floating Widget
-├── Speech Service
+├── Background Audio
 ├── Agent Tool
 └── Commands
 

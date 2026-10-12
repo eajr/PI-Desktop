@@ -9,45 +9,35 @@
 
 ---
 
-### E2E-LEGACY-DICTATION-idle-model-release
+### E2E-PLUGIN-removed-speech-permission-still-loads
 
-- **前提：** 通过 `VoiceService` 接口测试保留的本地 Dictation 服务，使用确定性的
-  Controller/ModelManager stub 和受控时钟。不访问物理麦克风，也不下载模型。
-- **步骤：** 启动并停止一次录音，将时间推进到 10 分钟空闲边界之前和边界时，检查
-  卸载调用。分别在边界前开始新录音、下一次启动被拒绝、进入 error 终态以及服务
-  dispose 时重复检查。
-- **预期：** 已结束的空闲模型只在边界到达时卸载一次，不会提前卸载。新录音会取消
-  计时器，其终态会启动新的等待窗口。新录音启动被拒绝时不会遗失卸载计划。回调时
-  处于活动阶段或服务已 dispose 都不会触发卸载。
-- **覆盖：** `apps/desktop/test/voice-service-idle-unload.test.mjs` 使用真实
-  `VoiceService` 生命周期，仅 mock 运行时边界和时钟。独立 Linux RSS 测量验证
-  `TranscribeModel.dispose()` 会向操作系统归还内存，且现有延迟加载路径可重新加载。
-- **规格：** [实时语音](../03-runtime/live-voice.md)。
+- **前提：** 隔离的插件宿主，加载一个仍在 manifest 中声明已移除权限
+  `speech.adapter.register`（D662）的本地插件。
+- **步骤：** 加载插件，然后在插件进程中调用 `pi.speech.registerAdapter` 和
+  `pi.speech.unregisterAdapter`。
+- **预期：** 插件正常加载。两次调用均以 `UNSUPPORTED` 失败，消息指明缺失的宿主
+  API；不注册任何内容。
+- **覆盖：** `apps/desktop/test/plugin-speech-removed.test.mjs`；`pi-plugin check`
+  报告 `permission.removed`（plugin-devkit 测试）。
+- **规格：** [ADR fork-removes-voice-and-speech](../../../adr/fork-removes-voice-and-speech.md)、
+  [插件清单](../07-plugins/02-plugin-manifest-schema.md)。
 
-### E2E-LIVE-VOICE-public-settings-and-reconnect
+### E2E-VOICE-live-voice-removed-no-entry-points
 
-- **前提：** 生产 Renderer 构建、真实 Electron/Main/Host、隔离数据和测试项目、关闭开发者模式、本地 TLS Realtime fixture 及合成麦克风。仅在测试子进程中信任 fixture CA，不关闭 TLS、sender、沙盒或麦克风权限校验。
-- **步骤：** 在功能关闭时从 Composer 打开 Live，点击“打开设置”。通过设置搜索找到 Voice，绑定测试账号并启用；连接、取消静音、接收音频和字幕、静音并挂断。取消延迟启动，断开服务后显式重连；使用同一隔离配置重启，检查持久化设置并关闭功能。
-- **预期：** 普通用户可以到达入口；启用设置不会开始采集。真实构建中的 Renderer 通过精确主 frame 所有者校验。只使用所选账号，静音停止输入，每次结束释放媒体/socket，失败不会自动发起新通话。重启保留设置但不重连；旧 Dictation 设置不变，纯通话不创建 Agent 会话。
-- **覆盖：** `pnpm test:e2e:live-voice` 驱动真实构建及具体 Realtime GA adapter，连接本地 WSS；`live-voice-owner.test.mjs` 打包生产 owner 模块并验证其他文件/frame 被拒绝。合成音频不代表物理设备或真实 Provider 验收；命令和结果见 `docs/implementation/live-voice-public-readiness.md`。
-- **规格：** [实时语音](../03-runtime/live-voice.md)。
-
-### E2E-LIVE-WORK-session-admission
-
-- **前提：** 使用隔离的 Live Provider fixture、本地 AgentHost 会话和确定性意图分类器；候选请求须从现有 Live adapter 回调进入，不使用真实账号或付费端点。
-- **步骤：** 验证纯通话没有工作作用域时会拒绝任务候选；再以明确选择的本地会话和关闭的上下文共享启动工作通话。提交一个已声明工具请求并检查回执、Host admission 和 `voiceOrigin`。覆盖忙时独立排队、过期 steer、精确回合 stop、submit 返回前到达的终态事件，以及基于已记录结果的只读查询。请求项目／会话列表，确认只返回标签和本次 call 的 opaque 引用；通过面板动作打开已列会话、在已列项目中新建会话，并确认工作绑定仍固定。分别保持 Provider 生成、用户讲话和本地播放活跃，确认反馈须待三者空闲和静默窗口结束后才发送。覆盖 silent、静默时的显式查询、过期反馈降级；当提交处于等待用户决策状态时，确认紧凑栏保留等待提示、详情显示待决请求并提供打开该精确会话的操作，且其他会话的待决请求不会被归到绑定会话；当提交处于等待用户决策状态时，确认紧凑栏保留等待提示、详情显示待决请求并提供打开该精确会话的操作，且其他会话的待决请求不会被归到绑定会话。随后用语音回答该 AskTool 提问，确认会话卡片经由 Host 输入路径解决；再分别用提问从未提供的标签、只回答一部分、以及同时存在两个待答提问重试，确认每次都被拒绝、不产生写操作且不重试。结束通话时确认已受理工作仍保留。
-- **预期：** 工作始终绑定到通话开始时选定的会话；关闭上下文共享时不读取历史；现有 AgentHost 执行 prompt、steer、queue 和 stop；重复 Provider ID 不重复派发；结果查询只投影准确操作摘要且不会创建新回合。项目／会话选项不暴露原始路径或 ID，引用按 call 隔离并过期；打开只导航，创建必须先列出注册项目并由用户点击确认。自动反馈同时观察 Provider 生成状态和本地播放活动，任务执行与反馈投递状态分开。结束 Live 不取消已受理任务；Renderer 信号不代表用户已经听到结果。
-- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`live-work-decision.test.mjs` 覆盖等待决策投影、会话作用域、有界纯文本渲染与打开绑定会话的面板操作，`voice-runtime/src/live/playback-monitor.test.ts` 覆盖本地音频信号检测；`packages/host-runtime/src/live-work/ask-answer.test.ts` 覆盖语音回答意图与路由（解决、拒绝、unknown 且绝不重发），`apps/desktop/test/spoken-answer.test.mjs` 覆盖只选既有选项的匹配、有界朗读内容与投递预算。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
-- **状态：** 部分完成；其余场景和实机矩阵见 `docs/implementation/live-work-evidence.md`。
-
-### E2E-LIVE-WORK-v2.1-reliability
-
-- **前提：** 隔离的本地 Host 会话、fixture 分类器和 fake runtime/provider I/O。不使用真实账号、用户项目或正在运行的 Desktop 实例。
-- **步骤：** 在 Provider 候选入口捕获 null/活动回合目标并延迟分类；让通过校验的 stop 与普通分类竞争；让 Host 派发保持未决，随后返回精确的只读准入证据；先到达终态事件再返回写操作 ACK；在派发期间关闭 Live；在 AgentHost 准入前更改已授权的工作区；提交独立工作队列项；延迟最终助手消息持久化；在 stop 控制操作后查询任务结果。
-- **预期：** 过期/null 目标不会变成之后的回合。stop 屏障会撤回尚未跨过准入边界的较早写操作。忙碌时的普通提交不会悄悄进入队列。Host 状态不确定时显示 unknown，并且只核对、不再次写入。终态证据不会被迟到 ACK 复活或覆盖。工作区不匹配不会创建回合或队列项。空闲时的显式队列项由 AgentHost 排空，恢复后挂起的条目保持挂起。结果查询只返回准确的任务结果，不返回准入或 stop 确认。
-- **覆盖：** `packages/host-runtime/src/live-work/coordinator.test.ts`、`packages/host-runtime/src/live-work/operation-ledger.test.ts`、`packages/agent-host/src/agent-host.test.ts`、`apps/desktop/test/live-work-production-composition.test.mjs` 和 `apps/desktop/test/agent-host-bridge-work-ack.test.mjs`。生产组合 fixture 实例化 Live Work bridge、AgentHost bridge、已注册的 `agentPrompt` handler 和真实 AgentHost；Host Core 持久化、具体 Provider adapter/transport 和真实设备旅程不在该测试边界内。
-- **状态：** 自动化覆盖为部分完成，逐项记录于 `docs/implementation/live-work-v21-coverage.md`。实机验收未运行。
-- **规格：** [live-work-session](../03-runtime/live-work-session.md)、[live-voice](../03-runtime/live-voice.md)。
+- **前提：** 包含 D662 实时语音移除的构建；宿主设置对象中可能仍有旧版本留下的
+  `liveVoice`、`voice` 或 `speech` 值，以及 `voiceToggle` / `voiceCancel` 快捷键覆盖。
+- **步骤：** 使用该设置启动应用。检查 Composer 工具栏、设置导航与搜索、键盘快捷键卡片
+  和 IPC 通道列表。向主渲染进程的默认 session 请求 `media` 权限。
+- **预期：** 启动和 `settings.set` 成功，已存储的值保持原样。没有通话按钮、语音设置
+  页、语音快捷键、停靠通话挂件，也没有 `voice/` / `speech/` 通道。默认 session 拒绝
+  `media`，其他权限（如剪贴板写入）仍被允许。
+- **覆盖：** `apps/desktop/test/voice-removed.test.mjs`、
+  `settings-developer-only-destinations.test.mjs`、
+  `settings-keyboard-shortcuts.test.mjs`、`keyboard-shortcuts` 迁移测试、
+  `packages/shared/src/protocol.test.ts` 以及 host-core 测试
+  `settings_set_preserves_removed_voice_and_speech_settings`。
+- **规格：** [ADR fork-removes-voice-and-speech](../../../adr/fork-removes-voice-and-speech.md)、
+  [live-voice.md](../03-runtime/live-voice.md)。
 
 ### E2E-POWER-keep-awake-setting
 
@@ -88,55 +78,6 @@
 - 作为可追溯性主干：场景 ID ↔ 验收标准 ↔ 规范。
 - 定义代码 pull request 的相关 E2E 合入门。
 - 让验证证据与准备合入的可执行提交保持关联。
-
-### E2E-LIVE-VOICE-four-stage-ui
-
-- **标题：** 已禁用、准备、紧凑通话栏和主动打开的详情。
-- **前提：** 使用隔离的开发构建 Electron 配置，开启开发者模式，Live Voice
-  初始为禁用状态，并使用确定性的本地服务商/媒体 fixture 和本地工作会话
-  fixture。不使用真实账号、麦克风、扬声器、付费端点或用户正在运行的 Desktop。
-- **步骤：**
-  1. 确认禁用时 Composer 中既没有 Live Voice 图标，也没有 Work 图标。仅从
-     「设置 → 语音」启用 Live Voice，并确认空闲时恰好显示一个语音图标。
-  2. 打开准备界面，展开并折叠工作选项，但不开始通话。确认没有准备请求、
-     麦克风获取、媒体初始化、服务商连接或工作派发。让选中的绑定不可用，
-     同时保持另一个绑定就绪：界面显示确切的选中身份和原因、禁用开始操作，
-     且不会隐式切换服务商。
-  3. 绑定就绪后，明确开始并观察紧凑栏显示「连接中」和「取消」，确认不会
-     自动打开详情。在准备或媒体获取仍未完成时取消，再送达延迟的完成事件。
-     再次开始并连接，确认默认静音，然后取消静音/静音并检查状态。
-  4. 打开详情，检查转录、服务商和工作状态，然后分别通过关闭、点击外部和
-     Escape 关闭详情。通话保持连接；通过通话栏恢复暂停的声音，观察恢复失败，
-     再明确重试并恢复。
-  5. 在聊天、设置、插件和会话间导航。通话控件是停靠的桌面挂件窗口：拖动它自身的
-     通话栏，确认位置在这些导航后仍然保留、并会被夹取回工作区内，同时确认主窗口
-     不再绘制任何通话栏。在 Main 延迟终止和 Renderer 延迟清理的
-     情况下结束通话或禁用功能，并分别测试两种清理完成顺序。在两者完成前，
-     始终显示「结束中」，且不允许再次开始。模拟释放未确认，确认阻止状态可见。
-  6. 重新打开准备界面，确认工作授权和上下文确认均未勾选。仅展开区域或选择
-     会话不会开始通话；未授权工作时开始只启用语音。明确授权工作请求、选择
-     有效的本地目标并开始；在详情中检查固定绑定和工作结果。结束后重新打开
-     准备界面，再分别变更/创建目标、取消工作授权或取消通话，并确认上下文
-     确认被重置。结束 Live 不会停止已受理的工作。
-  7. 使用已配置的切换快捷键直接开始纯语音通话并结束。启动期间，如果弹窗
-     消费了 Escape，则它只会关闭弹窗，不会取消启动；没有弹窗消费时，启动取消
-     快捷键才生效。Escape 不会结束已连接的通话。用英文和简体中文分别检查
-     可见控件，并确认所有已发布语言目录都齐全。
-- **预期：** 四种明确的界面状态、主动启动和工作授权、确切绑定的就绪状态、
-  默认静音、全局清理状态可见、控件无障碍属性和焦点返回正确，且 IPC、持久化或
-  权限边界没有变化。恢复播放和错误处理不需要打开详情。
-- **规格：** [Live Voice](../03-runtime/live-voice.md)、
-  [Live Work](../03-runtime/live-work-session.md)、
-  [组件规格](../04-ux/08-component-spec.md#1171-live-voice-准备-紧凑通话栏和详情)、
-  [设置 IA](../04-ux/06-settings-ia.md#voice-experimental)。
-- **验收：** C / E / Security / Quality。
-- **里程碑：** MVP 后实验性交互维护。
-- **覆盖：** 定向控制器/展示回归测试和 `pnpm test:e2e:live-voice-interaction`
-  覆盖已挂载的生产控件、控制器、store、快捷键、i18n、清理顺序、工作授权，
-  以及使用模拟 shell 导航和伪造外部边界的错误恢复。该测试不会挂载完整的
-  AppShell/设置/插件路由，也不会实际使用服务商、设备、权限提示或音频输出。
-- **状态：** 请求候选 fixture 的 48/48 项交互检查通过。完整 AppShell、真实服务商
-  和设备兼容性尚未验证。
 
 ## 2. 非目标
 
@@ -5632,7 +5573,7 @@ eleven-tool-round desktop paths are verified by
 | 验收 | 应用场景 |
 |---|---|
 | C / E / F / Quality / Security — Session Todo checklist | E2E-CHAT-session-todo-checklist |
-| C / E / Security / Quality — Live Voice 四阶段交互 | E2E-LIVE-VOICE-four-stage-ui |
+| Security / Quality — 实时语音已移除（D662） | E2E-VOICE-live-voice-removed-no-entry-points |
 | C / F — Hourly task updates | E2E-SCHEDULED-manual-to-hourly |
 | C / F / Quality — Saved project isolation | E2E-SCHEDULED-manual-workspace-binding |
 | C / F / Quality — 桌面定时任务 | E2E-SCHEDULED-desktop-automation-lifecycle |
@@ -5708,7 +5649,6 @@ eleven-tool-round desktop paths are verified by
 
 | 里程碑 | 应用场景 |
 |---|---|
-| MVP 后实验性交互维护 | E2E-LIVE-VOICE-four-stage-ui |
 | M1 | E2E-001、E2E-002、E2E-003、E2E-028、E2E-029 |
 | M2 | E2E-004、E2E-005、E2E-006、E2E-007、E2E-008、E2E-008d、E2E-009、E2E-010、E2E-011、E2E-011a、E2E-011b、E2E-020、E2E-021、E2E-027、E2E-031、E2E-042、E2E-087、E2E-088、E2E-088b、E2E-089、E2E-090、E2E-144、E2E-005J、E2E-201 |
 | M3 | E2E-012、E2E-013、E2E-014、E2E-015、E2E-016、E2E-017、E2E-018、E2E-019、E2E-040 |

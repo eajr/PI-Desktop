@@ -33,7 +33,6 @@ import { useAppStore } from "../../stores/app-store";
 import { useSidebarTransition } from "./useSidebarTransition";
 import { useStartupWatchdog } from "./useStartupWatchdog";
 import { useTraySessions } from "./useTraySessions";
-import { runLiveVoiceShortcut } from "../voice/live/live-voice-shortcuts";
 
 const MODIFIER_ONLY_KEYS = new Set([
   "Alt",
@@ -756,14 +755,8 @@ export function useAppShellRuntime() {
       if (
         e.repeat &&
         (shortcut.id === "navigateBack" ||
-          shortcut.id === "navigateForward" ||
-          shortcut.id === "voiceToggle" ||
-          shortcut.id === "voiceCancel")
+          shortcut.id === "navigateForward")
       ) {
-        return;
-      }
-      if (shortcut.id === "voiceToggle" || shortcut.id === "voiceCancel") {
-        if (runLiveVoiceShortcut(shortcut.id)) e.preventDefault();
         return;
       }
       e.preventDefault();

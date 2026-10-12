@@ -798,8 +798,9 @@ CREATE UNIQUE INDEX idx_turn_queue_idempotency
   keep their `position` order. `queueReorder` swaps two adjacent non-promoted
   `position` values and refuses a promoted entry.
 - `user_message_id` and `voice_origin_json` (schema v20) retain the stable
-  user-message identity and optional Live Voice operation provenance across
-  restart. They are metadata only: queue recovery still does not replay work.
+  user-message identity and optional voice operation provenance across
+  restart. Live Voice is removed (D662), so nothing writes `voice_origin_json`
+  any more; existing values still load. They are metadata only: queue recovery still does not replay work.
   `IDEMPOTENCY_CONFLICT`. A session holds at most eight entries.
 - `attachments_json` keeps the prompt's attachment references; bytes stay in
   the session scratch or project root like any other prompt attachment.

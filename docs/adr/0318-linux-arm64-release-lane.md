@@ -5,6 +5,12 @@
 - Deciders: PI-Desktop core
 - Related: D126, D285, D375, D603, ADR 0022, ADR 0145, ADR 0284, ADR 0292, issue #1281, E2E-192a
 
+> Amended 2026-10-12 by
+> [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md): the
+> native voice modules (`@picovoice/pvrecorder-node`, `transcribe-cpp`) were
+> removed. The arm64 microphone limitation and speech-to-text notes below are
+> historical.
+
 ## Context
 
 Tag releases publish Linux x64 only. Issue #1281 asks for a Linux arm64 build:

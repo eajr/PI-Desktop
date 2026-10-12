@@ -1,5 +1,9 @@
 # ADR 0281: Host speech capability
 
+> Superseded 2026-10-12 by [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md):
+> this build has no host speech capability, no `speech/*` IPC, and no
+> `speech.adapter.register` plugin permission. The text below is historical.
+
 - Status: Accepted for implementation (amended by [ADR 0291](0291-remove-speech-settings-ui.md))
 - Date: 2026-09-17
 - Deciders: PI-Desktop core

@@ -1,5 +1,9 @@
 # ADR 0315: A Spoken Answer Selects Among an Open asktool Question's Own Options
 
+> Superseded 2026-10-12 by [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md)
+> (D662): this build has no Live Voice or Live Work. The text below is
+> historical.
+
 - Status: Accepted for implementation
 - Date: 2026-10-01
 - Related: Live Voice Work Session Integration, [ADR 0313](0313-live-voice-default-session-target.md), ADR 0311, ADR 0310

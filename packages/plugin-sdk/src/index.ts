@@ -768,42 +768,6 @@ export type PluginCommand = {
   run: () => Promise<void> | void;
 };
 
-export type PluginSpeechRole = "transcribe" | "synthesize";
-
-export type PluginSpeechHandleInput = {
-  protocol: string;
-  role: PluginSpeechRole;
-  modelId: string;
-  voice?: string;
-  format?: string;
-  extra?: Record<string, string>;
-  text?: string;
-  language?: string;
-  audio?: { mimeType: string; data: string };
-};
-
-export type PluginSpeechHandleResult =
-  | { kind: "text"; text: string }
-  | { kind: "audio"; mimeType: string; data: string }
-  | {
-      kind: "http";
-      call: {
-        url: string;
-        method?: "GET" | "POST";
-        headers?: Record<string, string>;
-        body?: unknown;
-        parse: "bytes" | "json-text" | "json-path" | "openai-transcription" | "openai-chat-audio";
-        jsonPath?: string;
-      };
-    };
-
-export type PluginSpeechAdapter = {
-  protocol: string;
-  label: string;
-  roles: PluginSpeechRole[];
-  handle: (input: PluginSpeechHandleInput) => Promise<PluginSpeechHandleResult> | PluginSpeechHandleResult;
-};
-
 export type PluginTool = {
   name: string;
   description: string;
@@ -1141,10 +1105,6 @@ export type PluginHostApi = {
     register: (command: PluginCommand) => Promise<void>;
     unregister: (id: string) => Promise<void>;
   };
-  speech: {
-    registerAdapter: (adapter: PluginSpeechAdapter) => Promise<void>;
-    unregisterAdapter: (protocol: string) => Promise<void>;
-  };
   ui: {
     openPanel: (opts?: { title?: string }) => Promise<void>;
     closePanel: () => Promise<void>;
@@ -1454,7 +1414,6 @@ export const PLUGIN_PERMISSIONS = [
   // what a service may use with no page open.
   "audio.capture.background",
   "audio.playback.background",
-  "speech.adapter.register",
   "keyboard.globalShortcut",
   "net.websocket",
 ] as const;

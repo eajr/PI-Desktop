@@ -98,11 +98,6 @@ pub(crate) fn validate_application_references(st: &AppState, payload: &Value) ->
             require_provider_reference(st, binding, "imageGenerationModels")?;
         }
     }
-    if let Some(speech) = payload.get("speech").and_then(Value::as_object) {
-        for (role, binding) in speech {
-            require_provider_reference(st, binding, &format!("speech.{role}"))?;
-        }
-    }
     Ok(())
 }
 

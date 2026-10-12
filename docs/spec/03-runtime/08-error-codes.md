@@ -107,9 +107,6 @@ does not turn temporary thread pressure into a host process exit.
 | `STREAM_FAILED` | yes | provider stream was terminated, closed prematurely, or otherwise ended before a complete response; up to ten same-turn retries may precede the terminal event |
 | `EMPTY_MODEL_RESPONSE` | yes | the model ended its turn with no tool call and no visible text twice: once as streamed, once after the automatic re-run; the first reply to a Host-ledger completion notice is exempt (spec 02-agent-runtime §5e, D446) |
 | `PROMPT_ENHANCEMENT_EMPTY` | no | the one-shot enhancement model returned no text |
-| `SPEECH_NOT_CONFIGURED` | no | host speech ASR or TTS is not bound in settings |
-| `SPEECH_PROTOCOL_UNSUPPORTED` | no | the speech protocol is unknown or does not support this role |
-| `SPEECH_INPUT_TOO_LARGE` | no | speech input exceeds 25 MB |
 | `SUBAGENT_IDLE_TIMEOUT` | no | withdrawn (D328): idle watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_DURATION_TIMEOUT` | no | withdrawn (D328): duration watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_CONTEXT_OVERFLOW` | no | a delegate's own model context exceeded its safe budget and neither automatic turn-boundary compaction nor the degraded retry that keeps only the task brief and the most recent messages brought it back below the limit; the failure names the actionable recovery instead of the provider's overflow text |
@@ -316,41 +313,10 @@ codes surface through the same error object as any other call.
 | `PAIRING_TOKEN_EXPIRED` | no | the single-use pairing token expired before pairing completed |
 | `CAPABILITY_UNAVAILABLE` | no | an operation was requested for a capability the host advertised as unavailable (e.g. attachments, tool relay) |
 
-### 3.9 Live Voice
+### 3.9 Live Voice (removed)
 
-Live Voice errors are returned through app-owned IPC and provider adapter
-events. They do not represent Agent turn failures. A retriable error means the
-user may retry the same call after the stated transient condition clears; it
-does not trigger automatic provider or billing fallback.
-
-| code | retriable | meaning |
-|---|---|---|
-| `LIVE_DISABLED` | no | Live Voice is disabled in settings |
-| `LIVE_NOT_CONFIGURED` | no | no valid Live Voice binding is selected |
-| `LIVE_PROVIDER_NOT_FOUND` | no | the selected Provider is missing, disabled, or changed while resolving credentials |
-| `LIVE_AUTH_KIND_UNSUPPORTED` | no | the selected Provider credential type is incompatible with the adapter |
-| `LIVE_AUTH_REQUIRED` | no | required OAuth or API-key credentials are absent or rejected |
-| `LIVE_ACCOUNT_ID_MISSING` | no | Codex OAuth account identity is absent or inconsistent |
-| `LIVE_ACCESS_DENIED` | no | the provider denied access or entitlement |
-| `LIVE_RATE_LIMITED` | yes | the provider returned a rate-limit response |
-| `LIVE_PROTOCOL_UNSUPPORTED` | no | endpoint, model, or requested protocol profile is unsupported |
-| `LIVE_PROTOCOL_ERROR` | no | a provider or IPC message is malformed or violates the selected protocol |
-| `LIVE_ALREADY_ACTIVE` | no | another Live Voice call or microphone-release quarantine owns the single-call slot |
-| `LIVE_REQUEST_CONFLICT` | no | an idempotency request ID was reused with different call parameters |
-| `LIVE_SETTINGS_IN_USE` | no | settings changed during preparation or the active binding cannot be rewritten |
-| `LIVE_MEDIA_RELEASE_UNCONFIRMED` | no | renderer media release was not acknowledged; Main quarantines the microphone lease |
-| `LIVE_STALE_CALL` | no | the call, request, or capture epoch is no longer current |
-| `LIVE_INVALID_OWNER` | no | IPC or media-port ownership does not match the trusted main frame |
-| `LIVE_MICROPHONE_BUSY` | no | Dictation, another Live call, or an unconfirmed prior release owns the shared capture lease |
-| `LIVE_MICROPHONE_DENIED` | no | the user or operating system denied microphone permission |
-| `LIVE_MICROPHONE_UNAVAILABLE` | no | no usable microphone device is available |
-| `LIVE_MEDIA_UNSUPPORTED` | no | required browser media or AudioWorklet support is unavailable |
-| `LIVE_PLAYBACK_BLOCKED` | maybe | browser audio playback needs a user gesture or could not resume |
-| `LIVE_TIMEOUT` | yes | a bounded startup, handshake, heartbeat, control, or cleanup stage timed out |
-| `LIVE_NETWORK_ERROR` | yes | a transient provider transport connection failed |
-| `LIVE_NETWORK_POLICY_UNSUPPORTED` | no | the desktop proxy route cannot be represented safely by the Live transport |
-| `LIVE_AUDIO_BACKPRESSURE` | no | bounded PCM or playback credits were exhausted |
-| `LIVE_EXECUTION_NOT_CONNECTED` | no | a provider requested an unsupported function/delegation execution path |
+The `LIVE_*` codes were removed with Live Voice (D662,
+[fork-removes-voice-and-speech](../../adr/fork-removes-voice-and-speech.md)).
 
 ## 4. Mapping rules
 

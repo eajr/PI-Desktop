@@ -413,12 +413,17 @@ type PluginPermission =
  | "usage.read"
  | "audio.capture.background"
  | "audio.playback.background"
- | "speech.adapter.register"
  | "keyboard.globalShortcut"
  | "net.websocket";
 ```
 
 Unknown permission = validation failure.
+
+`speech.adapter.register` was removed in D662
+([ADR fork-removes-voice-and-speech](../../adr/fork-removes-voice-and-speech.md)).
+An installed manifest that still declares it keeps loading and the permission
+grants nothing; `pi.speech.registerAdapter` / `unregisterAdapter` fail at call
+time with `UNSUPPORTED`. `pi-plugin check` reports it as `permission.removed`.
 
 `fs.read.workspace`, `fs.write.workspace` and `fs.delete.workspace` are the
 pre-scope names. They still validate, and the host rewrites them on load to the

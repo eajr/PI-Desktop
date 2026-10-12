@@ -1,5 +1,9 @@
 # Live Voice v1 Implementation Evidence
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 This file records the local implementation baseline and verification limits.
 It contains no account credentials, tokens, audio or SDP.
 
@@ -13,7 +17,7 @@ It contains no account credentials, tokens, audio or SDP.
 | Settings owner | Host Core `settings.get/settings.set` stores app settings as a JSON object; `settings.set` merges top-level values. The Live Voice round-trip test preserves `voice` and unrelated settings. |
 | IPC owner gate | `apps/desktop/electron/main/live-voice/owner.ts` requires the current trusted main frame and derives ownership from Electron event metadata. Events are sent to that frame. |
 | Media permission gate | `apps/desktop/electron/main/live-voice/microphone-permissions.ts` installs both default-session permission handlers; only audio-only requests/checks from the exact trusted main frame with the active Live lease pass. A focused fixture covers subframes, other origins, video and missing leases. |
-| Microphone owners | Main `MicrophoneLeaseRegistry` arbitrates `dictation` and `live`; both Live and legacy Dictation acquire and release through it. |
+| Microphone owners | Main `MicrophoneLeaseRegistry` arbitrates `dictation` and `live`; both Live and legacy Dictation acquire and release through it. Dictation was removed in D662; only `live` remains. |
 | PCM port binding | One-time nonce is required in the prepare result and first port `hello`; controller, preload and Main reject mismatched call/nonce ownership. |
 | Protocol profiles | Gemini setup/parser, Codex SDP bounds and OpenAI GA/compat Realtime configuration/event profiles have local fixture tests. Interrupted Realtime response IDs are tracked so late audio/completion cannot revive old playback. |
 | Network proxy | Codex HTTP uses Electron `net.fetch`; WebSockets use the default session proxy resolver and explicit DIRECT or supported HTTP/SOCKS5 tunnels. Unsupported proxy resolution fails closed. |

@@ -1,5 +1,9 @@
 # ADR 0313: Default Live Work to the Current Composer Session
 
+> Superseded 2026-10-12 by [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md)
+> (D662): this build has no Live Voice or Live Work. The text below is
+> historical.
+
 - Status: Accepted
 - Date: 2026-09-30
 - Related: Live Voice Work Session Integration, ADR 0311

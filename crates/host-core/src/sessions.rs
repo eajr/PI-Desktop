@@ -196,7 +196,8 @@ pub struct UiMessage {
     /// Host-authenticated agent-to-agent origin, never a human authorization.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_message: Option<Value>,
-    /// Minimal provenance for an accepted Live Voice work input.
+    /// Minimal provenance for an accepted Live Voice work input. Live Voice
+    /// was removed (D662); rows written by older builds still carry it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voice_origin: Option<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

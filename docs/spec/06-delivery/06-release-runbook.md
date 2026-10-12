@@ -625,10 +625,6 @@ Shell smoke on each native runner:
   (Ubuntu 22.04, Debian 12, Fedora 36+). Each tag job runs
   `scripts/check-linux-host-glibc.mjs` and refuses a binary that needs a
   newer glibc.
-- Linux arm64 microphone capture works on Raspberry Pi boards only:
-  `@picovoice/pvrecorder-node` classifies Linux arm64 by `/proc/cpuinfo` CPU
-  part. Speech-to-text (`transcribe-cpp` ships a `linux-arm64-cpu-vulkan`
-  bundle) and every other feature work on any arm64 Linux device.
 - Rollback, staged rollout, and prerelease channel policy remain open release
   work. Existing unsigned macOS installs may need one manual signed DMG before
   in-app updates succeed.

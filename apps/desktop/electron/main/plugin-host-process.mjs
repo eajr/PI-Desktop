@@ -150,7 +150,6 @@ function normalizeBytes(value) {
 // the broker only ever holds the descriptor plus a proxy back into this process.
 const commands = new Map();
 const tools = new Map();
-const speechHandles = new Map();
 // Parent initiated OAuth callbacks can outlive the UI prompt. Their own
 // cancellation signal lets the plugin stop polling or clean up local state.
 const parentCallControllers = new Map();
@@ -211,34 +210,12 @@ function buildApi() {
         await call("commands.unregister", [id]);
       },
     },
+    // Host speech adapters were removed (ADR fork-removes-voice-and-speech).
+    // The stub keeps the call-time failure explicit: the host answers
+    // UNSUPPORTED instead of the plugin hitting an undefined namespace.
     speech: {
-      registerAdapter: async (adapter) => {
-        if (!adapter || typeof adapter.protocol !== "string" || !adapter.protocol.trim()) {
-          throw new Error("speech protocol is required");
-        }
-        if (typeof adapter.handle !== "function") {
-          throw new Error("speech handle must be a function");
-        }
-        const protocol = adapter.protocol.trim();
-        const roles = Array.isArray(adapter.roles) ? adapter.roles : [];
-        speechHandles.set(protocol, adapter.handle);
-        try {
-          await call("speech.registerAdapter", [
-            {
-              protocol,
-              label: adapter.label,
-              roles,
-            },
-          ]);
-        } catch (error) {
-          speechHandles.delete(protocol);
-          throw error;
-        }
-      },
-      unregisterAdapter: async (protocol) => {
-        speechHandles.delete(String(protocol ?? ""));
-        await call("speech.unregisterAdapter", [protocol]);
-      },
+      registerAdapter: () => call("speech.registerAdapter", []),
+      unregisterAdapter: () => call("speech.unregisterAdapter", []),
     },
     ui: {
       openPanel: (options) => call("ui.openPanel", [options]),
@@ -560,15 +537,6 @@ async function handleParentCall(method, payload, invocationId, callId) {
       await run();
       return { ok: true };
     }
-    case "speech.handle": {
-      const handle = speechHandles.get(String(payload?.protocol ?? ""));
-      if (!handle) {
-        const error = new Error(`speech adapter not registered: ${payload?.protocol}`);
-        error.code = "NOT_FOUND";
-        throw error;
-      }
-      return handle(payload ?? {});
-    }
     case "tool.execute": {
       if (typeof invocationId !== "string" || !invocationId || invocations.has(invocationId)) {
         throw toolAbortedError("A unique host tool invocation ID is required");
@@ -676,7 +644,6 @@ async function handleParentCall(method, payload, invocationId, callId) {
       }
       commands.clear();
       tools.clear();
-      speechHandles.clear();
       services.clear();
       busHandlers.clear();
       eventListeners.clear();

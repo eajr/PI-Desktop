@@ -1,5 +1,9 @@
 # Live Work W2 Acceptance Coverage Audit
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 Original audit baseline: phase-2 request candidate after merging `origin/main`
 at `8fcca3d25c98`. This v2.1 refresh adds evidence from the uncommitted
 working-tree candidate based on `f9543be51a2eea4f5010dd059fed6d68dddb8745`;
@@ -28,11 +32,11 @@ called out where relevant.
 | W2-007 | Direct | `apps/desktop/test/live-work-scope.test.mjs` — “work scope requires the still-active call binding and a supported local session” |
 | W2-008 | Gap | No test proves Live credentials remain separate from the bound session’s configured coding provider |
 | W2-009 | Partial | `apps/desktop/test/live-voice-controller.test.mjs` — “renderer and Main complete a Codex Live user path without invoking an Agent”; work-enabled Codex delegation is covered by the new wire/coordinator/AgentHost fixture, but not through WebRTC DataChannel transport |
-| W2-010 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` — “parses only the declared work tool arguments and builds provider-native single receipts”; actual WebSocket adapter lifecycle is not exercised |
-| W2-011 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` covers the 16-call parser limit; repeated multi-call adapter handling and replay are not asserted together |
-| W2-012 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` parses `response.function_call_arguments.done`; duplicate `output_item.done` delivery through the concrete adapter is not tested |
-| W2-013 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` — “keeps GA and compat-v1 session fields and audio events distinct”; concrete adapter setup and authentication paths are not exercised together |
-| W2-014 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` rejects extra `sessionId` and blank instructions; unknown-tool and malformed-wire zero-side-effect behavior through each adapter is not one fixture |
+| W2-010 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` — “parses only the declared work tool arguments and builds provider-native single receipts”; actual WebSocket adapter lifecycle is not exercised |
+| W2-011 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` covers the 16-call parser limit; repeated multi-call adapter handling and replay are not asserted together |
+| W2-012 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` parses `response.function_call_arguments.done`; duplicate `output_item.done` delivery through the concrete adapter is not tested |
+| W2-013 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` — “keeps GA and compat-v1 session fields and audio events distinct”; concrete adapter setup and authentication paths are not exercised together |
+| W2-014 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` rejects extra `sessionId` and blank instructions; unknown-tool and malformed-wire zero-side-effect behavior through each adapter is not one fixture |
 | W2-015 | Partial | `packages/host-runtime/src/live-work/coordinator.test.ts` — “delivers a received receipt before classifying and submits the original text once”; it checks ordering, not the specified receipt latency budget under a deliberately slow classifier/Agent |
 | W2-016 | Partial | `packages/host-runtime/src/live-work/coordinator.test.ts` — “does not dispatch if the local provider receipt was not sent”; adapter socket send failures are not exercised |
 | W2-017 | Partial | `packages/host-runtime/src/live-work/coordinator.test.ts` preserves the original request text, but does not assert classification preserves the example’s conditional constraint |
@@ -89,7 +93,7 @@ called out where relevant.
 | W2-068 | Partial | `packages/agent-host/src/agent-host.test.ts` — “relays asktool answers with skip semantics”; it does not test Live feedback/UI behavior for a waiting-input event |
 | W2-069 | Gap | No test exercises an authorized MCP/plugin tool from a voice-origin AgentHost turn through the existing permission gateway |
 | W2-070 | Gap | No test explicitly disables the MCP HTTP server while exercising the internal work port |
-| W2-071 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` rejects extra `sessionId` arguments; a generic desktop-action whitelist attack is not covered |
+| W2-071 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` rejects extra `sessionId` arguments; a generic desktop-action whitelist attack is not covered |
 | W2-072 | Gap | No test independently invalidates Live and coding credentials while an accepted task is running |
 | W2-073 | Partial | `packages/host-runtime/src/live-work/coordinator.test.ts` — “lists session choices and opens only a call-scoped selection reference”; page-size and secret/path exclusion are not all asserted there |
 | W2-074 | Partial | `apps/desktop/test/live-work-operations.test.mjs` covers opaque-reference panel actions; duplicate-label resolution is not explicitly asserted |
@@ -101,18 +105,18 @@ called out where relevant.
 | W2-080 | Gap | No test covers explicit target reconnection, old pending-candidate withdrawal, and old accepted-task retention together |
 | W2-081 | Partial | `packages/host-runtime/src/live-work/coordinator.test.ts` — “does not dispatch a classifier result after the work call closes”; microphone release is tested separately in the service suite |
 | W2-082 | Gap | No test ends Live after accepted work and proves the real AgentHost operation/queue continues |
-| W2-083 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` parses Gemini tool-call cancellation; adapter behavior before versus after work admission is not tested |
+| W2-083 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` parses Gemini tool-call cancellation; adapter behavior before versus after work admission is not tested |
 | W2-084 | Gap | No automated test covers lock/hide lifecycle cleanup while accepted work remains active |
 | W2-085 | Gap | No test delivers an old feedback or receipt callback after a new call replaces the old one |
 | W2-086 | Partial | Operation ledger and feedback scheduler tests bound identities/queues; repeated adapter start/end and detached observer cleanup are not covered together |
-| W2-087 | Partial | `packages/voice-runtime/src/live/response-tracker.test.ts` — “cancels active output and drops late audio and completion from an interrupted response”; PCM helpers have separate resampling coverage, but provider interruption paths are not combined in one regression case |
+| W2-087 | Partial | `packages/live-voice-protocol/src/response-tracker.test.ts` — “cancels active output and drops late audio and completion from an interrupted response”; PCM helpers have separate resampling coverage, but provider interruption paths are not combined in one regression case |
 | W2-088 | Partial | `apps/desktop/test/live-voice-service.test.mjs` covers mute/media state and feedback gating; active AgentHost work is not paired with mute in one assertion |
 | W2-089 | Partial | `apps/desktop/test/live-voice-controller.test.mjs` covers the existing renderer/Main path; React subscriber unmount ownership is not asserted |
 | W2-090 | Partial | `apps/desktop/test/live-work-operations.test.mjs` renders exact terminal summaries; the complete started/queued/waiting/unknown transition sequence is not tested |
 | W2-091 | Gap | No test switches the visible session before invoking stop/view and asserts the displayed A/T target is retained |
 | W2-092 | Partial | Coordinator tests cover malformed classification, stale steer, and expired selection seams; non-fatal media continuity for each business error is not combined |
 | W2-093 | Gap | No test queues Gemini context-only updates until both model generation and PCM playback drain |
-| W2-094 | Partial | `packages/voice-runtime/src/live/protocol.test.ts` verifies work-profile declarations and GA/compat separation; adapter capability refusal and UI availability are not integrated |
+| W2-094 | Partial | `packages/live-voice-protocol/src/protocol.test.ts` verifies work-profile declarations and GA/compat separation; adapter capability refusal and UI availability are not integrated |
 | W2-095 | Partial | Existing controller, shortcuts, microphone lease, and work-voice tests cover several legacy paths; text prompt/steer/queue and Dictation/Host Speech are not one regression matrix |
 | W2-096 | Partial | `apps/desktop/test/live-work-provider-integration.test.mjs` covers four protocol parsers/encoders → coordinator → AgentHost events; `apps/desktop/test/live-work-production-composition.test.mjs` separately reaches production Live WorkBridge, registered `agentPrompt` handler, real AgentHost, and result projection. Runtime/Host-core IO and concrete socket/WebRTC adapter instances remain fixtures or untested |
 

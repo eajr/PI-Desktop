@@ -358,31 +358,6 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
       };
     },
     /**
-     * The single open ask of a session, or `null` when none or several are
-     * open: an answer that cannot be attributed to exactly one question must
-     * fail closed rather than guess.
-     */
-    openAsk(sessionId: string) {
-      const open = agentHost.pendingInputRequests(sessionId);
-      if (open.length !== 1) return null;
-      const [entry] = open;
-      return {
-        inputId: entry.input.id,
-        turnId: entry.input.turnId,
-        requestId: entry.original.requestId,
-        toolCallId: entry.original.toolCallId,
-        questions: entry.original.questions,
-      };
-    },
-    /** Resolve one open ask through the Host-owned input path. */
-    async resolveOpenAsk(input: { sessionId: string; inputId: string; answers: Array<string[] | null> }) {
-      return forIpc(() => agentHost.respondInput(DESKTOP_PRINCIPAL, {
-        inputId: input.inputId,
-        answers: input.answers,
-        context: { requestId: `live-voice:${input.sessionId}` },
-      }));
-    },
-    /**
      * Resolve a Composer ask card through the Host-owned input path, matched
      * by the runtime request id the card carries. Returns `null` when this
      * Host holds no matching open input — including the re-entrant call the
@@ -413,31 +388,7 @@ export function createAgentHostBridge(options: AgentHostBridgeOptions) {
       }
       return { ok: true };
     },
-    lookupWorkAdmission(request: {
-      sessionId: string;
-      idempotencyKey: string;
-      userMessageId: string;
-      voiceOrigin: import("@pi-desktop/shared").VoiceOrigin;
-    }) {
-      return agentHost.lookupTurnByIdempotency(DESKTOP_PRINCIPAL, request);
-    },
     queue,
-    async steerWorkSession(input: { sessionId: string; expectedTurnId: string; content: string; userMessageId: string; voiceOrigin: import("@pi-desktop/shared").VoiceOrigin }): Promise<boolean> {
-      const result = await options.invoke(options.channels.agentSteer, [{
-        sessionId: input.sessionId,
-        expectedTurnId: input.expectedTurnId,
-        content: input.content,
-        messageId: input.userMessageId,
-        voiceOrigin: input.voiceOrigin,
-      }]) as { accepted?: boolean } | undefined;
-      return result?.accepted === true;
-    },
-    async stopWorkSession(input: { sessionId: string; expectedTurnId: string; urgency: "graceful" | "immediate" }): Promise<{ status: "requested" | "stale-target" | "already-terminal" }> {
-      const channel = input.urgency === "graceful" ? options.channels.agentStop : options.channels.agentAbort;
-      const result = await options.invoke(channel, [{ sessionId: input.sessionId, turnId: input.expectedTurnId }]) as { requested?: boolean; aborted?: boolean; ok?: boolean } | undefined;
-      const accepted = input.urgency === "graceful" ? result?.requested === true : result?.aborted === true || result?.ok === true;
-      return accepted ? { status: "requested" } : { status: "stale-target" };
-    },
     /** A ledger stores the actual durable turn, which can differ from a queue ID. */
     async interruptSessionMessage(sessionId: string, turnId: string): Promise<boolean> {
       const result = await options.invoke(options.channels.agentAbort, [{ sessionId, turnId }]) as { aborted?: boolean } | undefined;

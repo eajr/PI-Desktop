@@ -53,7 +53,6 @@ import { useComposerSubmit } from "../features/chat/composer/hooks/useComposerSu
 import { useComposerTransforms } from "../features/chat/composer/hooks/useComposerTransforms";
 import { ComposerInput } from "../features/chat/composer/ComposerInput";
 import { useComposerModelMenu } from "../features/chat/composer/hooks/useComposerModelMenu";
-import { useVoiceInput } from "../features/voice/useVoiceInput";
 import { ComposerToolbar } from "../features/chat/composer/ComposerToolbar";
 import { ComposerStatus } from "../features/chat/composer/ComposerStatus";
 
@@ -464,20 +463,6 @@ export function Composer({
     return submit(steering);
   };
 
-  // Keep the legacy listener for already-started or IPC-owned Dictation, but
-  // the Composer no longer exposes a Dictation control or overlay.
-  useVoiceInput({
-    enabled: localToolsAllowed && import.meta.env.DEV && !!settings?.voice?.enabled,
-    onTranscriptionComplete: (text) => {
-      const current = readLiveDraft();
-      if (!current.trim()) {
-        applyEditorDraft(text, fileReferencesRef.current, text.length);
-      } else {
-        const next = current + " " + text;
-        applyEditorDraft(next, fileReferencesRef.current, next.length);
-      }
-    },
-  });
   const completions = useComposerCompletions({
     value,
     cursor,
@@ -633,8 +618,6 @@ export function Composer({
             hasDraftContent={hasDraftContent}
             abort={abort}
             submit={submitFromComposer}
-            workSessionId={activeSessionId ?? undefined}
-            workSessionLabel={activeSessionSummary?.title}
           />
         </div>
       </div>
