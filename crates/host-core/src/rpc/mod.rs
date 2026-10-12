@@ -4964,6 +4964,25 @@ async fn handle_request(
                 .map_err(skill_err)?;
             Ok(json!({ "skill": skill }))
         }
+        "skills.approve" => {
+            let id = require_id(&params)?;
+            let project_path = params
+                .get("projectPath")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
+            let content_hash = params
+                .get("contentHash")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "contentHash required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let skill = st
+                .user_skills
+                .approve(&id, project_path, content_hash)
+                .map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
         "skills.setScope" => {
             let id = require_id(&params)?;
             let scope = parse_scope(&params)?;

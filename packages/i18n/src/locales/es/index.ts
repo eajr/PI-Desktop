@@ -1128,6 +1128,15 @@ sklm: {
       "approve": "Aprobar y activar",
       "approved": "{{name}} aprobado",
     },
+    "skillApproval": {
+      "pending": "Requiere aprobación",
+      "changed": "Cambiado desde la aprobación",
+      "pendingNotice": "Esta skill procede de la carpeta .agents/skills del proyecto. El agente no la verá hasta que revises y apruebes su texto exacto.",
+      "changedNotice": "El texto de esta skill cambió después de aprobarla. El agente no la verá hasta que la revises de nuevo.",
+      "show": "Revisar texto",
+      "approve": "Aprobar y activar",
+      "approved": "{{name}} aprobada",
+    },
     "mcpMarket": {
       browse: "Mercado",
       back: "Mis servidores",

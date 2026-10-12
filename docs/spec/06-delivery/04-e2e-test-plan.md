@@ -15959,6 +15959,31 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   proves the runtime never spawns an unapproved project record; the rendered
   journey requires an explicitly authorized run.
 
+#### E2E-SKILL-project-skill-requires-approval: A project's skill never reaches the model before the user approves its exact text
+
+- **Preconditions**: Disposable data dir and HOME. Project A is registered and
+  contains `<project A>/.agents/skills/probe/SKILL.md` with a distinctive
+  description and body. No approval exists in
+  `<data>/agent-capabilities/skills.json`.
+- **Steps**:
+  1. Open project A. The composer command list offers no `/skill:probe`, and a
+     session's system prompt skill catalog does not list `probe`; a `Skill`
+     tool call with id `probe` is refused.
+  2. Open Settings > Agent > Skills with project A selected. The `probe` row
+     shows "Needs approval" and no enable switch. "Review text" shows the name,
+     description and body.
+  3. Choose "Approve and enable". The row becomes enabled; a new session lists
+     `probe` and the `Skill` tool returns its body.
+  4. Edit `SKILL.md` on disk. Reload the page: the row shows "Changed since
+     approval", new sessions and the composer no longer offer it, and
+     approving again restores it.
+  5. Create a project skill through the editor: it is enabled immediately.
+- **Status**: Draft. Host-core `user_skills` approval tests cover
+  pending/approved/changed state, stale-hash refusal and app-authored skills;
+  `apps/pi-host/src/skill-tool.test.ts` and
+  `apps/desktop/test/skill-project-approval.test.mjs` cover the headless tool
+  and the review UI; the rendered journey requires an explicitly authorized run.
+
 ### MCP market scenarios (`pnpm test:e2e:mcp-market`, headless protocol-level)
 
 | ID | Scenario | Verification |

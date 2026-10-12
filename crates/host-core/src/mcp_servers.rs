@@ -1,12 +1,11 @@
 use crate::activation::{ActivationMode, ActivationScope};
 use crate::agent_capabilities::{
-    capability_dir, file_timestamp, move_capability_file, normalize_project_path,
+    capability_dir, content_hash, file_timestamp, move_capability_file, normalize_project_path,
     set_moved_capability_state, sorted_files, suffixed_capability_id, suffixed_display_name,
-    CapabilityLevel, CapabilityState, CapabilityTarget,
+    CapabilityLevel, CapabilityState, CapabilityTarget, ContentApproval,
 };
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Deserializer, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -63,14 +62,8 @@ pub struct McpServerRecord {
 /// opened, so its servers never run until the user approves the exact
 /// command/args/env/url/headers. The approval is bound to `config_hash`; an
 /// edit to the file after approval reads as `Changed` and runs nothing until
-/// the user approves again.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum McpApproval {
-    Approved,
-    Pending,
-    Changed,
-}
+/// the user approves again. Project skills share the same states.
+pub type McpApproval = ContentApproval;
 
 /// JSON stored in `.agents/servers/<id>.json`. Activation fields never enter
 /// this file; they belong to the application-local capability state.
@@ -238,7 +231,7 @@ fn config_hash(config: &McpConfig) -> String {
     // Every field is a string, a list or a BTreeMap, so serialization is
     // deterministic and cannot fail.
     let canonical = serde_json::to_vec(&subject).unwrap_or_default();
-    format!("sha256:{}", hex::encode(&Sha256::digest(&canonical)[..]))
+    content_hash(&canonical)
 }
 
 fn merge_active_records(
@@ -303,15 +296,13 @@ impl McpServerRegistry {
                 CapabilityLevel::Global => (None, None),
                 CapabilityLevel::Project => {
                     let hash = config_hash(&config);
-                    let approval =
-                        match self
-                            .state
-                            .approval(MCP_KIND, level, &config.id, effective_project)
-                        {
-                            Some(approved) if approved == hash => McpApproval::Approved,
-                            Some(_) => McpApproval::Changed,
-                            None => McpApproval::Pending,
-                        };
+                    let approval = self.state.approval_status(
+                        MCP_KIND,
+                        level,
+                        &config.id,
+                        effective_project,
+                        &hash,
+                    );
                     (Some(hash), Some(approval))
                 }
             };

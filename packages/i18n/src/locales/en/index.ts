@@ -980,6 +980,15 @@ sklm: {
       approve: "Approve and enable",
       approved: "Approved {{name}}",
     },
+    skillApproval: {
+      pending: "Needs approval",
+      changed: "Changed since approval",
+      pendingNotice: "This skill comes from the project's .agents/skills folder. The agent will not see it until you review and approve its exact text.",
+      changedNotice: "This skill's text changed after you approved it. The agent will not see it until you review it again.",
+      show: "Review text",
+      approve: "Approve and enable",
+      approved: "Approved {{name}}",
+    },
     mcpProjectSubtitle: "Active only in {{project}}.",
     mcpEmpty: "No MCP servers in this folder",
     mcpMarket: {

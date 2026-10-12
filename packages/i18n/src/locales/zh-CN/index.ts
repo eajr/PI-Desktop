@@ -1121,6 +1121,15 @@ sklm: {
       approve: "批准并启用",
       approved: "已批准 {{name}}",
     },
+    skillApproval: {
+      pending: "需要批准",
+      changed: "批准后已更改",
+      pendingNotice: "此技能来自项目的 .agents/skills 文件夹。在你审核并批准其确切内容之前，智能体不会看到它。",
+      changedNotice: "此技能的内容在你批准后已更改。重新审核之前智能体不会看到它。",
+      show: "查看内容",
+      approve: "批准并启用",
+      approved: "已批准 {{name}}",
+    },
     mcpProjectSubtitle: "仅在 {{project}} 中生效。",
     mcpEmpty: "此目录中没有 MCP 服务器",
     mcpMarket: {

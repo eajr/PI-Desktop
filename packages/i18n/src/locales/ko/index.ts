@@ -1136,6 +1136,15 @@ sklm: {
       approve: "승인 후 사용",
       approved: "{{name}} 승인됨",
     },
+    skillApproval: {
+      pending: "승인 필요",
+      changed: "승인 후 변경됨",
+      pendingNotice: "이 스킬은 프로젝트의 .agents/skills 폴더에서 왔습니다. 정확한 내용을 검토하고 승인하기 전까지 에이전트에 표시되지 않습니다.",
+      changedNotice: "승인한 뒤 이 스킬의 내용이 변경되었습니다. 다시 검토하기 전까지 에이전트에 표시되지 않습니다.",
+      show: "내용 검토",
+      approve: "승인 후 사용",
+      approved: "{{name}} 승인됨",
+    },
     mcpProjectSubtitle: "{{project}}에서만 활성 상태입니다.",
     mcpEmpty: "이 폴더에 MCP 서버 없음",
     mcpMarket: {

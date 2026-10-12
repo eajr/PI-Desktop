@@ -1243,6 +1243,16 @@ export const api = {
     enabled: boolean,
     query?: Partial<AgentCapabilityQuery>,
   ) => invoke(IPC.invoke.skillSetEnabled, { id, enabled, ...query }),
+  /**
+   * Approve a project skill's exact reviewed document. `contentHash` is the
+   * hash of the document the user was shown; a file changed since is refused.
+   */
+  approveUserSkill: (id: string, projectPath: string, contentHash: string) =>
+    invoke<{ skill: UserSkillRecord | null }>(IPC.invoke.skillApprove, {
+      id,
+      projectPath,
+      contentHash,
+    }),
   setUserSkillScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.skillSetScope, { id, scope }),
   /**

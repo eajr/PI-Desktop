@@ -4204,3 +4204,9 @@
   font-family: var(--font-mono);
   font-size: var(--text-3xs);
 }
+
+/* A pending project skill's full document, scrollable inside the review. */
+.agent-capability-approval-field code.agent-capability-approval-document {
+  max-height: 240px;
+  overflow: auto;
+}

@@ -33,6 +33,26 @@ impl CapabilityLevel {
     }
 }
 
+/// Trust state of a project-level capability document.
+///
+/// A project's `.agents/` directory arrives with whatever repository the user
+/// opened, so a project document that can run something or reach the model
+/// takes effect only once the user approved its exact content. The approval is
+/// bound to a content hash; an edit after approval reads as `Changed` and stays
+/// inert until the user approves again.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ContentApproval {
+    Approved,
+    Pending,
+    Changed,
+}
+
+/// `sha256:<hex>` of `bytes`, the form approvals are stored and compared in.
+pub fn content_hash(bytes: &[u8]) -> String {
+    format!("sha256:{}", hex::encode(&Sha256::digest(bytes)[..]))
+}
+
 /// The application-local state file deliberately lives outside capability
 /// directories. Capability documents remain portable and user-editable.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -188,6 +208,22 @@ impl CapabilityState {
         self.values.remove(&key);
         self.approvals.insert(key, hash.to_string());
         self.save()
+    }
+
+    /// Compare a document's current content hash with the stored approval.
+    pub fn approval_status(
+        &self,
+        kind: &str,
+        level: CapabilityLevel,
+        id: &str,
+        project_path: Option<&str>,
+        hash: &str,
+    ) -> ContentApproval {
+        match self.approval(kind, level, id, project_path) {
+            Some(approved) if approved == hash => ContentApproval::Approved,
+            Some(_) => ContentApproval::Changed,
+            None => ContentApproval::Pending,
+        }
     }
 
     /// Every id of `kind` at `level` whose stored value is an explicit `false`.

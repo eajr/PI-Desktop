@@ -575,6 +575,13 @@ Rules the control encodes:
   non-ASCII.
 - The description is the catalog summary and the body is fetched only when the
   model invokes `Skill` (D174, D194).
+- A project skill enters the catalog only after approval bound to the exact
+  skill document (D658). A pending or changed project row shows a "Needs
+  approval" or "Changed since approval" badge and a review block; "Review text"
+  loads the name, description and body, and "Approve and enable" approves the
+  hash returned with that text. Its switch is hidden until approved. Skills the
+  user creates or imports into a project through the app are approved as
+  written.
 
 ## 13. Developer experience
 
