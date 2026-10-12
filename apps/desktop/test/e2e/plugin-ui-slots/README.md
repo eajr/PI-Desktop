@@ -5,6 +5,11 @@ Launches the real Electron app with the UI Slots Lab
 every renderer slot end to end. The model is a deterministic in-process
 Chat Completions stub; no real provider or network access is used.
 
+> **Not applicable in this build.** Renderer extensions are disabled
+> (`RENDERER_EXTENSIONS_ENABLED = false`,
+> `docs/adr/disable-plugin-renderer-extensions.md`), so the lab's slots never
+> mount and this suite fails by design until the switch is turned back on.
+
 ```bash
 pnpm build:js
 cargo build -p host-core            # or set PI_DESKTOP_HOST_BIN

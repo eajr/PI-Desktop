@@ -74,12 +74,14 @@ function writePlugin(t, { id, main = RENDERER_CALL_MAIN }) {
   return dir;
 }
 
-function runtimeFor(t) {
+function runtimeFor(t, { rendererExtensionsEnabled = true } = {}) {
   const runtime = new PluginRuntime({
     hostEntry: hostProcessEntry,
     spawnProcess: forkPluginProcess,
     getWorkspacePath: () => null,
     audit: () => {},
+    // Off in this build; the dormant machinery stays covered.
+    rendererExtensionsEnabled,
   });
   t.after(async () => {
     for (const loaded of runtime.listLoaded()) await runtime.unload(loaded.manifest.id);
@@ -189,5 +191,27 @@ test("without the renderer.extension grant the plugin runs but has no renderer e
   // No generation was ever handed out, so there is none to guess.
   for (let generation = 1; generation < 64; generation += 1) {
     assert.equal(runtime.resolveRendererSource("lab.ungranted", generation, "renderer/index.js"), null);
+  }
+});
+
+test("with renderer extensions off in this build, a granted plugin runs headless only", async (t) => {
+  // No override: the runtime follows the build switch.
+  const runtime = new PluginRuntime({
+    hostEntry: hostProcessEntry,
+    spawnProcess: forkPluginProcess,
+    getWorkspacePath: () => null,
+    audit: () => {},
+  });
+  t.after(async () => {
+    for (const loaded of runtime.listLoaded()) await runtime.unload(loaded.manifest.id);
+  });
+  const dir = writePlugin(t, { id: "lab.disabled" });
+  await runtime.loadFromPath(dir, ["renderer.extension"]);
+  assert.ok(runtime.getLoaded("lab.disabled"), "the headless entry still runs");
+  assert.ok(runtime.getLoaded("lab.disabled").permissions.has("renderer.extension"), "the grant is recorded");
+  assert.equal(runtime.rendererDescriptor("lab.disabled"), undefined);
+  await assert.rejects(runtime.callRenderer("lab.disabled", "echo", {}), refusedWith("PLUGIN_UNLOADED"));
+  for (let generation = 1; generation < 64; generation += 1) {
+    assert.equal(runtime.resolveRendererSource("lab.disabled", generation, "renderer/index.js"), null);
   }
 });

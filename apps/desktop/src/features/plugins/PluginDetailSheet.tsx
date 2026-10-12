@@ -14,6 +14,7 @@ import {
   formatBytes,
   formatDate,
   monogram,
+  permissionHelp,
   permissionLabel,
   permissionRisk,
   RISK_LABEL_KEYS,
@@ -267,9 +268,7 @@ export function PluginDetailSheet({
                               <span className="plugins-perm-copy">
                                 <strong>{permissionLabel(permission, t)}</strong>
                                 <span>
-                                  {t(`plugins.permissionHelp.${permission}`, {
-                                    defaultValue: permission,
-                                  })}
+                                  {permissionHelp(permission, t)}
                                 </span>
                               </span>
                             </li>

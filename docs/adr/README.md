@@ -380,5 +380,6 @@ Each ADR includes:
 | external-mcp-import-secret-custody | [Keep external MCP import secrets in Electron main](external-mcp-import-secret-custody.md) | Accepted |
 | launchable-files-reveal-instead-of-open | [Reveal launchable files instead of opening them](launchable-files-reveal-instead-of-open.md) | Accepted (implementation candidate; amends ADR 0109) |
 | plugin-net-resolved-address-guard | [Judge plugin egress on the address, not the spelling](plugin-net-resolved-address-guard.md) | Accepted (implementation candidate) |
+| disable-plugin-renderer-extensions | [Disable plugin renderer extensions until they are isolated](disable-plugin-renderer-extensions.md) | Accepted (fork security mitigation) |
 
 | local-agent-remote-workspace-tools | [Local Agent and model requests for remote workspaces](local-agent-remote-workspace-tools.md) | Accepted for implementation |

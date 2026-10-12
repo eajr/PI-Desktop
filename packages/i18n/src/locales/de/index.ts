@@ -2207,6 +2207,7 @@ sklm: {
     "fsRootPicked": "einen von Ihnen ausgewählten Ordner",
     "fsOwnFiles": "Von ihm erstellte Dateien",
     "fsAsksEachTime": "fragt Sie jedes Mal",
+    "rendererExtensionsDisabled": "Renderer-Erweiterungen sind in diesem Build deaktiviert. Die Chat-UI-Elemente dieses Plugins werden nicht geladen; seine übrigen Funktionen arbeiten weiter.",
     "legacyFsDowngraded": "Dieses Plugin deklariert Dateiberechtigungen von vor der Existenz von Bereichen, daher wurde seine Reichweite reduziert. Aktualisieren Sie es, um die volle Funktion wiederherzustellen.",
     "permissions": {
       "ui.panel": "Plugin-Panel anzeigen",

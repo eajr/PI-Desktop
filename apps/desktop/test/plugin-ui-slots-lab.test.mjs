@@ -56,6 +56,8 @@ async function labRuntime(t) {
     spawnProcess: forkPluginProcess,
     getWorkspacePath: () => null,
     audit: () => {},
+    // Off in this build; the dormant machinery stays covered.
+    rendererExtensionsEnabled: true,
   });
   t.after(() => runtime.disposeAll());
   await runtime.loadFromPath(LAB_DIR, manifest.permissions);

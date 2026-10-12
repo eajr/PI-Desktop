@@ -1,7 +1,8 @@
-import type {
-  MarketPluginSummary,
-  PluginCapability,
-  PluginSummary,
+import {
+  RENDERER_EXTENSIONS_ENABLED,
+  type MarketPluginSummary,
+  type PluginCapability,
+  type PluginSummary,
 } from "@pi-desktop/shared";
 
 export type TabId = "installed" | "market";
@@ -142,6 +143,43 @@ export function permissionRisk(key: string): RiskTier {
 
 export function permissionLabel(key: string, t: (k: string, o?: any) => string): string {
   return t(`plugins.permissions.${key}`, { defaultValue: key });
+}
+
+/** The grant behind `manifest.renderer`. */
+export const RENDERER_EXTENSION_PERMISSION = "renderer.extension";
+
+/** Shown wherever this build declines to load a plugin's renderer extension. */
+export const RENDERER_EXTENSIONS_DISABLED_KEY = "plugins.rendererExtensionsDisabled";
+
+/**
+ * Whether this build ignores a permission outright. Renderer extensions are
+ * off (`RENDERER_EXTENSIONS_ENABLED`), so a review must not present
+ * `renderer.extension` as something the user is turning on: it records the
+ * declaration and grants nothing.
+ */
+export function permissionDisabledInBuild(
+  permission: string,
+  enabled: boolean = RENDERER_EXTENSIONS_ENABLED,
+): boolean {
+  return !enabled && permission === RENDERER_EXTENSION_PERMISSION;
+}
+
+/** The explanation under a permission's label in reviews and detail sheets. */
+export function permissionHelp(permission: string, t: (k: string, o?: any) => string): string {
+  if (permissionDisabledInBuild(permission)) return t(RENDERER_EXTENSIONS_DISABLED_KEY);
+  return t(`plugins.permissionHelp.${permission}`, { defaultValue: permission });
+}
+
+/** An installed plugin whose renderer extension this build skips. */
+export function skipsRendererExtension(
+  plugin: Pick<PluginSummary, "permissions" | "capabilities">,
+  enabled: boolean = RENDERER_EXTENSIONS_ENABLED,
+): boolean {
+  if (enabled) return false;
+  return (
+    (plugin.capabilities ?? []).includes("rendererUi") ||
+    (plugin.permissions ?? []).includes(RENDERER_EXTENSION_PERMISSION)
+  );
 }
 
 /** Deduplicates permissions and orders them by descending risk, then by label. */

@@ -28,6 +28,7 @@ import {
 } from "@pi-desktop/plugin-sdk";
 import {
   isActiveInProject,
+  RENDERER_EXTENSIONS_ENABLED,
   type PluginRendererDescriptor,
   type PluginSummary,
 } from "@pi-desktop/shared";
@@ -277,11 +278,17 @@ export class RendererModuleLoader {
  * renderer descriptor (it is running, declares `manifest.renderer` and holds
  * `renderer.extension`) that is active in the open project. A project-scoped
  * plugin's slots belong to its projects, like its views and tools.
+ *
+ * Nothing at all while renderer extensions are disabled in this build
+ * (`RENDERER_EXTENSIONS_ENABLED`), whatever a summary carries: a plugin module
+ * evaluated here would share the window's privileged preload bridge.
  */
 export function rendererLoadSpecs(
   plugins: readonly PluginSummary[],
   projectPath: string | null | undefined,
+  enabled: boolean = RENDERER_EXTENSIONS_ENABLED,
 ): RendererLoadSpec[] {
+  if (!enabled) return [];
   return plugins.flatMap((summary) =>
     summary.renderer && isActiveInProject(summary, projectPath)
       ? [{ pluginId: summary.id, version: summary.version, descriptor: summary.renderer }]
@@ -291,7 +298,10 @@ export function rendererLoadSpecs(
 
 /** The app window's loader. */
 export const rendererModules = new RendererModuleLoader({
-  importModule: (url) => import(/* @vite-ignore */ url),
+  importModule: (url) =>
+    RENDERER_EXTENSIONS_ENABLED
+      ? import(/* @vite-ignore */ url)
+      : Promise.reject(new Error("renderer extensions are disabled in this build")),
   registry: slotRegistry,
   injectStyle: injectPluginStyle,
   openLayer: (pluginId) => pluginLayers.open(pluginId),

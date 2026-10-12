@@ -2221,6 +2221,7 @@ importConfirm: "가져온 확장은 에이전트 프로세스 안에서 에이�
     fsRootPicked: "선택한 폴더",
     fsOwnFiles: "플러그인이 만든 파일",
     fsAsksEachTime: "매번 확인 요청",
+    rendererExtensionsDisabled: "이 빌드에서는 렌더러 확장이 비활성화되어 있습니다. 이 플러그인의 채팅 UI 슬롯은 로드되지 않으며 다른 기능은 계속 작동합니다.",
     legacyFsDowngraded:
       "이 플러그인은 범위 기능이 생기기 전의 파일 권한을 선언했으므로 접근 범위가 줄었습니다. 전체 기능을 복원하려면 업데이트하세요.",
     permissions: {

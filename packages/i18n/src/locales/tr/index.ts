@@ -2215,6 +2215,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
     fsRootPicked: "seçtiğiniz bir klasör",
     fsOwnFiles: "oluşturduğu dosyalar",
     fsAsksEachTime: "her seferinde sorar",
+    rendererExtensionsDisabled: "Bu derlemede oluşturucu uzantıları devre dışıdır. Bu eklentinin sohbet arayüzü yuvaları yüklenmez; diğer özellikleri çalışmaya devam eder.",
     legacyFsDowngraded:
       "Bu eklenti kapsamlar yokken tanımlanmış dosya izinleri bildiriyor, bu yüzden erişimi azaltıldı. Tam işlev için güncelleyin.",
     permissions: {

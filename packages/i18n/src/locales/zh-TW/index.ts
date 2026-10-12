@@ -2199,6 +2199,7 @@ sklm: {
     fsRootPicked: "你選擇的資料夾",
     fsOwnFiles: "自己建立的檔案",
     fsAsksEachTime: "每次都會詢問",
+    rendererExtensionsDisabled: "此版本已停用渲染擴充。此外掛的聊天介面插槽不會載入，其他功能仍可正常使用。",
     legacyFsDowngraded: "此外掛宣告的是舊版檔案許可權，實際範圍已被收窄。更新外掛可恢復完整功能。",
     permissions: {
       "ui.panel": "顯示外掛面板",

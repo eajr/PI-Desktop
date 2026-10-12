@@ -2199,6 +2199,7 @@ sklm: {
     fsRootPicked: "你选择的文件夹",
     fsOwnFiles: "自己创建的文件",
     fsAsksEachTime: "每次都会询问",
+    rendererExtensionsDisabled: "此版本已禁用渲染扩展。此插件的聊天界面插槽不会加载，其他功能仍可正常使用。",
     legacyFsDowngraded: "此插件声明的是旧版文件权限，实际范围已被收窄。更新插件可恢复完整功能。",
     permissions: {
       "ui.panel": "显示插件面板",
