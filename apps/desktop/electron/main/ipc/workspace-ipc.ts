@@ -31,6 +31,8 @@ import {
 } from "../composer-picker";
 import { collectWorkspaceDiff } from "@pi-desktop/host-runtime";
 import { parseAllowedExternalUrl } from "../safe-open-external";
+import { electronOpenPathDeps } from "../safe-open-path-electron";
+import { openPathOrReveal } from "../safe-open-path";
 import {
   isAttachmentBlobRef,
   listDir,
@@ -961,9 +963,14 @@ export function registerWorkspaceIpc({
       });
     }
     const openPath = await openableMp4Path(dataDir, target, input.mimeType);
-    const openError = await shell.openPath(stripWinLongPrefix(openPath));
-    if (openError) throw new Error(openError);
-    return { ok: true };
+    const result = await openPathOrReveal(
+      stripWinLongPrefix(openPath),
+      electronOpenPathDeps,
+      stripWinLongPrefix(target),
+    );
+    return result.outcome === "revealed"
+      ? { ok: true, outcome: "revealed", reason: result.reason }
+      : { ok: true, outcome: "opened" };
   });
 
   handle(IPC.invoke.fsIndex, async (input: { sessionId?: string } = {}) => {

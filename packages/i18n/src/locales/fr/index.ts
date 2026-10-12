@@ -1939,7 +1939,8 @@ sklm: {
       "reveal": "Révéler dans le Finder",
       "binary": "Fichier binaire — aperçu indisponible",
       "tooLarge": "Le fichier est trop volumineux pour être prévisualisé",
-      "openFailed": "Impossible d’ouvrir le fichier avec l’application par défaut."
+      "openFailed": "Impossible d’ouvrir le fichier avec l’application par défaut.",
+      "launchableRevealed": "Ce fichier peut exécuter des programmes : il a été affiché dans son dossier au lieu d’être ouvert."
     }
   },
   "palette": {

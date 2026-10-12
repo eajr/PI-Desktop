@@ -88,7 +88,7 @@ test("a file chip is routed by where the reference resolved, never optimisticall
   assert.doesNotMatch(hook, /api\.fsOpen\(/);
   assert.match(
     api,
-    /fsOpen: \(path: string, mimeType\?: string, sessionId\?: string\) =>\s*invoke\(IPC\.invoke\.fsOpen, \{ path, mimeType, \.\.\.\(sessionId \? \{ sessionId \} : \{\}\) \}\)/,
+    /fsOpen: \(path: string, mimeType\?: string, sessionId\?: string\) =>\s*invoke<FsOpenResult>\(IPC\.invoke\.fsOpen, \{ path, mimeType, \.\.\.\(sessionId \? \{ sessionId \} : \{\}\) \}\)/,
   );
 });
 

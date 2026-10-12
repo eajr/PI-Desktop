@@ -1939,7 +1939,8 @@ sklm: {
       "reveal": "Im Finder anzeigen",
       "binary": "Binärdatei – Vorschau nicht verfügbar",
       "tooLarge": "Datei ist zu groß für die Vorschau",
-      "openFailed": "Die Datei konnte nicht mit der Standardanwendung geöffnet werden."
+      "openFailed": "Die Datei konnte nicht mit der Standardanwendung geöffnet werden.",
+      "launchableRevealed": "Diese Datei kann Programme ausführen und wurde deshalb in ihrem Ordner angezeigt statt geöffnet."
     }
   },
   "palette": {

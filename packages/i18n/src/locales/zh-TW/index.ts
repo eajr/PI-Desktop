@@ -1935,6 +1935,7 @@ sklm: {
       binary: "二進位制檔案，無法預覽",
       tooLarge: "檔案過大，無法預覽",
       openFailed: "無法使用系統預設應用程式開啟檔案。",
+      launchableRevealed: "此檔案可以執行程式，因此已在所在資料夾中顯示，而未直接開啟。",
     },
   },
   palette: {

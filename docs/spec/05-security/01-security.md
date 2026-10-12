@@ -87,6 +87,33 @@ Required (all **implemented**):
   `ELECTRON_RUN_AS_NODE` or `NODE_OPTIONS`. Closing that requires moving the
   sidecar off `RunAsNode` and replacing the `NODE_EXTRA_CA_CERTS` input.
 
+### 2a. Opening local files with the OS
+
+Every `shell.openPath` of a workspace- or plugin-chosen path — `fs/open`,
+plugin `fs.openDefault`, and the browser pane's "open externally" for a
+`file:` preview — first goes through `safe-open-path.ts`
+(`openPathOrReveal`, ADR launchable-files-reveal-instead-of-open). A path
+whose OS association could run code is **revealed** in the file manager
+(`shell.showItemInFolder`) instead of opened, and the user sees the localized
+`panel.files.launchableRevealed` notice. Launchable means:
+
+- the final extension, case-insensitively and after folding the trailing dots,
+  spaces, and NTFS `:stream` suffix Windows ignores, names an application,
+  bundle, script, installer, shortcut, or location file (`.app`, `.command`,
+  `.terminal`, `.workflow`, `.pkg`, `.dmg`, `.webloc`, `.inetloc`, `.exe`,
+  `.bat`, `.cmd`, `.ps1`, `.vbs`, `.msi`, `.lnk`, `.url`, `.reg`, `.desktop`,
+  `.appimage`, `.sh`, `.jar`, …; `.js` on Windows only). `x.pdf.command` is
+  launchable; `x.command.pdf` is not;
+- a directory with such an extension, or on macOS one whose
+  `Contents/Info.plist` names a `CFBundleExecutable`;
+- on POSIX, a file with any execute bit unless every name of it has a known
+  document extension;
+- a path that cannot be inspected.
+
+Both the literal and the symlink-resolved name are checked. App-owned
+directories opened on purpose (logs, project root, session scratch) are
+outside this policy.
+
 ### Future hardening (tracked, post-MVP)
 
 - Sidecar launch without `ELECTRON_RUN_AS_NODE`, then `runAsNode` and
@@ -364,6 +391,7 @@ host-core. They do not change the loopback-only rule above.
 | Dependency poisoning | lockfiles, few deps, native-module review |
 | Local malware swapping app code or executables | asar integrity + `onlyLoadAppFromAsar`, packaged builds ignore executable-path env overrides; `RunAsNode` still open (ADR electron-fuses-and-packaged-code-paths) |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
+| Agent- or repo-written launcher opened from the UI | `openPathOrReveal` reveals launchable files instead of opening them (§2a) |
 | Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 
 ## 11. Security acceptance gates

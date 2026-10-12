@@ -1960,6 +1960,7 @@ sklm: {
       binary: "Binary file — preview unavailable",
       tooLarge: "File is too large to preview",
       openFailed: "Could not open the file with its default application.",
+      launchableRevealed: "This file can run programs, so it was shown in its folder instead of opened.",
     },
   },
   palette: {

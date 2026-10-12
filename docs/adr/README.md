@@ -377,5 +377,6 @@ Each ADR includes:
 | 0326 | [Verified SSH Host installation and daily startup](0326-verified-ssh-host-installation.md) | Accepted for experimental implementation (amends ADR 0292; Linux SSH qualification and publication pending) |
 | plugin-fetch-redirect-policy | [Host-enforced plugin fetch redirect policy](plugin-fetch-redirect-policy.md) | Accepted (implementation candidate for #1475) |
 | external-mcp-import-secret-custody | [Keep external MCP import secrets in Electron main](external-mcp-import-secret-custody.md) | Accepted |
+| launchable-files-reveal-instead-of-open | [Reveal launchable files instead of opening them](launchable-files-reveal-instead-of-open.md) | Accepted (implementation candidate; amends ADR 0109) |
 
 | local-agent-remote-workspace-tools | [Local Agent and model requests for remote workspaces](local-agent-remote-workspace-tools.md) | Accepted for implementation |

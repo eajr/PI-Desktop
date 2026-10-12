@@ -1956,6 +1956,7 @@ sklm: {
       binary: "바이너리 파일 — 미리 볼 수 없음",
       tooLarge: "파일이 너무 커서 미리 볼 수 없음",
       openFailed: "기본 앱으로 파일을 열 수 없습니다.",
+      launchableRevealed: "이 파일은 프로그램을 실행할 수 있어 열지 않고 폴더에서 표시했습니다.",
     },
   },
   palette: {
