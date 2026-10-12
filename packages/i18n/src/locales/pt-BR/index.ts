@@ -938,6 +938,18 @@ export const ptBR = {
     mcpAdded: "Adicionado {{name}}",
     mcpSaved: "Salvo {{name}}",
     mcpDuplicate: "Já existe um servidor MCP com este ID ou nome neste nível.",
+    mcpApproval: {
+      pending: "Requer aprovação",
+      changed: "Alterado desde a aprovação",
+      pendingNotice: "Este servidor vem da pasta .agents/servers do projeto. Ele não será executado até você aprovar exatamente o que ele inicia ou ao que se conecta.",
+      changedNotice: "A configuração deste servidor mudou depois da sua aprovação. Ele não será executado até você revisá-lo novamente.",
+      command: "Comando",
+      url: "URL",
+      env: "Ambiente",
+      headers: "Cabeçalhos",
+      approve: "Aprovar e ativar",
+      approved: "{{name}} aprovado",
+    },
     mcpProjectSubtitle: "Ativo apenas em {{project}}.",
     mcpEmpty: "Nenhum servidor MCP nesta pasta",
     mcpMarket: {

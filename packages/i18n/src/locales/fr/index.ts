@@ -1116,6 +1116,18 @@ sklm: {
     "mcpAdded": "Ajouté {{name}}",
     "mcpSaved": "Enregistré {{name}}",
     "mcpDuplicate": "Un serveur MCP avec cet ID ou ce nom existe déjà à ce niveau.",
+    "mcpApproval": {
+      "pending": "Approbation requise",
+      "changed": "Modifié depuis l'approbation",
+      "pendingNotice": "Ce serveur provient du dossier .agents/servers du projet. Il ne s'exécutera pas tant que vous n'aurez pas approuvé exactement ce qu'il lance ou ce à quoi il se connecte.",
+      "changedNotice": "La configuration de ce serveur a changé après votre approbation. Il ne s'exécutera pas avant un nouvel examen.",
+      "command": "Commande",
+      "url": "URL",
+      "env": "Environnement",
+      "headers": "En-têtes",
+      "approve": "Approuver et activer",
+      "approved": "{{name}} approuvé",
+    },
     "mcpMarket": {
       browse: "Marché",
       back: "Mes serveurs",

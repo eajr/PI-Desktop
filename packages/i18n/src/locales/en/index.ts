@@ -968,6 +968,18 @@ sklm: {
     mcpAdded: "Added {{name}}",
     mcpSaved: "Saved {{name}}",
     mcpDuplicate: "An MCP server with this ID or name already exists at this level.",
+    mcpApproval: {
+      pending: "Needs approval",
+      changed: "Changed since approval",
+      pendingNotice: "This server comes from the project's .agents/servers folder. It will not run until you approve exactly what it starts or connects to.",
+      changedNotice: "This server's configuration changed after you approved it. It will not run until you review it again.",
+      command: "Command",
+      url: "URL",
+      env: "Environment",
+      headers: "Headers",
+      approve: "Approve and enable",
+      approved: "Approved {{name}}",
+    },
     mcpProjectSubtitle: "Active only in {{project}}.",
     mcpEmpty: "No MCP servers in this folder",
     mcpMarket: {

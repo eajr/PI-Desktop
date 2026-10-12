@@ -1124,6 +1124,18 @@ sklm: {
     mcpAdded: "{{name}} 추가됨",
     mcpSaved: "{{name}} 저장됨",
     mcpDuplicate: "이 수준에 같은 ID 또는 이름의 MCP 서버가 이미 있습니다.",
+    mcpApproval: {
+      pending: "승인 필요",
+      changed: "승인 후 변경됨",
+      pendingNotice: "이 서버는 프로젝트의 .agents/servers 폴더에서 왔습니다. 시작하거나 연결하는 대상을 정확히 승인하기 전까지 실행되지 않습니다.",
+      changedNotice: "승인한 뒤 이 서버의 구성이 변경되었습니다. 다시 검토하기 전까지 실행되지 않습니다.",
+      command: "명령",
+      url: "URL",
+      env: "환경 변수",
+      headers: "헤더",
+      approve: "승인 후 사용",
+      approved: "{{name}} 승인됨",
+    },
     mcpProjectSubtitle: "{{project}}에서만 활성 상태입니다.",
     mcpEmpty: "이 폴더에 MCP 서버 없음",
     mcpMarket: {

@@ -4821,6 +4821,25 @@ async fn handle_request(
                 .map_err(scope_err)?;
             Ok(json!({ "server": server }))
         }
+        "mcp.approve" => {
+            let id = require_id(&params)?;
+            let project_path = params
+                .get("projectPath")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| capability_err("projectPath required to approve a server"))?;
+            let config_hash = params
+                .get("configHash")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "configHash required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let server = st
+                .mcp_servers
+                .approve(&id, project_path, config_hash)
+                .map_err(scope_err)?;
+            Ok(json!({ "server": server }))
+        }
         "mcp.setScope" => {
             let id = require_id(&params)?;
             let scope = parse_scope(&params)?;

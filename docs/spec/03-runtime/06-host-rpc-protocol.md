@@ -693,8 +693,9 @@ against a live host, and replaying one after the final row would be wrong.
   `agents.update` / `agents.remove` / `agents.setEnabled` /
   `agents.setScope` — user subagent documents (`SUBAGENT_INVALID`)
 - `mcp.list` / `mcp.active` / `mcp.upsert` / `mcp.remove` /
-  `mcp.setEnabled` / `mcp.setScope` / `mcp.transfer` — user MCP server
-  definitions (`MCP_INVALID`)
+  `mcp.setEnabled` / `mcp.approve` / `mcp.setScope` / `mcp.transfer` — user MCP
+  server definitions (`MCP_INVALID`); `mcp.approve` binds a project server's
+  approval to its `configHash` (D657)
 
 `skills.transfer` and `mcp.transfer` take `{ id, from, to }`, each end a
 `{ level, projectPath? }` target (`projectPath` is required for the project

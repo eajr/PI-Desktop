@@ -1109,6 +1109,18 @@ sklm: {
     mcpAdded: "已新增 {{name}}",
     mcpSaved: "已儲存 {{name}}",
     mcpDuplicate: "此級別已存在相同 ID 或名稱的 MCP 伺服器。",
+    mcpApproval: {
+      pending: "需要核准",
+      changed: "核准後已變更",
+      pendingNotice: "此伺服器來自專案的 .agents/servers 資料夾。在你核准它啟動或連線的確切內容之前，它不會執行。",
+      changedNotice: "此伺服器的設定在你核准後已變更。重新審查之前它不會執行。",
+      command: "指令",
+      url: "URL",
+      env: "環境變數",
+      headers: "標頭",
+      approve: "核准並啟用",
+      approved: "已核准 {{name}}",
+    },
     mcpProjectSubtitle: "僅在 {{project}} 中生效。",
     mcpEmpty: "此目錄中沒有 MCP 伺服器",
     mcpMarket: {

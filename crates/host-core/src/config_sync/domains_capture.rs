@@ -72,7 +72,11 @@ fn capture_mcp(
     for (level, project_path) in targets {
         for record in st.mcp_servers.list(level, project_path.as_deref())? {
             let mut payload = serde_json::to_value(&record)?;
-            strip_keys(&mut payload, &["path", "createdAt", "updatedAt"]);
+            // Approval is this device's trust decision, never portable.
+            strip_keys(
+                &mut payload,
+                &["path", "createdAt", "updatedAt", "configHash", "approval"],
+            );
             let secret_bearing = !record.env.is_empty() || !record.headers.is_empty();
             let project_scope = record
                 .project_path

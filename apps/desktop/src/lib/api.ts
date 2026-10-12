@@ -1107,6 +1107,16 @@ export const api = {
     enabled: boolean,
     query?: Partial<AgentCapabilityQuery>,
   ) => invoke(IPC.invoke.mcpSetEnabled, { id, enabled, ...query }),
+  /**
+   * Approve a project server's exact reviewed content. `configHash` is the hash
+   * of the record the user was shown; a file changed since is refused.
+   */
+  approveMcpServer: (id: string, projectPath: string, configHash: string) =>
+    invoke<{ server: McpServerRecord | null }>(IPC.invoke.mcpApprove, {
+      id,
+      projectPath,
+      configHash,
+    }),
   setMcpServerScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.mcpSetScope, { id, scope }),
   /**
