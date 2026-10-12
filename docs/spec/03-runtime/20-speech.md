@@ -75,3 +75,28 @@ only consumers, and the renderer has no transcription or speech control.
 Whisper / TTS models must not appear in the chat model picker.
 
 v1 does not implement microphone capture, Realtime, or agent tools.
+
+## 7. Local dictation models
+
+`packages/voice-runtime` downloads Whisper / SenseVoice GGUF files from
+Hugging Face into the voice model cache and loads them with the native
+`transcribe-cpp` parser, so every model file is untrusted input to native
+code until verified:
+
+- Each catalog entry (`src/model-catalog.ts`) pins `hfRevision` (a 40-hex
+  commit), `sha256` (the file's LFS oid at that commit, 64 lowercase hex),
+  and `sizeBytes`. Downloads request the pinned commit, never `main`.
+- The downloader hashes bytes while they stream to `<file>.part` and renames
+  the file into place only when the digest matches. A mismatch deletes the
+  partial file and fails the download. An entry with an empty or malformed
+  `sha256` or `hfRevision` is refused before any network request.
+- `ModelManager` re-hashes an on-disk file before its first native load in
+  each process, so files from older app versions (which downloaded without
+  checks) or files altered on disk are not trusted because they exist. A
+  failing file is deleted and the model state becomes `error` with
+  `localPath` cleared, so the next download starts fresh. Later loads in the
+  same process skip the re-hash; replacing a file after verification needs
+  local write access to the user's profile and is out of scope.
+- Bumping a model means updating `hfRevision`, `sha256`, and `sizeBytes`
+  together from `GET /api/models/<repo>/revision/<commit>?blobs=true`;
+  `test/model-catalog.test.ts` rejects entries without a well-formed pin.

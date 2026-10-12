@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import { mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
+import { assertDigestMatches, assertPinnedModel } from "./model-integrity.js";
 import type { ModelInfo } from "./types.js";
 
 /**
@@ -9,12 +11,18 @@ import type { ModelInfo } from "./types.js";
  * Bytes land at `<target>.part` and are renamed into place only after the
  * stream completed, so an interrupted download never leaves a truncated
  * file behind for `ModelManager` to mistake for a finished one.
+ *
+ * The file is fetched from the catalog's pinned commit and hashed while it
+ * streams; it is renamed into place only when the SHA-256 matches the
+ * catalog pin. A catalog entry without a valid pin is rejected before any
+ * network request, and a mismatching download is deleted.
  */
 export async function* downloadModel(
   info: ModelInfo,
   targetDir: string,
   signal?: AbortSignal,
 ): AsyncGenerator<number, void, unknown> {
+  assertPinnedModel(info);
   await mkdir(targetDir, { recursive: true });
 
   const targetPath = path.join(targetDir, info.hfFilename);
@@ -26,6 +34,7 @@ export async function* downloadModel(
   const blob = await downloadFile({
     repo: info.hfRepo,
     path: info.hfFilename,
+    revision: info.hfRevision,
   });
 
   // In Node the hub SDK returns a Response-like object, not a Blob.
@@ -37,6 +46,7 @@ export async function* downloadModel(
 
   const contentLength = Number(response.headers.get("content-length") || info.sizeBytes);
   let received = 0;
+  const hash = createHash("sha256");
 
   const { createWriteStream } = await import("node:fs");
   const writer = createWriteStream(partPath);
@@ -75,6 +85,7 @@ export async function* downloadModel(
       const { done, value } = await Promise.race([reader.read(), streamFailure]);
       if (done) break;
 
+      hash.update(value);
       writer.write(Buffer.from(value));
       received += value.byteLength;
       yield contentLength > 0 ? received / contentLength : 0;
@@ -87,6 +98,7 @@ export async function* downloadModel(
     if (streamError) throw streamError;
 
     await writerClosed;
+    assertDigestMatches(info, hash.digest("hex"));
     await rename(partPath, targetPath);
     yield 1;
   } catch (error) {

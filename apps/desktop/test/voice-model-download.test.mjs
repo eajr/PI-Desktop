@@ -18,6 +18,9 @@ const MODEL = {
   id: "whisper-small",
   hfRepo: "fixture/whisper-small-GGUF",
   hfFilename: "ggml-small-q8_0.bin",
+  hfRevision: "0123456789abcdef0123456789abcdef01234567",
+  // sha256 of bytes 1..9, the payload the success case streams.
+  sha256: "47e4ee7f211f73265dd17658f6e21c1318bd6c81f37598e20a2756299542efcf",
   sizeBytes: 9,
 };
 
@@ -57,7 +60,11 @@ async function consume(generator) {
 
 test("a completed download lands at the final path with the .part file gone", async (t) => {
   const dir = await tmpDir(t);
-  setBehavior(() => responseFrom([[1, 2, 3], [4, 5], [6, 7, 8, 9]]));
+  let requested = null;
+  setBehavior((args) => {
+    requested = args;
+    return responseFrom([[1, 2, 3], [4, 5], [6, 7, 8, 9]]);
+  });
 
   const last = await consume(downloadModel(MODEL, dir));
   assert.equal(last, 1);
@@ -65,6 +72,46 @@ test("a completed download lands at the final path with the .part file gone", as
   assert.deepEqual([...bytes], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   const entries = await readdir(dir);
   assert.deepEqual(entries, ["ggml-small-q8_0.bin"], "no .part residue");
+  assert.equal(requested.revision, MODEL.hfRevision, "fetches the pinned commit");
+});
+
+test("a download whose sha256 does not match the pin is rejected and deleted", async (t) => {
+  const dir = await tmpDir(t);
+  // Same length as the pinned payload, different content.
+  setBehavior(() => responseFrom([[9, 8, 7, 6, 5, 4, 3, 2, 1]]));
+
+  await assert.rejects(
+    consume(downloadModel(MODEL, dir)),
+    /failed sha256 verification/,
+  );
+  const entries = await readdir(dir);
+  assert.deepEqual(entries, [], "neither the final file nor the .part survives");
+});
+
+test("a catalog entry with an empty sha256 is refused before any network request", async (t) => {
+  const dir = await tmpDir(t);
+  let called = false;
+  setBehavior(() => {
+    called = true;
+    return responseFrom([[1, 2, 3, 4, 5, 6, 7, 8, 9]]);
+  });
+
+  await assert.rejects(
+    consume(downloadModel({ ...MODEL, sha256: "" }, dir)),
+    /no valid pinned sha256/,
+  );
+  assert.equal(called, false, "the hub is never contacted");
+  assert.deepEqual(await readdir(dir), []);
+});
+
+test("a catalog entry without a pinned commit is refused", async (t) => {
+  const dir = await tmpDir(t);
+  setBehavior(() => responseFrom([[1, 2, 3, 4, 5, 6, 7, 8, 9]]));
+
+  await assert.rejects(
+    consume(downloadModel({ ...MODEL, hfRevision: "main" }, dir)),
+    /no pinned Hugging Face commit/,
+  );
 });
 
 test("a mid-stream source failure rejects and leaves neither the final file nor the .part", async (t) => {
