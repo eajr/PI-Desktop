@@ -124,9 +124,9 @@
   披露。全局偏好以 `thinkingDisplayMode` 持久化到宿主设置；缺失值使用详细模式。
   它只影响展示，不改变模型推理配置；显式披露选择在已挂载的会话窗格内保留。设置
   搜索会索引该行和两种模式名称。
-- 没有语音或听写设置页面。宿主语音与本地听写已移除（D662，ADR
-  fork-removes-voice-and-speech）；已存的 `speech` 与 `voice` 值保持原样并被忽略，
-  设置搜索不索引语音相关键。
+- 没有语音、实时语音或听写设置页面。实时语音、宿主语音与本地听写已移除（D662，ADR
+  fork-removes-voice-and-speech）；已存的 `liveVoice`、`speech` 与 `voice` 值保持
+  原样并被忽略，设置搜索不索引语音相关键。
 - **默认项**卡中的**命令 Shell**行：主机发现的本机 PowerShell 5.1、PowerShell 7、
   cmd、Git Bash 和 ID 为 `windows-powershell`、`windows-pwsh`、`cmd`、`git-bash`
   的 Bash 和

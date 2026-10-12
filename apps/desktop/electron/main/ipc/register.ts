@@ -32,9 +32,6 @@ import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-cat
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
 import { registerComposerIpc } from "./composer-ipc";
-import { registerLiveVoiceIpc } from "./live-voice-ipc";
-import type { LiveCallService } from "../live-voice/call-service";
-import type { LiveVoiceWidget } from "../live-voice/widget-window";
 import type { IpcRegistrar } from "./types";
 import type { createTraySessions } from "../tray-sessions";
 import type { createTaskbarUnreadBadge } from "../taskbar-unread-badge";
@@ -60,8 +57,6 @@ export type RegisterIpcDependencies = {
   activeUserSubagentDocuments: (...args: any[]) => Promise<any>;
   disabledBuiltinSubagents: () => Promise<string[]>;
   disabledBuiltinSkills: () => Promise<string[]>;
-  liveCallService?: LiveCallService;
-  liveVoiceWidget?: LiveVoiceWidget;
   restartForStorage: () => void;
   mcpOAuth?: McpOAuthManager;
   [name: string]: any;
@@ -166,8 +161,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getPluginPanelTheme,
     isDeveloperMode,
     sendToRenderer,
-    liveCallService,
-    liveVoiceWidget,
   } = dependencies;
 
 
@@ -279,7 +272,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     applyKeepAwakeWhileRunning,
     applyUpdatePreference: (preference) => updater.setPreference(preference),
     resolveEffectiveCommandShell,
-    liveCallService,
   });
   registerConfigSyncIpc({
     registrar,
@@ -296,7 +288,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     listRuntimeProviders,
     enrichProviderList,
     bindingForModel,
-    onProviderInvalidated: (providerId) => liveCallService?.invalidateProvider(providerId),
   });
   registerJevIpc({ registrar, logger });
   const loadComposerTemplatesCached = createComposerTemplateLoader(logger);
@@ -471,10 +462,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getUpdaterLocale,
     getPluginPanelTheme,
   });
-
-  if (liveCallService && liveVoiceWidget) {
-    registerLiveVoiceIpc({ registrar, service: liveCallService, getMainWindow, widget: liveVoiceWidget });
-  }
 
   registerRemoteHostIpc({ registrar });
   registerRemoteMediaIpc({ registrar, logger });

@@ -1,5 +1,9 @@
 # Live Voice Work Integration Evidence
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 Implementation status: **COMPLETE** for Live Work v2.1. The task candidate is
 based on `origin/main` at
 `b360e04eb11edb8256b85ad314a8fdda7dc54e30`. No real provider account, paid

@@ -7317,7 +7317,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn settings_set_round_trips_live_voice_without_changing_dictation_settings() {
+    async fn settings_set_preserves_removed_voice_and_speech_settings() {
+        // Live Voice, local Dictation and host speech were removed (D662). An
+        // older build's stored keys must survive later writes untouched.
         let data_dir = tempfile::tempdir().unwrap();
         let mut app_state = AppState::open(data_dir.path()).unwrap();
         app_state.handshook = true;
@@ -7333,6 +7335,7 @@ mod tests {
                 "voice": "cove"
             }]
         });
+        let speech = json!({ "asr": { "providerId": "openai", "modelId": "whisper-1" } });
         let dictation = json!({
             "enabled": true,
             "deviceId": "microphone-1",
@@ -7344,7 +7347,7 @@ mod tests {
         handle_request(
             state.clone(),
             "settings.set",
-            json!({ "liveVoice": live_voice, "voice": dictation }),
+            json!({ "liveVoice": live_voice, "voice": dictation, "speech": speech }),
             tx.clone(),
         )
         .await
@@ -7363,6 +7366,7 @@ mod tests {
 
         assert_eq!(stored["liveVoice"], live_voice);
         assert_eq!(stored["voice"], dictation);
+        assert_eq!(stored["speech"], speech);
         assert_eq!(stored["theme"], "light");
     }
 

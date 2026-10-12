@@ -11,8 +11,8 @@
 - 没有 `transcribe` / `synthesize` 服务，没有 `pi-desktop/speech/*` IPC 通道，
   也没有 `SPEECH_*` 错误码。
 - 没有本地转写运行时：主进程不再录制麦克风，不再有模型目录或下载器，也不会
-  请求 Hugging Face。剩余的 `pi-desktop/voice/*` 通道只属于实时语音
-  （`pi-desktop/voice/live/*`，见 [live-voice.md](live-voice.md)）。
+  请求 Hugging Face。不再有任何 `pi-desktop/voice/*` 通道；实时语音也已移除
+  （见 [live-voice.md](live-voice.md)）。
 - 插件不再有 `pi.speech` 契约和 `speech.adapter.register` 权限。仍声明该权限的
   插件可以加载，但不会获得任何能力；调用 `pi.speech.registerAdapter` 或
   `unregisterAdapter` 会以 `UNSUPPORTED` 失败。

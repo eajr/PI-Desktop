@@ -21,7 +21,6 @@ import {
   IconUndo2,
 } from "../../../components/icons";
 import { ModeIcon } from "./ComposerModeIcon";
-import { LiveVoiceControls } from "../../voice/live/LiveVoiceControls";
 import { ComposerModelPicker } from "./ComposerModelPicker";
 import {
   MODE_LABEL_KEYS,
@@ -66,8 +65,6 @@ export type ComposerToolbarProps = {
   hasDraftContent: boolean;
   abort: AppState["abort"];
   submit: () => Promise<void>;
-  workSessionId?: string;
-  workSessionLabel?: string;
 };
 
 /** Composer controls: mode, permission, model, plugin actions, and send/stop. */
@@ -105,8 +102,6 @@ export function ComposerToolbar({
   hasDraftContent,
   abort,
   submit,
-  workSessionId,
-  workSessionLabel,
 }: ComposerToolbarProps) {
   const platform = (window.piDesktop?.platform ?? "darwin") as ShortcutPlatform;
   const steeringShortcut = keybindingDisplayParts("Alt+Enter", platform).join("+");
@@ -128,7 +123,6 @@ export function ComposerToolbar({
             <IconPlus size={15} aria-hidden="true" />
           </TooltipButton>
         </div>
-        {localToolsAllowed ? <LiveVoiceControls t={t} workSessionId={workSessionId} /> : null}
         <TooltipButton
           type="button"
           className="icon-btn mode-chip composer-mode-chip"

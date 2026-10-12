@@ -309,38 +309,10 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `PAIRING_TOKEN_EXPIRED` | 否 | 一次性配对令牌在配对完成前已过期 |
 | `CAPABILITY_UNAVAILABLE` | 否 | 请求的操作对应主机声明为不可用的能力（如附件、工具中继） |
 
-### 3.9 实时语音
+### 3.9 实时语音（已移除）
 
-实时语音错误通过应用所有的 IPC 和 Provider adapter 事件返回，不表示 Agent turn 失败。可重试错误表示瞬时条件清除后，用户可以重试同一通话；不会自动切换 Provider 或计费路径。
-
-| 代码 | 可重试 | 含义 |
-|---|---|---|
-| `LIVE_DISABLED` | 否 | 设置中关闭了实时语音 |
-| `LIVE_NOT_CONFIGURED` | 否 | 未选择有效的实时语音绑定 |
-| `LIVE_PROVIDER_NOT_FOUND` | 否 | 所选 Provider 不存在、已停用或解析凭证期间发生变化 |
-| `LIVE_AUTH_KIND_UNSUPPORTED` | 否 | 所选 Provider 凭证类型与 adapter 不兼容 |
-| `LIVE_AUTH_REQUIRED` | 否 | 缺少所需 OAuth/API key，或凭证被拒绝 |
-| `LIVE_ACCOUNT_ID_MISSING` | 否 | Codex OAuth 账号身份缺失或不一致 |
-| `LIVE_ACCESS_DENIED` | 否 | Provider 拒绝访问或账号无权限 |
-| `LIVE_RATE_LIMITED` | 是 | Provider 返回了速率限制响应 |
-| `LIVE_PROTOCOL_UNSUPPORTED` | 否 | endpoint、模型或所选协议 profile 不受支持 |
-| `LIVE_PROTOCOL_ERROR` | 否 | Provider 或 IPC 消息格式错误，或违反所选协议 |
-| `LIVE_ALREADY_ACTIVE` | 否 | 另一通实时语音通话或麦克风释放隔离占用唯一通话槽位 |
-| `LIVE_REQUEST_CONFLICT` | 否 | 相同幂等 request ID 被不同通话参数重复使用 |
-| `LIVE_SETTINGS_IN_USE` | 否 | 准备期间设置发生变化，或活动绑定不可编辑 |
-| `LIVE_MEDIA_RELEASE_UNCONFIRMED` | 否 | 未收到 Renderer 的媒体释放确认；Main 隔离麦克风租约 |
-| `LIVE_STALE_CALL` | 否 | 通话、请求或采集 epoch 已不是当前值 |
-| `LIVE_INVALID_OWNER` | 否 | IPC 或媒体端口 owner 与受信主 frame 不匹配 |
-| `LIVE_MICROPHONE_BUSY` | 否 | 另一通 Live 通话或尚未确认的释放占用共享采集租约 |
-| `LIVE_MICROPHONE_DENIED` | 否 | 用户或操作系统拒绝麦克风权限 |
-| `LIVE_MICROPHONE_UNAVAILABLE` | 否 | 没有可用的麦克风设备 |
-| `LIVE_MEDIA_UNSUPPORTED` | 否 | 浏览器媒体或 AudioWorklet 支持不可用 |
-| `LIVE_PLAYBACK_BLOCKED` | 不确定 | 浏览器播放需要用户手势才能开始或恢复 |
-| `LIVE_TIMEOUT` | 是 | 有时限的启动、握手、heartbeat、控制或清理阶段超时 |
-| `LIVE_NETWORK_ERROR` | 是 | Provider 传输发生暂时性连接故障 |
-| `LIVE_NETWORK_POLICY_UNSUPPORTED` | 否 | 桌面代理路由无法由 Live 传输安全表示 |
-| `LIVE_AUDIO_BACKPRESSURE` | 否 | PCM 或播放 credit 的有界容量已耗尽 |
-| `LIVE_EXECUTION_NOT_CONNECTED` | 否 | Provider 请求了当前不支持的函数/delegation 执行路径 |
+`LIVE_*` 错误码已随实时语音一并移除（D662，
+[fork-removes-voice-and-speech](/adr/fork-removes-voice-and-speech)）。
 
 ## 4. 映射规则
 

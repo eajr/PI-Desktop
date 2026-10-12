@@ -5,7 +5,10 @@ import type { AppError } from "../errors.js";
 
 export type UiMessageRole = "user" | "assistant" | "system" | "tool";
 
-/** Minimal provenance for an accepted Live Voice work input. */
+/**
+ * Minimal provenance for an accepted Live Voice work input. Live Voice was
+ * removed (D662); the type stays so stored rows that carry it keep loading.
+ */
 export type VoiceOrigin = {
   callId: string;
   operationId: string;

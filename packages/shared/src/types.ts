@@ -22,4 +22,3 @@ export * from "./types/filesystem.js";
 export * from "./types/remote-media.js";
 export * from "./types/remote-host.js";
 export * from "./types/config-sync.js";
-export * from "./types/live-voice.js";

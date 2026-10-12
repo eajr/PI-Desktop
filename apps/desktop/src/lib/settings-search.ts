@@ -17,7 +17,6 @@ export type SettingsTabId =
   | "projects"
   | "sync"
   | "remoteHosts"
-  | "voice"
   | "about";
 
 export type SettingsNavGroupId =
@@ -119,23 +118,6 @@ export const SETTINGS_NAV: SettingsNavEntry[] = [
       "settings.contextUsageDisplayRemaining",
       "settings.contextUsageDisplayUsed",
       "settings.largePasteThreshold",
-    ],
-  },
-  {
-    id: "voice",
-    labelKey: "liveVoice.title",
-    titleKey: "liveVoice.title",
-    group: "preferences",
-    keywordKeys: [
-      "liveVoice.title",
-      "liveVoice.description",
-      "liveVoice.enable",
-      "liveVoice.provider",
-      "liveVoice.model",
-      "liveVoice.voice",
-      "liveVoice.adapters.codex-live.title",
-      "liveVoice.adapters.gemini-live.title",
-      "liveVoice.adapters.openai-realtime.title",
     ],
   },
   {

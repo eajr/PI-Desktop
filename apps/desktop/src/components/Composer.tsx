@@ -618,8 +618,6 @@ export function Composer({
             hasDraftContent={hasDraftContent}
             abort={abort}
             submit={submitFromComposer}
-            workSessionId={activeSessionId ?? undefined}
-            workSessionLabel={activeSessionSummary?.title}
           />
         </div>
       </div>

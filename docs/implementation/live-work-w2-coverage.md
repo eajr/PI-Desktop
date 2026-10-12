@@ -1,5 +1,9 @@
 # Live Work W2 Acceptance Coverage Audit
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 Original audit baseline: phase-2 request candidate after merging `origin/main`
 at `8fcca3d25c98`. This v2.1 refresh adds evidence from the uncommitted
 working-tree candidate based on `f9543be51a2eea4f5010dd059fed6d68dddb8745`;

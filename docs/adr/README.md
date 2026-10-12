@@ -355,12 +355,12 @@ Each ADR includes:
 | 0308 | [Remove the Pull Requests destination and listing tool](0308-remove-pull-requests-destination.md) | Accepted |
 | 0309 | [Remove bundled macOS first-launch guidance](0309-remove-macos-first-launch-artifacts.md) | Accepted (D634; amends D457 / ADR 0296) |
 | 0310 | [Keep local permission approvals pending until resolved](0310-local-permission-approvals-without-deadline.md) | Accepted for implementation |
-| 0311 | [Recheck Live Work workspace identity at Host admission](0311-live-work-workspace-admission-guard.md) | Implemented candidate |
+| 0311 | [Recheck Live Work workspace identity at Host admission](0311-live-work-workspace-admission-guard.md) | Superseded by fork-removes-voice-and-speech |
 | 0312 | [Session-scoped Todo checklist](0312-session-scoped-todo-checklist.md) | Accepted for implementation |
 | 0317 | [Preserve Windows resizing without the native frameless rim](0317-windows-borderless-window-resize.md) | Accepted (D637) |
-| 0313 | [Default Live Work to the Current Composer Session](0313-live-voice-default-session-target.md) | Accepted |
-| 0315 | [A spoken answer selects among an open asktool question's own options](0315-live-voice-spoken-asktool-answers.md) | Accepted for implementation (amends the Live Voice Work Session decision path for AskTool only) |
-| 0316 | [The Live Voice call bar is a docked desktop widget window](0316-live-voice-docked-widget.md) | Accepted |
+| 0313 | [Default Live Work to the Current Composer Session](0313-live-voice-default-session-target.md) | Superseded by fork-removes-voice-and-speech |
+| 0315 | [A spoken answer selects among an open asktool question's own options](0315-live-voice-spoken-asktool-answers.md) | Superseded by fork-removes-voice-and-speech (amended the Live Voice Work Session decision path for AskTool only) |
+| 0316 | [The Live Voice call bar is a docked desktop widget window](0316-live-voice-docked-widget.md) | Superseded by fork-removes-voice-and-speech |
 | turn-process-and-thinking-display | [Turn process and thinking presentation](turn-process-and-thinking-display.md) | Accepted |
 | provider-display-order | [Provider display order](provider-display-order.md) | Accepted |
 | registry-header-variable-spelling | [Remote header variables accept the registry's `{name}` spelling](registry-header-variable-spelling.md) | Proposed |
@@ -385,6 +385,6 @@ Each ADR includes:
 | plugin-net-resolved-address-guard | [Judge plugin egress on the address, not the spelling](plugin-net-resolved-address-guard.md) | Accepted (implementation candidate) |
 | disable-plugin-renderer-extensions | [Disable plugin renderer extensions until they are isolated](disable-plugin-renderer-extensions.md) | Accepted (fork security mitigation) |
 | fork-removes-plugin-marketplace | [Remove the remote plugin marketplace](fork-removes-plugin-marketplace.md) | Accepted (supersedes ADR 0276 and ADR 0241) |
-| fork-removes-voice-and-speech | [Remove local Dictation and host speech](fork-removes-voice-and-speech.md) | Accepted (D662; supersedes ADR 0281 and ADR 0291) |
+| fork-removes-voice-and-speech | [Remove Live Voice, local Dictation and host speech](fork-removes-voice-and-speech.md) | Accepted (D662; supersedes ADRs 0281, 0291, 0311, 0313, 0315, 0316) |
 
 | local-agent-remote-workspace-tools | [Local Agent and model requests for remote workspaces](local-agent-remote-workspace-tools.md) | Accepted for implementation |

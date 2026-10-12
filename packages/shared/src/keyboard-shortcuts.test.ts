@@ -60,7 +60,7 @@ describe("keyboard shortcut mapping", () => {
     expect(normalizeKeybinding("Mod+Escape")).toBeNull();
   });
 
-  it("recognizes Escape for the unmodified voice-cancel shortcut", () => {
+  it("recognizes an unmodified Escape binding", () => {
     expect(normalizeKeybinding("Escape")).toBe("Escape");
     expect(normalizeKeybinding("Mod+Escape")).toBeNull();
     expect(
@@ -213,6 +213,18 @@ describe("keyboard shortcut mapping", () => {
     );
     expect(keybindingDisplayParts("Mod+Shift+P", "darwin")).toEqual(["⌘", "⇧", "P"]);
     expect(keybindingDisplayParts("Mod+Comma", "win32")).toEqual(["Ctrl", ","]);
+  });
+});
+
+describe("removed Live Voice shortcuts (D662)", () => {
+  it("drops stored voice overrides and keeps the rest", () => {
+    expect(
+      migrateKeybindingOverrides({ voiceToggle: "Mod+Shift+V", voiceCancel: null }),
+    ).toBeUndefined();
+    expect(
+      migrateKeybindingOverrides({ voiceToggle: "Mod+Shift+V", openSearch: "Mod+K" }),
+    ).toEqual({ openSearch: "Mod+K" });
+    expect(KEYBOARD_SHORTCUTS.map((shortcut) => shortcut.id)).not.toContain("voiceToggle");
   });
 });
 

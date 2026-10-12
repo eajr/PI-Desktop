@@ -1,5 +1,9 @@
 # ADR 0311: Recheck Live Work workspace identity at Host admission
 
+> Superseded 2026-10-12 by [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md)
+> (D662): this build has no Live Voice or Live Work. The text below is
+> historical.
+
 - Status: Implemented candidate
 - Date: 2026-09-29
 - Related: Live Voice Work Integration, ADR 0284

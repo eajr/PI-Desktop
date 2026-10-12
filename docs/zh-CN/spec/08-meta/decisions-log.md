@@ -55,7 +55,7 @@
 | D657 | 窗口边界恢复不再运行外部辅助程序 | **取代 D053；修订 D447。主进程不再执行 `/tmp/pi-window-bounds` CoreGraphics 辅助程序（也不执行任何外部进程）来检测舞台管理器“上架”。`bootstrap/window.ts` 中的上架检测只使用 Electron 边界（宽 < 500 或高 < 400），这与所有未安装该未发布开发工具的构建此前的行为一致。macOS 看门狗节奏、`ensureStableBounds` 触发条件与 Codex 默认尺寸恢复保持不变。** | `/tmp` 对所有用户可写，任何本地用户都可在该路径放置可执行文件，从而每 1.5 秒以桌面用户身份执行代码（包括打包构建）；仓库中没有任何内容构建或发布该辅助程序。 |
 | D658 | RACP 设备令牌过期并经 SSH 重新配对 | **修订 D448 / ADR 0285 / ADR remote-provider-import / 安全 §3.4：`pdt1.` 设备令牌在 30 天未使用或签发满 180 天后被拒（`RACP_DEVICE_TOKEN_IDLE_TTL_MS`、`RACP_DEVICE_TOKEN_MAX_LIFETIME_MS`）；升级与连接关闭都记录使用。仍有效但已过期的令牌得到 `401` 与 `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED`（新的不可重试错误码）；其他拒绝仍为 `REMOTE_AUTH_FAILED`。经 SSH 管理的桌面随后通过 SSH 运行 `pi-host pairing-issue`（管理套接字 `pairing.issue`，一次性、两分钟有效），带 Host id 校验完成交换、保存新令牌并重试一次；不重装也不重启，已吊销的令牌绝不自动重新配对。`credentials.json` 升为版本 2（`tokenIssuedAt`、持久化的 `lastSeenAt`）；版本 1 记录的两个时间窗从迁移时刻开始。失败的升级认证按地址限流（10 次额度、每 6 秒恢复 1 次，之后 `429` + `Retry-After`，从 1 秒倍增至 60 秒），日志不含令牌内容。`applyCeilingToPairedDevices` 保持关闭，因为同一默认值也约束本地桌面主体。** | 一旦被复制，永不过期的 `owner` 凭据会一直有效；SSH 是配对的信任根，因此续期可以自动完成，无需打扰用户或重启 Host。见 ADR racp-device-token-lifetime。 |
 | D660 | 确认 SSH 主机密钥，不再首次连接即信任 | **经 ADR 0328 修订 ADR 0292 / D453：每个远程主机 `ssh` 子进程都使用 `StrictHostKeyChecking=yes`，`UserKnownHostsFile` 先列出应用管理的 `<dataDir>/ssh_known_hosts`，再列出用户的默认文件。未知主机以 `SSH_HOST_KEY_UNKNOWN` 失败，并携带密钥类型和 SHA-256 指纹；设置页请用户确认，只有确认过的密钥才写入应用文件。密钥变更以 `SSH_HOST_KEY_CHANGED` 失败，应用绝不接受。`RemoteHostBootstrapRequest.trustedHostKeys` 与两个错误码均为新增；主机/用户 argv 值也拒绝空白和控制字符，目标地址位于 `--` 之后。见 `05-security/02-remote-control-security.md` §3.4 与 E2E-REMOTE-HOST-ssh-host-key-confirmation。** | `accept-new` 会静默信任从未见过的主机，首次连接时的攻击者可以冒充它并收到 SSH 密码和同步的提供商密钥。 |
-| D662 | 移除本地听写与宿主语音 | **经 ADR fork-removes-voice-and-speech 取代 ADR 0281 / ADR 0291：删除 `packages/voice-runtime` 及其原生与模型下载依赖、非 Live 的 `pi-desktop/voice/*` 与 `pi-desktop/speech/*` IPC、`AppSettings.voice` / `AppSettings.speech`、`SPEECH_*` 错误码，以及 Plugin SDK 的 `speech.adapter.register` 权限与 `pi.speech` 命名空间。保留 Live Voice，其协议代码迁至 `packages/live-voice-protocol`。已存设置值与声明该权限的 manifest 仍可加载。** | 用户使用系统听写；两项功能都带来原生插件、模型下载通道、IPC 与插件权限，却没有用户入口。 |
+| D662 | 移除实时语音、本地听写与宿主语音 | **经 ADR fork-removes-voice-and-speech 取代 ADR 0281、0291、0311、0313、0315、0316：删除 `packages/voice-runtime` 及其原生与模型下载依赖、实时语音与 Live Work（主进程通话服务、Provider adapter、停靠挂件、`packages/live-voice-protocol`、host-runtime `live-work`）、全部 `pi-desktop/voice/*` 与 `pi-desktop/speech/*` IPC、`AppSettings.liveVoice` / `voice` / `speech`、`LIVE_*` 与 `SPEECH_*` 错误码、语音快捷键，以及 Plugin SDK 的 `speech.adapter.register` 权限与 `pi.speech` 命名空间。默认 session 拒绝 `media`。已存设置值、`voiceOrigin` 记录与声明该权限的 manifest 仍可加载。** | 用户使用系统听写且不使用实时通话；这些功能带来原生插件、模型下载通道、Provider 协议客户端、第二个窗口、IPC 与插件权限。 |
 
 ## B. 辅助实现默认值
 
@@ -5393,7 +5393,7 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
   E2E-SESSION-outbox-unclassifiable-failure-does-not-stall-the-queue 覆盖。见 ADR 0041、
   `03-runtime/04-data-storage.md` 与 `03-runtime/06-host-rpc-protocol.md`。
 
-## 2026-10-12 —— 移除本地听写与宿主语音（D662）
+## 2026-10-12 —— 移除实时语音、本地听写与宿主语音（D662）
 
 - D662 经 `docs/adr/fork-removes-voice-and-speech.md` 取代 ADR 0281 与 ADR 0291。
   移除本地听写（`packages/voice-runtime`、`transcribe-cpp`、
@@ -5403,10 +5403,20 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - Plugin SDK 契约移除：`speech.adapter.register`、`pi.speech` 与 `PluginSpeech*`
   类型不再提供。仍声明该权限的 manifest 照常加载；插件进程中的 `pi.speech` 存根在
   调用时以 `UNSUPPORTED` 失败，`pi-plugin check` 报告 `permission.removed`。
-- 保留 Live Voice。其纯协议与 PCM 代码原样迁至 `@pi-desktop/live-voice-protocol`；
-  麦克风租约只有一种所有者；采集使用系统默认输入设备。
+- 第二阶段同时移除实时语音与 Live Work，并取代 ADR 0311、0313、0315、0316：主进程
+  通话服务与 Provider adapter（Codex Live、Gemini Live、OpenAI Realtime）、停靠通话
+  挂件、`@pi-desktop/live-voice-protocol`、host-runtime `live-work`、
+  `pi-desktop/voice/live/*` IPC、`AppSettings.liveVoice`、`LIVE_*` 错误码、语音设置页
+  以及 `voiceToggle` / `voiceCancel` 快捷键。新的默认 session 权限处理器拒绝
+  `media`，主渲染进程不会回退到 Electron 默认全部允许的行为。麦克风 entitlement 保留
+  给插件的 `ui.microphone` 与 `audio.capture.background`。
+- 实时语音没有自己的凭证。已存的 `liveVoice` 设置被忽略，语音快捷键覆盖在迁移时
+  丢弃，`live-voice-widget.json` 不删除，`voiceOrigin` / `voice_origin_json` 作为
+  休眠的来源信息保留，无需 schema 变更。
 - 已存的 `voice` / `speech` 设置既不读取也不改写，启动无需迁移。不删除
   `<dataDir>/voice-models`。配置同步不再携带 `speech`。
 - 由 `apps/desktop/test/plugin-speech-removed.test.mjs`、`packaging-footprint.test.mjs`、
   shared 协议测试、plugin-sdk 与 plugin-devkit 测试及 host-core 配置同步测试覆盖。
-  见 E2E-PLUGIN-removed-speech-permission-still-loads。
+  `apps/desktop/test/voice-removed.test.mjs` 与 host-core 设置测试也覆盖本次移除。
+  见 E2E-PLUGIN-removed-speech-permission-still-loads 与
+  E2E-VOICE-live-voice-removed-no-entry-points。

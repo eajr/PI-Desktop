@@ -185,7 +185,7 @@ export function registerAgentIpc({
       // Desktop-managed MCP servers are not installed in native Pi sessions.
       if (/^\/mcp:\S/.test(req.content)) expandMcpInvocation(req.content, []);
       if (voiceOrigin) {
-        throw Object.assign(new Error("Live Voice work is unsupported for native Pi sessions"), {
+        throw Object.assign(new Error("voice-origin prompts are unsupported for native Pi sessions"), {
           errorCode: "NATIVE_PI_UNSUPPORTED",
         });
       }

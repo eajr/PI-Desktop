@@ -29,7 +29,6 @@ try {
       "@pi-desktop/i18n/locale-info": join(root, "packages/i18n/src/locale-info.ts"),
       ...Object.fromEntries(["en", "zh-CN", "zh-TW", "tr", "de", "es", "fr", "ko", "pt-BR"].map((locale) =>
         [`@pi-desktop/i18n/locales/${locale}`, join(root, `packages/i18n/src/locales/${locale}/index.ts`)])),
-      "@pi-desktop/live-voice-protocol": join(root, "packages/live-voice-protocol/src/index.ts"),
       react: join(root, "apps/desktop/node_modules/react"),
       "react-dom": join(root, "apps/desktop/node_modules/react-dom"),
       i18next: join(root, "apps/desktop/node_modules/i18next"),

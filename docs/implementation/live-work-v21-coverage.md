@@ -1,5 +1,9 @@
 # Live Work v2.1 Acceptance Coverage
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 Status: **IN_PROGRESS**. This table maps all LV21-001—064 cases to the current
 working-tree evidence. `PASS` means only that the named deterministic assertion
 passed at the listed test boundary; it does not mean provider, Rust persistence,

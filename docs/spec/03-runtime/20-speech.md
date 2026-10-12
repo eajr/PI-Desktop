@@ -9,9 +9,9 @@ This build has no host speech capability and no local Dictation.
 - There is no `transcribe` / `synthesize` service, no `pi-desktop/speech/*`
   IPC channel, and no `SPEECH_*` error code.
 - There is no local transcription runtime: no microphone recorder in the main
-  process, no model catalog or downloader, and no request to Hugging Face. The
-  only `pi-desktop/voice/*` channels left belong to Live Voice
-  (`pi-desktop/voice/live/*`, see [live-voice.md](live-voice.md)).
+  process, no model catalog or downloader, and no request to Hugging Face. No
+  `pi-desktop/voice/*` channel is left; Live Voice is removed too (see
+  [live-voice.md](live-voice.md)).
 - Plugins have no `pi.speech` contract and no `speech.adapter.register`
   permission. A plugin that still declares the permission loads and is granted
   nothing; calling `pi.speech.registerAdapter` or `unregisterAdapter` fails with

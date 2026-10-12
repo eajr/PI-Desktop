@@ -1,5 +1,9 @@
 # Live Voice v1 Implementation Evidence
 
+> Historical. Live Voice and Live Work were removed (D662,
+> [ADR fork-removes-voice-and-speech](../adr/fork-removes-voice-and-speech.md)).
+> The code, scripts, and tests this file names no longer exist.
+
 This file records the local implementation baseline and verification limits.
 It contains no account credentials, tokens, audio or SDP.
 

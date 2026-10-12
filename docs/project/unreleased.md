@@ -10,13 +10,16 @@
   header values (often API tokens) to the renderer. The panel shows only the
   key names; the import resolves the real values in the main process from the
   retained scan.
-- Removed the hidden local dictation feature and the host speech
-  (transcribe/synthesize) capability. The app no longer ships the
-  `transcribe-cpp` and PvRecorder native modules or downloads speech models
-  from Hugging Face. Live Voice is unchanged and now always captures from the
-  system default microphone. Previously downloaded models stay in the
-  `voice-models` folder under the app data directory and can be deleted by
-  hand.
+- Removed Live Voice, the hidden local dictation feature, and the host speech
+  (transcribe/synthesize) capability. There is no call button, call widget,
+  Voice settings page, or voice shortcut any more, and the app no longer ships
+  the `transcribe-cpp` and PvRecorder native modules or downloads speech
+  models from Hugging Face. Saved Live Voice settings and voice shortcut
+  overrides are ignored; no provider account or key is removed. The main
+  window now refuses microphone and camera requests outright; plugins keep the
+  microphone access you granted them. Previously downloaded models in the
+  `voice-models` folder and the `live-voice-widget.json` file under the app
+  data directory stay and can be deleted by hand.
 - Plugin SDK: the `speech.adapter.register` permission and the `pi.speech` API
   are removed. Plugins that still declare the permission keep loading, but
   `pi.speech.registerAdapter` / `unregisterAdapter` now fail with
