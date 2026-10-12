@@ -301,6 +301,7 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `HOST_BOOTSTRAP_FAILED` | 否 | 经 SSH 配置远程 `pi-host` 失败（下载、校验和不匹配或 `install.sh`）；`details.reason` 指明阶段 |
 | `HOST_VERSION_MISMATCH` | 否 | 远程 `pi-host` 版本与桌面不匹配；桌面拒绝驱动不兼容的主机 |
 | `REMOTE_AUTH_FAILED` | 否 | 设备或配对令牌在 RACP-WS 升级时被拒 |
+| `REMOTE_DEVICE_TOKEN_EXPIRED` | 否 | 设备令牌对应已配对设备，但已超过空闲或绝对有效期（升级响应头 `x-racp-error`）；经 SSH 管理的桌面会先通过 SSH 重新配对一次再上报 |
 | `REMOTE_CONNECTION_FAILED` | 是 | RACP-WS 传输无法连接（非回环 URL、套接字被拒） |
 | `REMOTE_FORWARD_FAILED` | 是 | 无法建立 SSH 回环端口转发 |
 | `REMOTE_PATH_NOT_FOUND` | 否 | 远程项目/工作区路径在主机上不存在 |

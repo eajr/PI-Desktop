@@ -18,6 +18,9 @@ a versioned bounded payload, and writes it to an explicit SSH command's stdin.
 `pi-host provider-import` forwards the payload to the running Host over an
 owner-only Unix socket. The socket accepts only provider import and uses the
 Host's existing Rust RPC connection. It is not a general-purpose RPC tunnel.
+*(Amended by [racp-device-token-lifetime](racp-device-token-lifetime.md): the
+socket also accepts `pairing.issue`, which mints one single-use pairing token
+for SSH re-pairing.)*
 
 Directory/socket permissions, a process ownership lock, connection/request
 limits and deadlines bound the new local channel. A private digest receipt

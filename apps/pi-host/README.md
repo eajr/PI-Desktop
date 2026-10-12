@@ -93,6 +93,18 @@ starts a second database writer. Custom data directories use `--data-dir`.
 Data directories must be owned by the current user and mode 0700; the socket is
 0600. Do not relax these permissions to work around `ADMIN_UNAVAILABLE`.
 
+## Device token lifetime and re-pairing
+
+Device tokens expire after 30 days unused or 180 days since issue. The Host
+refuses an expired token with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED`, and an
+SSH-paired desktop then runs `pi-host pairing-issue` over SSH. That command asks
+the running Host, over the same admin socket, for one single-use pairing token
+(two-minute lifetime) and prints `PI_HOST_PAIRING_TOKEN {...}`; the desktop
+exchanges it over its forward. The Host is not restarted. `credentials.json` is
+format version 2; a file from an older Host is migrated on first load, starting
+existing devices' lifetime at that moment. Repeated failed authentications from
+one address are answered with `429` and `Retry-After`.
+
 Copies are additive. Identical payloads reuse imported IDs; changed configurations
 create a new row. Remotely changed/deleted rows are skipped. The returned summary
 contains imported IDs, safe skip reasons and whether the default was set, never

@@ -149,6 +149,26 @@ pairing only binds a desktop device to the Host it started.
   device as `owner` of that Host.
 - The Host binds loopback only and accepts a device token only from a
   loopback peer; a non-loopback bind requires TLS and the same device token.
+- A device token expires (D658). The Host refuses it once it has gone unused
+  for 30 days or once 180 days have passed since it was issued, whichever is
+  first (`RACP_DEVICE_TOKEN_IDLE_TTL_MS`, `RACP_DEVICE_TOKEN_MAX_LIFETIME_MS`).
+  An authenticated upgrade and the close of an authenticated connection
+  record use; nothing extends the absolute lifetime. The refusal is `401`
+  with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED`, reported only for a token
+  that matches a live, unrevoked device; every other refusal says
+  `REMOTE_AUTH_FAILED`. Records stored before expiry existed start both
+  windows at the time the Host first loads them after upgrading.
+- On `REMOTE_DEVICE_TOKEN_EXPIRED` an SSH-managed desktop re-pairs once,
+  automatically: it runs `pi-host pairing-issue` over SSH, which asks the
+  running Host through its owner-only admin socket for a single-use pairing
+  token with a two-minute lifetime, and exchanges it over the existing forward
+  with the saved Host id check. The Host is not reinstalled or restarted. A
+  revoked or unknown token is never re-paired automatically; a failed re-pair
+  leaves the Host `action-required`.
+- Failed upgrade authentications are throttled per remote address: a bucket
+  of 10 failures refilled one per 6 seconds, then `429` with `Retry-After`
+  for a backoff from 1 second doubling to 60 seconds. Logs name the peer,
+  reason, and device id, never the token or `Authorization` header.
 - Resolve the same-version published target and trusted release SHA-256 over
   HTTPS. Prefer remote download; only `download-failed` permits one bounded
   Desktop download, local verification and SSH upload of the same artifact.
@@ -165,11 +185,14 @@ pairing only binds a desktop device to the Host it started.
   digest plus read-only file verification; version equality alone is insufficient.
   System Node and remote GitHub access are not required for new bundles, but
   supported Linux ABI, POSIX/hash/archive tools and Linux `flock` still are.
-- Daily readiness MUST NOT reinstall, re-pair or reset credentials. Validate
+- Daily readiness MUST NOT reinstall, re-pair or reset credentials. The only
+  re-pairing outside a bootstrap is the expired-token path above, which is
+  triggered by the Host's refusal, not by readiness. Validate
   loopback readiness/version and saved Host ID before forwarding, then validate
   the RACP identity. A legacy descriptor without Host ID remains readable.
 - Revoking the device token on the Host, or removing the Host from the
-  desktop, ends the pairing; a new pairing needs a new SSH bootstrap.
+  desktop, ends the pairing; a new pairing needs a new SSH bootstrap. An
+  expired (not revoked) token is renewed over SSH as described above.
 - Provider configuration is copied only after explicit selection and consent,
   over SSH stdin as Host-local configuration; it never crosses RACP.
 
@@ -319,7 +342,10 @@ an SSH login already grants shell access to the machine, so a ceiling would
 withhold nothing. Its turns report the session's own mode as
 `effectivePermissionMode`. The Host policy `applyCeilingToPairedDevices`
 (default off) re-applies the ceiling to paired devices for an operator who
-wants every remote turn to start at `ask`.
+wants every remote turn to start at `ask`. The default stays off because
+`RACP_DEFAULT_POLICY` is also the local Agent Host module's default, whose
+desktop principal is a paired-device `owner`; turning it on would cap the
+desktop's own local sessions as well (D658).
 
 `allow-session` is offered to a remote approver only when Host policy allows
 remote session grants; otherwise the request's `allowedDecisions` omit it. A
@@ -560,7 +586,9 @@ separate, explicitly specified credential-management capability is added.
     the answer reaches only the Host that raised it. Applies when the Gateway
     milestone is scheduled.
 16. A `pi-host` bound to loopback accepts only loopback peers with a valid
-    device token; a non-loopback bind without TLS fails to start.
+    device token; a non-loopback bind without TLS fails to start. A device
+    token past its idle or absolute lifetime is refused as expired, and
+    repeated failed authentications from one address are throttled.
 17. A pairing token is single-use, arrives only over the SSH channel, and
     cannot be exchanged twice or from a non-loopback peer.
 18. A remote session exposes only the remote Host's tool catalog; desktop
@@ -604,3 +632,10 @@ D454 (2026-09-19) added SSH password authentication for the bootstrap (§3.4,
 ADR 0293): the credential-handling rules above and gate 21. It relaxes
 `BatchMode=yes` for a password target only, with `NumberOfPasswordPrompts=1`
 and `PubkeyAuthentication=no`, and keeps a key or agent as the default path.
+
+D658 (2026-10-12) gave device tokens an idle (30-day) and absolute (180-day)
+lifetime with a distinct expired refusal, automatic re-pairing over SSH
+through the Host's admin socket, migration of stored records without a
+lifetime, and a per-address throttle on failed upgrade authentications
+(§3.4, gate 16). It kept `applyCeilingToPairedDevices` off (§4.3). See
+[ADR racp-device-token-lifetime](../../adr/racp-device-token-lifetime.md).
