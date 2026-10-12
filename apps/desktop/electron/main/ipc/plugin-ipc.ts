@@ -404,14 +404,6 @@ export function registerPluginIpc({
     return res;
   });
 
-  handle(IPC.invoke.pluginSetAutoUpdate, async (payload: { id: string; enabled: boolean }) => {
-    if (!host) throw new Error("host unavailable");
-    return host.call("plugins.setAutoUpdate", {
-      id: payload.id,
-      enabled: payload.enabled,
-    });
-  });
-
   handle(
     IPC.invoke.pluginSetScope,
     async (payload: { id: string; scope: ActivationScope }) => {

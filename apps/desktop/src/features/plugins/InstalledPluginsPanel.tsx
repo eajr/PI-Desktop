@@ -1,7 +1,6 @@
 import { Button, TooltipButton, cx } from "../../components/ui";
 import {
   IconCircleAlert,
-  IconCloudDown,
   IconMore,
   IconPanel,
   IconPlug,
@@ -21,7 +20,7 @@ import { api } from "../../lib/api";
 export function InstalledPluginsPanel({
   t,
   plugins,
-  setTab,
+  installPackage,
   loadDev,
   setTemplatePick,
   installedGroups,
@@ -29,7 +28,6 @@ export function InstalledPluginsPanel({
   rowMenu,
   setRowMenu,
   busyId,
-  queueInstall,
   projects,
   currentProjectPath,
   run,
@@ -42,8 +40,6 @@ export function InstalledPluginsPanel({
   return (
           <div
             id="plugins-panel-installed"
-            role="tabpanel"
-            aria-labelledby="plugins-tab-installed"
             className="plugins-panel"
           >
             {plugins.length === 0 ? (
@@ -53,8 +49,8 @@ export function InstalledPluginsPanel({
                 </span>
                 <p className="plugins-empty-title">{t("plugins.empty")}</p>
                 <div className="plugins-empty-actions">
-                  <Button variant="primary" onClick={() => setTab("market")}>
-                    {t("plugins.browseMarket")}
+                  <Button variant="primary" onClick={() => void installPackage()}>
+                    {t("plugins.installPackage")}
                   </Button>
                   <Button variant="secondary" onClick={() => void loadDev()}>
                     {t("plugins.loadDev")}
@@ -94,7 +90,6 @@ export function InstalledPluginsPanel({
                     {group.rows.map((plugin) => {
                       const broken = group.id === "attention";
                       const menuOpen = rowMenu === plugin.id;
-                      const update = plugin.updateAvailable;
                       return (
                         <div
                           key={plugin.id}
@@ -139,26 +134,6 @@ export function InstalledPluginsPanel({
                             />
                           </div>
                           <div className="plugins-row-controls">
-                            {update ? (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                disabled={busyId === plugin.id}
-                                onClick={() =>
-                                  queueInstall({
-                                    id: plugin.id,
-                                    name: plugin.name,
-                                    version: update.version,
-                                    permissions: plugin.permissions ?? [],
-                                    newPermissions: update.permissionDiff ?? [],
-                                  })
-                                }
-                              >
-                                {busyId === plugin.id
-                                  ? t("plugins.updating")
-                                  : t("plugins.updateNow")}
-                              </Button>
-                            ) : null}
                             <ScopeControl
                               target={plugin}
                               label={plugin.name}
@@ -204,6 +179,9 @@ export function InstalledPluginsPanel({
                                   <IconSettings size={15} />
                                 </TooltipButton>
                               ) : null}
+                              {/* Nothing to offer for a bundled, non-development
+                                  plugin, so it gets no empty menu. */}
+                              {plugin.source === "dev" || !plugin.bundled ? (
                               <AnchoredMenu
                                 className="plugins-menu-wrap"
                                 open={menuOpen}
@@ -248,32 +226,15 @@ export function InstalledPluginsPanel({
                                         {t("plugins.reload")}
                                       </button>
                                     ) : null}
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      onClick={() => {
-                                        setRowMenu(null);
-                                        void run(async () => {
-                                          await api.setPluginAutoUpdate(
-                                            plugin.id,
-                                            !plugin.autoUpdate,
-                                          );
-                                          await refreshPlugins();
-                                        });
-                                      }}
-                                    >
-                                      <IconCloudDown size={14} />
-                                      {plugin.autoUpdate
-                                        ? t("plugins.disableAutoUpdate")
-                                        : t("plugins.enableAutoUpdate")}
-                                    </button>
                                     {/* A bundled plugin belongs to the
                                         application: the host refuses the
                                         removal, so the action is not offered
                                         (ADR 0104, ADR 0241). */}
                                     {plugin.bundled ? null : (
                                       <>
-                                        <div className="plugins-menu-sep" />
+                                        {plugin.source === "dev" ? (
+                                          <div className="plugins-menu-sep" />
+                                        ) : null}
                                         <button
                                           type="button"
                                           role="menuitem"
@@ -292,6 +253,7 @@ export function InstalledPluginsPanel({
                                       </>
                                     )}
                               </AnchoredMenu>
+                              ) : null}
                             </div>
                           </div>
                         </div>

@@ -10,11 +10,9 @@ import { SessionRenameDialog } from "../../src/components/SessionRenameDialog";
 import { ProjectInstructionsDialog } from "../../src/components/ProjectInstructionsDialog";
 import { ProjectMemoryDialog } from "../../src/components/ProjectMemoryDialog";
 import { ProjectDeleteDialog } from "../../src/components/ProjectDeleteDialog";
-import { PluginInstallDialog } from "../../src/components/plugins/PluginInstallDialog";
 import { OAuthLoginDialog } from "../../src/components/settings/OAuthLoginDialog";
 import { PluginDialogs } from "../../src/features/plugins/PluginDialogs";
 import { PluginSettingsSheet } from "../../src/components/plugins/PluginSettingsSheet";
-import { newInstallJob } from "../../src/features/plugins/install-progress";
 import { ModelSelectionPanes } from "../../src/components/settings/ModelSelectionPanes";
 import { isBlockingOverlayActive } from "../../src/lib/blocking-overlay";
 
@@ -94,9 +92,8 @@ window.dialogFixture = {
     if (kind === "instructions") component = <ProjectInstructionsDialog {...props} />;
     if (kind === "memory") component = <ProjectMemoryDialog {...props} />;
     if (kind === "delete") component = <ProjectDeleteDialog {...props} runningSessionIds={[]} onDeleted={() => {}} />;
-    if (kind === "install") component = <PluginInstallDialog job={{ ...newInstallJob({ id: "fixture", name: long, grantedPermissions: [], autoUpdate: false }), status: "failed", error: long }} onCancel={close} onRetry={() => {}} onClose={close} />;
     if (kind === "plugin-settings") component = <PluginSettingsSheet plugin={{ id: "fixture", name: long, settings: [] }} platform="win32" onClose={close} onSaved={() => {}} />;
-    if (kind === "plugin-review") component = <PluginDialogs t={i18n.t.bind(i18n)} pendingInstall={{ id: "fixture", name: long, permissions: [] }} setPendingInstall={close} confirmInstall={close} autoUpdate={false} setAutoUpdate={() => {}} />;
+    if (kind === "plugin-review") component = <PluginDialogs t={i18n.t.bind(i18n)} pendingReview={{ kind: "load", path, id: "fixture", name: long, permissions: [], addedPermissions: [] }} setPendingReview={close} confirmReview={close} />;
     if (kind === "oauth") component = <OAuthLoginDialog vendor={{ id: "fixture", name: "Fixture" }} onClose={close} onDone={close} session={{
       subscribe(listener) { queueMicrotask(() => listener({ kind: "authUrl", url: "https://example.invalid/" + long, instructions: "Open the sign-in URL", opened: false })); return () => {}; },
       cancel: async () => {},

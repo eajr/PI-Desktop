@@ -1,6 +1,5 @@
-import { Button, SettingsToggle, cx, portalOverlay } from "../../components/ui";
+import { Button, cx, portalOverlay } from "../../components/ui";
 import { IconCheck, IconShield, IconSparkles, IconTriangleAlert } from "../../components/icons";
-import { PluginInstallDialog } from "../../components/plugins/PluginInstallDialog";
 import { PluginSettingsSheet } from "../../components/plugins/PluginSettingsSheet";
 import { useBlockingOverlay } from "../../lib/blocking-overlay";
 import type { ReactNode } from "react";
@@ -26,19 +25,10 @@ function PluginModalBlockingHost({ children }: { children: ReactNode }) {
 
 export function PluginDialogs({
   t,
-  pendingInstall,
-  setPendingInstall,
   pendingReview,
   setPendingReview,
   confirmReview,
-  autoUpdate,
-  setAutoUpdate,
   busyId,
-  confirmInstall,
-  installJob,
-  cancelInstallDownload,
-  retryInstall,
-  closeInstallDialog,
   settingsPlugin,
   setSettingsPlugin,
   refreshPlugins,
@@ -106,74 +96,6 @@ export function PluginDialogs({
         </div>,
       )
         : null}
-      {pendingInstall
-        ? pluginModalPortal(
-        <div className="plugins-modal-backdrop" role="presentation">
-          <div
-            className="plugins-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("plugins.permissionReview")}
-          >
-            <header className="plugins-modal-head">
-              <span className="plugins-modal-icon" aria-hidden>
-                <IconShield size={17} />
-              </span>
-              <div>
-                <h2 className="plugins-modal-title">
-                  {t("plugins.permissionReviewTitle", { name: pendingInstall.name })}
-                </h2>
-                {pendingInstall.version ? (
-                  <p className="plugins-modal-subtitle">
-                    {t("plugins.installingVersion", { version: pendingInstall.version })}
-                  </p>
-                ) : null}
-              </div>
-            </header>
-
-            <div className="plugins-modal-body">
-              <p className="plugins-modal-lede">{t("plugins.permissionReviewBody")}</p>
-              <PermissionGroups
-                t={t}
-                permissions={pendingInstall.permissions}
-                newPermissions={pendingInstall.newPermissions}
-              />
-            </div>
-
-            <div className="plugins-switch-row">
-              <SettingsToggle
-                checked={autoUpdate}
-                label={t("plugins.enableAutoUpdateOnInstall")}
-                onChange={() => setAutoUpdate((on) => !on)}
-              />
-            </div>
-
-            <div className="plugins-modal-actions">
-              <Button variant="secondary" onClick={() => setPendingInstall(null)}>
-                {t("plugins.cancel")}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={busyId === pendingInstall.id}
-                onClick={() => void confirmInstall()}
-              >
-                {busyId === pendingInstall.id
-                  ? t("plugins.installing")
-                  : t("plugins.acceptInstall")}
-              </Button>
-            </div>
-          </div>
-        </div>,
-      )
-        : null}
-      {installJob ? (
-        <PluginInstallDialog
-          job={installJob}
-          onCancel={cancelInstallDownload}
-          onRetry={retryInstall}
-          onClose={closeInstallDialog}
-        />
-      ) : null}
       {settingsPlugin ? (
         <PluginSettingsSheet
           plugin={settingsPlugin}
@@ -270,10 +192,7 @@ export function PluginDialogs({
 }
 
 /**
-/**
- * One permission list, shared by the install review and the development review:
- * both answer the same question, so they must not drift into two renderings of
- * the same risk data.
+ * The permission list for the development review, grouped by risk tier.
  */
 function PermissionGroups({
   t,

@@ -1,5 +1,7 @@
 # 15. 插件中心
 
+> **状态：本构建已移除。** PI-Desktop 不再包含插件市场客户端：不拉取目录，不发送 resolve 请求或设备标识，也不通过网络下载插件包。插件只能从本地包或文件夹安装，或随应用捆绑。见 [ADR fork-removes-plugin-marketplace](/adr/fork-removes-plugin-marketplace)。下文的发布侧在本构建中已没有客户端。
+
 > **翻译说明：** 本页是与 [英文源规格](/spec/07-plugins/15-plugin-center) 一一对应的机器辅助翻译。代码、协议字段和标识符保持原文；如翻译与英文源事实有歧义，以英文版本为准。
 
 > 管理仓库：[vastsa/pi-plugin-center](https://github.com/vastsa/pi-plugin-center)

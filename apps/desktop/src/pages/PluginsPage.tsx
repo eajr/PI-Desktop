@@ -1,49 +1,29 @@
-import { useEffect, useRef } from "react";
-import { Button, TooltipButton, cx } from "../components/ui";
-import { IconCloudDown, IconDownload, IconMore, IconPlug } from "../components/icons";
+import { Button, TooltipButton } from "../components/ui";
+import { IconDownload, IconMore, IconPlug } from "../components/icons";
 import { AnchoredMenu } from "../components/settings/AnchoredMenu";
 import { SearchField } from "../features/plugins/presentation";
 import { InstalledPluginsPanel } from "../features/plugins/InstalledPluginsPanel";
-import { MarketplacePanel } from "../features/plugins/MarketplacePanel";
-import { PluginDetailSheet } from "../features/plugins/PluginDetailSheet";
 import { PluginDialogs } from "../features/plugins/PluginDialogs";
 import { usePluginsPage } from "../features/plugins/usePluginsPage";
 
+/**
+ * Installed plugins only. This build has no remote marketplace: plugins arrive
+ * bundled, from a local package or folder, or from a development folder (ADR
+ * fork-removes-plugin-marketplace).
+ */
 export function PluginsPage() {
   const page = usePluginsPage();
   const {
     t,
-    tab,
-    setTab,
-    refreshMarket,
-    query,
-    setQuery,
     headerMenu,
     setHeaderMenu,
     overflowActions,
-    stats,
     plugins,
     installedQuery,
     filteredInstalled,
     setInstalledQuery,
-    marketLoading,
-    market,
-    showToast,
+    installPackage,
   } = page;
-
-  /**
-   * Pending updates are announced once, where the user is looking, instead of
-   * holding a banner open across the route. Applying them keeps its entry on
-   * the header menu (`plugins.applyAutoUpdates`), and a count that was already
-   * on screen when the page opened is not news.
-   */
-  const reportedUpdatesRef = useRef<number | null>(null);
-  useEffect(() => {
-    const reported = reportedUpdatesRef.current;
-    reportedUpdatesRef.current = stats.updates;
-    if (reported === null || reported === stats.updates || stats.updates === 0) return;
-    showToast(t("plugins.updatesReady", { count: stats.updates }), { variant: "info" });
-  }, [stats.updates, showToast, t]);
 
   return (
     <div className="route-scroll">
@@ -58,21 +38,10 @@ export function PluginsPage() {
             </div>
           </div>
           <div className="plugins-header-actions">
-            {tab === "market" ? (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => void refreshMarket(query, { refreshRemote: true })}
-              >
-                <IconCloudDown size={14} />
-                {t("plugins.refreshMarket")}
-              </Button>
-            ) : tab === "installed" ? (
-              <Button variant="primary" size="sm" onClick={() => setTab("market")}>
-                <IconDownload size={14} />
-                {t("plugins.browseMarket")}
-              </Button>
-            ) : null}
+            <Button variant="primary" size="sm" onClick={() => void installPackage()}>
+              <IconDownload size={14} />
+              {t("plugins.installPackage")}
+            </Button>
             <AnchoredMenu
               className="plugins-menu-wrap"
               open={headerMenu}
@@ -96,94 +65,46 @@ export function PluginsPage() {
                 </TooltipButton>
               )}
             >
-                  {overflowActions.map((action) => (
-                    <button
-                      key={action.key}
-                      type="button"
-                      role="menuitem"
-                      data-action={action.key}
-                      onClick={() => {
-                        setHeaderMenu(false);
-                        void action.run();
-                      }}
-                    >
-                      {t(`plugins.${action.key}`)}
-                    </button>
-                  ))}
+              {overflowActions.map((action) => (
+                <button
+                  key={action.key}
+                  type="button"
+                  role="menuitem"
+                  data-action={action.key}
+                  onClick={() => {
+                    setHeaderMenu(false);
+                    void action.run();
+                  }}
+                >
+                  {t(`plugins.${action.key}`)}
+                </button>
+              ))}
             </AnchoredMenu>
           </div>
         </div>
 
-        <div className="plugins-toolbar">
-          <div className="plugins-segment" role="tablist" aria-label={t("plugins.title")}>
-            <button
-              type="button"
-              role="tab"
-              id="plugins-tab-installed"
-              aria-selected={tab === "installed"}
-              aria-controls="plugins-panel-installed"
-              className={cx("plugins-segment-btn", tab === "installed" && "active")}
-              onClick={() => setTab("installed")}
-            >
-              {t("plugins.tabInstalled")}
-              <span className="plugins-segment-count">{stats.total}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              id="plugins-tab-market"
-              aria-selected={tab === "market"}
-              aria-controls="plugins-panel-market"
-              className={cx("plugins-segment-btn", tab === "market" && "active")}
-              onClick={() => setTab("market")}
-            >
-              {t("plugins.tabMarket")}
-              {market.length ? (
-                <span className="plugins-segment-count">{market.length}</span>
-              ) : null}
-            </button>
-          </div>
-          {tab === "installed" ? (
-            plugins.length ? (
-              <div className="plugins-toolbar-end">
-                {installedQuery.trim() ? (
-                  <span className="plugins-result-count" aria-live="polite">
-                    {t("plugins.resultCount", {
-                      count: filteredInstalled.length,
-                      total: plugins.length,
-                    })}
-                  </span>
-                ) : null}
-                <SearchField
-                  value={installedQuery}
-                  onChange={setInstalledQuery}
-                  placeholder={t("plugins.searchInstalled")}
-                />
-              </div>
-            ) : null
-          ) : (
+        {plugins.length ? (
+          <div className="plugins-toolbar">
             <div className="plugins-toolbar-end">
-              {marketLoading ? (
+              {installedQuery.trim() ? (
                 <span className="plugins-result-count" aria-live="polite">
-                  {t("plugins.marketLoading")}
+                  {t("plugins.resultCount", {
+                    count: filteredInstalled.length,
+                    total: plugins.length,
+                  })}
                 </span>
               ) : null}
               <SearchField
-                value={query}
-                onChange={setQuery}
-                placeholder={t("plugins.marketSearchPlaceholder")}
+                value={installedQuery}
+                onChange={setInstalledQuery}
+                placeholder={t("plugins.searchInstalled")}
               />
             </div>
-          )}
-        </div>
-        {tab === "installed" ? (
-          <InstalledPluginsPanel {...page} />
-        ) : (
-          <MarketplacePanel {...page} />
-        )}
+          </div>
+        ) : null}
+        <InstalledPluginsPanel {...page} />
       </div>
 
-      <PluginDetailSheet {...page} />
       <PluginDialogs {...page} />
     </div>
   );

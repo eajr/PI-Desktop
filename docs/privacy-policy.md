@@ -85,27 +85,22 @@ enabling one.
 PI-Desktop does not intentionally expose the host secret store through its
 documented plugin APIs. However, plugin code currently runs locally with the
 user's operating-system privileges and is not fully capability-sandboxed. Treat
-all plugins, especially marketplace packages, as user-privileged third-party
-code. Marketplace packages and remote MCP servers are third-party software and
-services.
+all plugins, especially packages from outside this repository, as
+user-privileged third-party code. Such packages and remote MCP servers are
+third-party software and services.
 
 ### 3.3 Catalogs, updates, links, and media
 
-The application may contact configured model catalogs, plugin marketplace
-endpoints, GitHub release/update endpoints, provider OAuth endpoints, and
-other services required by features you enable. Those services may receive
-network metadata such as your IP address and user agent.
+The application may contact configured model catalogs, GitHub release/update
+endpoints, provider OAuth endpoints, and other services required by features
+you enable. Those services may receive network metadata such as your IP address
+and user agent.
 
-Installing or updating a plugin through the official plugin channel also
-contacts the plugin marketplace endpoint used by that channel, the plugin
-center at `https://plugins.aiuo.net/api/v1/download/resolve`. That request
-carries a device identifier: a SHA-256 digest derived from a machine identifier
-the operating system exposes, or, when no machine identifier can be read, a
-random identifier generated once and stored in the application data directory.
-The value sent is the digest, not the machine code, and the machine code cannot
-be recovered from it. The service uses the identifier to de-duplicate and
-rate-limit a download, and it keeps counts for a device rather than the identity
-behind it. The two backup channels and a custom source do not send it.
+This build has no remote plugin marketplace. Plugins are installed only from a
+local package file or folder you choose, or ship bundled with the application.
+The application does not fetch a plugin catalog, does not download or update
+plugins over the network, and does not compute or send a device identifier for
+plugin installs.
 
 Links opened through the application are handled by the operating system or an
 external browser. Markdown written by a model, returned by a tool, or read from

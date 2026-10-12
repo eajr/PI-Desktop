@@ -195,7 +195,7 @@ Session Analytics
 | **Service**         | Run persistent background work                                 |
 | **Message Bus**     | Let plugins communicate with each other                        |
 
-Plugins can be distributed as `.piplug` packages or installed through the marketplace.
+Plugins are distributed as `.piplug` packages or folders and installed locally; this build has no remote marketplace.
 
 <div align="center">
 
@@ -408,7 +408,7 @@ You can:
 
 <img src="docs/image/readme/plugins_en.png" alt="PI-Desktop Plugins" />
 
-<p align="center"><sub>A plugin marketplace that extends both the agent and the desktop</sub></p>
+<p align="center"><sub>Plugins that extend both the agent and the desktop</sub></p>
 
 </td>
 

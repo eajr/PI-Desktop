@@ -93,17 +93,11 @@ test("plugin browsing choices survive subscribers disconnecting without retainin
   const before = usePluginBrowseState.getInitialState();
   try {
     const unsubscribe = usePluginBrowseState.subscribe(() => {});
-    usePluginBrowseState.getState().setTab("market");
-    usePluginBrowseState.getState().setQuery("browser");
     usePluginBrowseState.getState().setInstalledQuery("local");
-    usePluginBrowseState.getState().setCategory("productivity");
     unsubscribe();
     const reopened = usePluginBrowseState.getState();
-    assert.equal(reopened.tab, "market");
-    assert.equal(reopened.query, "browser");
     assert.equal(reopened.installedQuery, "local");
-    assert.equal(reopened.category, "productivity");
     assert.deepEqual(Object.keys(reopened).filter((key) => typeof reopened[key] !== "function").sort(),
-      ["category", "installedQuery", "query", "tab"]);
+      ["installedQuery"]);
   } finally { usePluginBrowseState.setState(before, true); }
 });

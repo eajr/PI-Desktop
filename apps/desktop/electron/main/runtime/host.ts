@@ -94,13 +94,6 @@ export function createHostRuntime({
       remoteTools.cancel(params as { sessionId: string; toolCallId: string });
       return;
     }
-    // An install reports itself, so the dialog that shows it can follow the
-    // phases, the mirror being tried and the bytes that have arrived. Nothing
-    // here decides anything: the request's own answer is still the outcome.
-    if (method === "plugin.installProgress") {
-      sendToRenderer(IPC.event.pluginInstallProgress, params);
-      return;
-    }
     if (method === "permissions.request") {
       const permission = params as {
         requestId: string;

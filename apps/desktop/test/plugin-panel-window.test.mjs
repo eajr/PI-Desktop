@@ -18,13 +18,6 @@ const examplePanelSource = await readFile(
   new URL("../../../examples/plugins/hello/renderer/index.html", import.meta.url),
   "utf8",
 );
-const hostCorePluginSource = await readFile(
-  new URL("../../../crates/host-core/src/plugins/marketplace/catalog.rs", import.meta.url),
-  "utf8",
-);
-const bundledPanelSources = [
-  ...hostCorePluginSource.matchAll(/"renderer\/index\.html",\s*br#"(.*?)"#,/gs),
-].map((match) => match[1]);
 
 test("plugin panels match the cross-platform main-window chrome contract", () => {
   assert.match(hostSource, /frame: false/);
@@ -169,8 +162,7 @@ test("paint-through panels let page content draw and receive pointer events", ()
 });
 
 test("checked-in plugin panels follow the host chrome contract", () => {
-  assert.equal(bundledPanelSources.length, 2);
-  for (const panelSource of [examplePanelSource, ...bundledPanelSources]) {
+  for (const panelSource of [examplePanelSource]) {
     assert.match(panelSource, /meta name="pi-plugin-chrome" content="v2"/);
     assert.match(panelSource, /PI-Desktop reserves exactly a transparent 46px drag band/);
     assert.match(panelSource, /var\(--pi-plugin-titlebar-height, 46px\)/);

@@ -23,14 +23,6 @@ pub struct PluginManager {
     /// build stops shipping must stop being protected immediately, whatever the
     /// row that survives it looks like.
     pub(crate) bundled_ids: BTreeSet<String>,
-    /// Catalog channel pinned by app settings.
-    pub(crate) market_channel: MarketChannel,
-    /// Cancel token of the install currently running, when one is.
-    ///
-    /// The renderer's cancel action flips it and the download loop reads it.
-    /// Only one install runs at a time — the RPC that starts one holds the
-    /// state lock — so a single slot is enough.
-    pub(crate) install_cancel: Option<CancelToken>,
     /// Locale a row's display fields are resolved against.
     ///
     /// The desktop shell owns the app language — `settings.language`, or the
@@ -40,24 +32,20 @@ pub struct PluginManager {
 }
 
 impl PluginManager {
-    /// Build a manager against the official catalog channel.
+    /// Build a manager over the plugins already on disk.
     ///
-    /// The legacy custom URL argument is accepted and ignored for compatibility.
-    pub fn new(
-        data_dir: &Path,
-        market_channel: MarketChannel,
-        _legacy_custom_url: Option<String>,
-    ) -> Self {
+    /// Construction is local-only: there is no plugin marketplace (ADR
+    /// fork-removes-plugin-marketplace), so nothing here fetches a catalog,
+    /// derives a device identifier, or reaches the network. A `plugins/market`
+    /// directory left by an older build is neither read nor deleted.
+    pub fn new(data_dir: &Path) -> Self {
         let mut mgr = Self {
             data_dir: data_dir.to_path_buf(),
             runtime: Vec::new(),
             bundled_ids: BTreeSet::new(),
-            market_channel,
-            install_cancel: None,
             locale: "en".into(),
         };
         let _ = mgr.ensure_dirs();
-        let _ = mgr.ensure_default_catalog();
         let _ = mgr.reload_from_disk();
         let _ = mgr.sync_builtin(builtin_plugins_dir().as_deref());
         mgr
@@ -75,9 +63,9 @@ impl PluginManager {
     /// across. A bundled plugin that disappears from a newer build leaves the
     /// registry with it.
     ///
-    /// The user *may* update a bundled plugin from the marketplace (ADR 0241).
+    /// The user *may* install their own copy over a bundled plugin (ADR 0241).
     /// Their copy is not state to discard: it stays registered for as long as
-    /// this build does not ship something newer, so an update survives the next
+    /// this build does not ship something newer, so it survives the next
     /// launch while a stale install cannot hold an app update back.
     pub fn sync_builtin(&mut self, dir: Option<&Path>) -> Result<()> {
         let mut shipped: Vec<PluginSummary> = Vec::new();
@@ -133,11 +121,6 @@ impl PluginManager {
                         .or(Some(now.clone())),
                     updated_at: Some(now),
                     marketplace: None,
-                    auto_update: None,
-                    update_available: None,
-                    // A bundled plugin has no publisher to yank it; its
-                    // lifecycle is the application's own release cycle.
-                    yanked: None,
                     ui: manifest.ui.clone(),
                     fs: manifest.fs.clone(),
                     settings: derive_settings(&manifest),
@@ -192,7 +175,6 @@ impl PluginManager {
             "plugins/logs",
             "plugins/cache/download",
             "plugins/cache/backup",
-            "plugins/market",
         ] {
             fs::create_dir_all(self.data_dir.join(rel))?;
         }
@@ -201,10 +183,6 @@ impl PluginManager {
 
     pub(crate) fn registry_path(&self) -> PathBuf {
         self.data_dir.join("plugins/registry.json")
-    }
-
-    pub(crate) fn catalog_path(&self) -> PathBuf {
-        self.data_dir.join("plugins/market/catalog.json")
     }
 
     pub(crate) fn installed_dir(&self, id: &str) -> PathBuf {
@@ -319,9 +297,6 @@ impl PluginManager {
             installed_at: Some(now.clone()),
             updated_at: Some(now),
             marketplace: None,
-            auto_update: Some(false),
-            update_available: None,
-            yanked: None,
             ui: manifest.ui.clone(),
             fs: manifest.fs.clone(),
             settings: derive_settings(&manifest),
@@ -351,17 +326,6 @@ impl PluginManager {
     pub fn set_scope(&mut self, id: &str, scope: ActivationScope) -> Result<Option<PluginSummary>> {
         if let Some(plugin) = self.runtime.iter_mut().find(|p| p.id == id) {
             plugin.scope = scope.normalized();
-            plugin.updated_at = Some(Utc::now().to_rfc3339());
-            let out = plugin.localized(&self.locale);
-            self.save()?;
-            return Ok(Some(out));
-        }
-        Ok(None)
-    }
-
-    pub fn set_auto_update(&mut self, id: &str, enabled: bool) -> Result<Option<PluginSummary>> {
-        if let Some(plugin) = self.runtime.iter_mut().find(|p| p.id == id) {
-            plugin.auto_update = Some(enabled);
             plugin.updated_at = Some(Utc::now().to_rfc3339());
             let out = plugin.localized(&self.locale);
             self.save()?;

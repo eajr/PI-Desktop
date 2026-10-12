@@ -103,17 +103,12 @@ impl AppState {
             Err(error) => tracing::warn!(%error, "in-flight reply sweep failed"),
         }
         let secrets = SecretStore::open(data_dir)?;
-        // The marketplace channel is read before the manager builds its first
-        // catalog, so a source configured for networks without GitHub access
-        // applies on launch instead of only after a manual refresh.
         let app_settings = db.get_setting("app").unwrap_or_default();
         crate::network_proxy::apply_from_settings(app_settings.as_ref());
         // The WebDAV transport reads this before it allows a plaintext hop, so
         // it has to be in place on launch and not only after a settings write.
         crate::network_policy::apply_from_settings(app_settings.as_ref());
-        let (channel, custom_url) =
-            crate::plugins::market_channel_from_settings(app_settings.as_ref());
-        let plugins = PluginManager::new(data_dir, channel, custom_url);
+        let plugins = PluginManager::new(data_dir);
         // Provider rows a plugin declared are rebuilt from the registry on
         // launch, so the table matches the enabled plugins whatever path
         // (install, enable, an upgraded manifest) last changed them.

@@ -278,7 +278,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
 | 0204 | [未签名 macOS 首次启动助手](/adr/0204-unsigned-macos-first-launch-helper) | 已接受（由 D406 / ADR 0232 修订） |
 | 0205 | [远程 Agent 控制使用专用的 Host 边界](/adr/0205-remote-agent-control-boundary) | 已接受待实现（MVP 之后；由 D376 修订） |
 | 0232 | [macOS DMG 只保留打开说明](/adr/0232-macos-dmg-text-only-opening-guidance) | 已接受（由 D457 / ADR 0296 修订；修订 D371 / ADR 0204） |
-| 0241 | [文件视图改为 vendor 的可更新插件](/adr/0241-vendored-updatable-file-view-plugin) | 已接受（取代 ADR 0105；issue #304） |
+| 0241 | [文件视图改为 vendor 的可更新插件](/adr/0241-vendored-updatable-file-view-plugin) | 已被 fork-removes-plugin-marketplace 取代（取代 ADR 0105；issue #304） |
 | 0242 | [仅增量且合并的流式更新](/adr/0242-delta-only-streaming-updates) | 已接受（修订 0127 / 0130 / 0149 / 0153；issue #299） |
 | 0243 | [技能市场公网 HTTPS 目录拉取](/adr/0243-skill-market-public-https-catalog) | 已接受（修订 ADR 0009；issue #287 / PR #290） |
 | 0245 | [加固 MCP 市场公网网络边界](/adr/0245-mcp-market-public-network-boundary) | 已接受 |
@@ -292,7 +292,7 @@ ADR 记录那些不应被静默改变的架构选择。中文入口与英文索�
  | 0265 | [排队队列的优先区块与行内操作](/adr/0265-turn-queue-priority-block-and-row-actions) | 已接受待实现（修订 ADR 0213 / 0118） |
  | 0267 | [插件标签跟随应用语言](/adr/0267-plugin-labels-follow-the-app-language) | 已接受（修订 ADR 0160；ADR 0182） |
  | 0272 | [按请求实际会走的线路判定公网地址](/adr/0272-connection-time-public-network-route) | 已接受待实现（修订 ADR 0243；issue #419 / PR #473） |
-| 0276 | [官方插件渠道与备份渠道](/adr/0276-official-plugin-channel-and-backup-channels) | 已接受待实现（修订 ADR 0102；D442） |
+| 0276 | [官方插件渠道与备份渠道](/adr/0276-official-plugin-channel-and-backup-channels) | 已被 fork-removes-plugin-marketplace 取代（修订 ADR 0102；D442） |
 | 0278 | [规范应用 ID `net.aiuo.pi-desktop`](/adr/0278-canonical-application-id) | 已接受（D443；修订 D141 / D371 / ADR 0204；issue #524） |
 | 0279 | [可恢复的子代理委托](/adr/0279-resumable-subagent-delegations) | 已接受待实现（修订 ADR 0062；ADR 0089；issue #513） |
 | 0280 | [插件自有界面按宿主语言自行本地化](/adr/0280-plugin-owned-ui-localizes-from-host-locale) | 已接受（修订 ADR 0267；ADR 0159） |

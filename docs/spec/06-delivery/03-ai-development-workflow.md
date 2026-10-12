@@ -347,26 +347,10 @@ Every change follows this sequence. Steps may be iterated if the implementation 
 
 ### Marketplace/update diagnosis gate
 
-Plugin update incidents require an evidence-first prompt flow before code
-changes:
-
-1. Capture the exact plugin ID, installed version, displayed version, expected
-   release, catalog URL, and observation time.
-2. Fetch the live catalog and inspect the exact entry, then inspect the local
-   catalog cache and installed registry independently.
-3. Classify the failure boundary: publisher/catalog data, fetch/cache fallback,
-   host version comparison, IPC propagation, or renderer presentation.
-4. Run `pnpm check:marketplace -- --url <catalog-url> --plugin <id>`. Missing
-   `shasum`, `url`, positive `sizeBytes`, or `permissions`, or a catalog
-   `author` that is not a string (for example `{ name, url }` copied from a
-   plugin manifest), is a release-data failure, not evidence of a stale
-   renderer. Incomplete releases remain non-installable.
-5. Reproduce with a fixture containing unsorted versions and incomplete
-   metadata before changing host or renderer code.
-
-The agent must state which boundary failed and what evidence rules out the
-other boundaries. A client-side fallback may preserve safe discovery, but it
-must not be used to conceal an invalid marketplace release.
+Removed. This build has no remote plugin marketplace, catalog, or update
+check, and `pnpm check:marketplace` no longer exists (ADR
+fork-removes-plugin-marketplace). A plugin version problem is diagnosed
+against the local package that was installed and the installed registry.
 
 ---
 
