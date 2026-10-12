@@ -77,6 +77,27 @@
 - 残余风险：本地进程仍可借 `ELECTRON_RUN_AS_NODE` / `NODE_OPTIONS` 启动已签名
   二进制。
 
+### 2a. 用操作系统打开本地文件
+
+对工作区或插件选择的路径执行的每次 `shell.openPath`（`fs/open`、插件
+`fs.openDefault`，以及浏览器面板对 `file:` 预览的"在外部打开"）都先经过
+`safe-open-path.ts`（`openPathOrReveal`，ADR launchable-files-reveal-instead-of-open）。
+系统关联可能运行代码的路径会在文件管理器中**显示**（`shell.showItemInFolder`）而不是打开，
+用户会看到本地化提示 `panel.files.launchableRevealed`。可启动的路径包括：
+
+- 最终扩展名（不区分大小写，并折叠 Windows 忽略的尾随点、空格和 NTFS `:stream`
+  后缀）指向应用、包、脚本、安装程序、快捷方式或位置文件（`.app`、`.command`、
+  `.terminal`、`.workflow`、`.pkg`、`.dmg`、`.webloc`、`.inetloc`、`.exe`、`.bat`、
+  `.cmd`、`.ps1`、`.vbs`、`.msi`、`.lnk`、`.url`、`.reg`、`.desktop`、`.appimage`、
+  `.sh`、`.jar` 等；`.js` 仅在 Windows 上）。`x.pdf.command` 可启动，`x.command.pdf` 不可；
+- 带上述扩展名的目录，或在 macOS 上 `Contents/Info.plist` 声明了 `CFBundleExecutable`
+  的目录；
+- 在 POSIX 上带任一执行位的文件，除非它的每个名称都是已知文档扩展名；
+- 无法检查的路径。
+
+字面名称和解析符号链接后的名称都会检查。应用有意打开的自有目录（日志、项目根目录、
+会话暂存目录）不在此策略范围内。
+
 ### 未来强化（跟踪、MVP 后）
 
 - sidecar 不再依赖 `ELECTRON_RUN_AS_NODE` 后，关闭 `runAsNode` 与
@@ -249,6 +270,9 @@ MCP 市场只接受无凭据的公网 HTTPS 源和目录端点。Main 在每一�
 | 依赖性中毒 | 锁定文件、几个 dep、本机模块审查 |
 | 本地恶意软件替换应用代码或可执行文件 | asar 完整性 + `onlyLoadAppFromAsar`，打包版忽略可执行路径环境变量；`RunAsNode` 仍开启（ADR electron-fuses-and-packaged-code-paths） |
 | 恶意本地插件 | 声明的权限、无秘密访问、MVP 后跟踪的进程隔离 (ADR 0008) |
+| 由智能体或仓库写入、并从界面打开的启动器 | `openPathOrReveal` 对可启动文件改为在文件管理器中显示而不打开（§2a） |
+| 克隆的仓库自带项目 MCP 服务器 | 任何启动/连接前须基于内容哈希的批准；文件变更后须重新批准；Main 拒绝未批准的项目记录（英文版 §4.4） |
+| 克隆的仓库自带用于提示注入的项目技能 | 进入技能目录、斜杠命令或 `Skill` 工具前须基于内容哈希的批准；文档变更后须重新批准（英文版 §4.4） |
 | 技能市场 SSRF（用户源 URL） | 主进程公网 HTTPS 分类器 + DNS + 逐跳 redirect；渲染层 CSP 禁止该 fetch（ADR 0243） |
 
 ## 11. 安检门
@@ -269,3 +293,7 @@ approve/reject-only 和计划的 Plan 在 artifact/queue 工作之前被拒绝
    单独和 timeout/abort 杀死完整的进程树
 10. 本地 MCP 控制只允许回环、经过 bearer 认证、默认关闭且有界，不能暴露密钥写入
     或原生选择器，并且更改会话权限模式需要确认
+11. 未经批准、或批准后与执行相关的内容已变更的项目 MCP 服务器，绝不会被启动或连接
+    （host-core 单元测试与 `apps/desktop/test/user-mcp.test.mjs`）
+12. 未经批准、或批准后文档已变更的项目技能，不会出现在技能目录中，并被 `Skill` 工具拒绝
+    （host-core `user_skills` 批准测试与 `apps/pi-host/src/skill-tool.test.ts`）

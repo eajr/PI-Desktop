@@ -304,6 +304,8 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `REMOTE_DEVICE_TOKEN_EXPIRED` | 否 | 设备令牌对应已配对设备，但已超过空闲或绝对有效期（升级响应头 `x-racp-error`）；经 SSH 管理的桌面会先通过 SSH 重新配对一次再上报 |
 | `REMOTE_CONNECTION_FAILED` | 是 | RACP-WS 传输无法连接（非回环 URL、套接字被拒） |
 | `REMOTE_FORWARD_FAILED` | 是 | 无法建立 SSH 回环端口转发 |
+| `SSH_HOST_KEY_UNKNOWN` | 否 | SSH 主机出示的密钥不被任何参与校验的 known_hosts 文件信任；`details` 携带 `host`、可选的 `port`，以及（已获知时）供用户确认的 `keys`（`type`、`SHA256:` 指纹）（ADR 0328） |
+| `SSH_HOST_KEY_CHANGED` | 否 | SSH 主机密钥与已信任的密钥冲突；桌面绝不接受，用户须在应用之外处理（ADR 0328） |
 | `REMOTE_PATH_NOT_FOUND` | 否 | 远程项目/工作区路径在主机上不存在 |
 | `REMOTE_PATH_FORBIDDEN` | 否 | 远程路径在主机允许的根之外 |
 | `PAIRING_FAILED` | 否 | `connection/pair` 无法铸造设备凭据 |
