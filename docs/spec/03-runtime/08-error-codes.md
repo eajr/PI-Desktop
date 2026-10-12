@@ -305,6 +305,7 @@ codes surface through the same error object as any other call.
 | `HOST_BOOTSTRAP_FAILED` | no | provisioning the remote `pi-host` over SSH failed (download, checksum mismatch, or `install.sh`); `details.reason` names the stage |
 | `HOST_VERSION_MISMATCH` | no | the remote `pi-host` version does not match the desktop; the desktop refuses to drive an incompatible host |
 | `REMOTE_AUTH_FAILED` | no | the device or pairing token was rejected on the RACP-WS upgrade |
+| `REMOTE_DEVICE_TOKEN_EXPIRED` | no | the device token matched a paired device but is past its idle or absolute lifetime (upgrade header `x-racp-error`); an SSH-managed desktop re-pairs over SSH once before surfacing it |
 | `REMOTE_CONNECTION_FAILED` | yes | the RACP-WS transport could not connect (non-loopback URL, refused socket) |
 | `REMOTE_FORWARD_FAILED` | yes | the SSH loopback port forward could not be established |
 | `REMOTE_PATH_NOT_FOUND` | no | a remote project/workspace path does not exist on the host |

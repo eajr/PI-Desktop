@@ -209,7 +209,10 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
   });
 
   // Claim the owner-only channel before spawning the sole SQLite writer.
-  const admin = process.platform === "win32" ? undefined : await startAdminSocket({ dataDir: config.dataDir, getHost, log });
+  const admin = process.platform === "win32" ? undefined : await startAdminSocket({
+    dataDir: config.dataDir, getHost, log,
+    issuePairing: (lifetimeMs) => authenticator.issuePairingToken(lifetimeMs),
+  });
   try {
     await startHost();
     await startSidecar();

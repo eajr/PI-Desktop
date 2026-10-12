@@ -15,12 +15,18 @@ async function main(): Promise<void> {
     process.exitCode = await runProviderImport(process.argv.slice(3));
     return;
   }
+  if (process.argv[2] === "pairing-issue") {
+    const { runPairingIssue } = await import("./pairing-issue.js");
+    process.exitCode = await runPairingIssue(process.argv.slice(3));
+    return;
+  }
   const args = parseArgs(process.argv.slice(2));
   if (args.help === true) {
     process.stdout.write(
       [
         "pi-host — headless PI Agent Host (RACP-WS on loopback)",
         "  provider-import          import selected providers from SSH stdin",
+        "  pairing-issue            print a fresh pairing token from the running host",
         "",
         "  --data-dir <dir>          host data directory (default ~/.pi-desktop)",
         "  --port <n>                loopback port (default 0 = pick free)",

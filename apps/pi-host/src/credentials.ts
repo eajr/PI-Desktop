@@ -5,7 +5,14 @@ import { dirname, join } from "node:path";
 import type { DeviceCredentialStore, DeviceRecord, PairingRecord } from "@pi-desktop/racp";
 
 type IdentityFile = { hostId: string; createdAt: string };
-type CredentialFile = { devices: DeviceRecord[]; pairings: PairingRecord[] };
+/**
+ * `credentials.json` format. Version 1 (no `version` field) predates device
+ * token expiry; version 2 adds `tokenIssuedAt` and persists `lastSeenAt`.
+ * Readers of either version accept the other's fields: version 1 code ignores
+ * the extra fields, and a version 1 file is migrated on first load.
+ */
+export const CREDENTIAL_FILE_VERSION = 2;
+type CredentialFile = { version?: number; devices: DeviceRecord[]; pairings: PairingRecord[] };
 
 const FILE_MODE = 0o600;
 
@@ -47,15 +54,49 @@ export async function loadOrCreateHostId(dataDir: string): Promise<string> {
 export class FileCredentialStore implements DeviceCredentialStore {
   private readonly path: string;
   private state: CredentialFile | null = null;
+  private loading: Promise<CredentialFile> | null = null;
   private chain = Promise.resolve();
 
-  constructor(dataDir: string) {
+  constructor(
+    dataDir: string,
+    private readonly now: () => number = () => Date.now(),
+  ) {
     this.path = join(dataDir, "pi-host", "credentials.json");
   }
 
-  private async load(): Promise<CredentialFile> {
-    if (!this.state) this.state = (await readJson<CredentialFile>(this.path)) ?? { devices: [], pairings: [] };
-    return this.state;
+  private load(): Promise<CredentialFile> {
+    if (this.state) return Promise.resolve(this.state);
+    this.loading ??= this.loadFromDisk().then(
+      (state) => {
+        this.state = state;
+        return state;
+      },
+      (error: unknown) => {
+        this.loading = null;
+        throw error;
+      },
+    );
+    return this.loading;
+  }
+
+  private async loadFromDisk(): Promise<CredentialFile> {
+    const file = await readJson<CredentialFile>(this.path);
+    if (!file) return { version: CREDENTIAL_FILE_VERSION, devices: [], pairings: [] };
+    if (typeof file.version === "number" && file.version >= CREDENTIAL_FILE_VERSION) return file;
+    // Version 1: tokens had no lifetime. Start every existing token's
+    // lifetime and idle window at migration time instead of its pairing time,
+    // so upgrading never locks a paired desktop out on the spot, and persist
+    // that choice so a restart does not move it again.
+    const migratedAt = new Date(this.now()).toISOString();
+    const migrated: CredentialFile = {
+      version: CREDENTIAL_FILE_VERSION,
+      devices: (file.devices ?? []).map((device) =>
+        device.tokenIssuedAt ? device : { ...device, tokenIssuedAt: migratedAt, lastSeenAt: migratedAt },
+      ),
+      pairings: file.pairings ?? [],
+    };
+    await writeJsonAtomic(this.path, migrated);
+    return migrated;
   }
 
   private async mutate<T>(operation: (state: CredentialFile) => T): Promise<T> {
@@ -64,7 +105,7 @@ export class FileCredentialStore implements DeviceCredentialStore {
       const state = await this.load();
       result = operation(state);
       // Expired, consumed pairings are useless after a write; drop them.
-      const now = Date.now();
+      const now = this.now();
       state.pairings = state.pairings.filter((pairing) => !pairing.consumedAt && Date.parse(pairing.expiresAt) > now);
       await writeJsonAtomic(this.path, state);
     });
@@ -83,10 +124,12 @@ export class FileCredentialStore implements DeviceCredentialStore {
     });
   }
   async touchDevice(deviceId: string, seenAt: string): Promise<void> {
-    const state = await this.load();
-    const device = state.devices.find((candidate) => candidate.deviceId === deviceId);
-    // Last-seen is informational; it does not need a synchronous write per connection.
-    if (device) device.lastSeenAt = seenAt;
+    // Last-seen slides the device token's idle window, so it must survive a
+    // restart: persist it (once per connection open and close).
+    await this.mutate((state) => {
+      const device = state.devices.find((candidate) => candidate.deviceId === deviceId);
+      if (device && (!device.lastSeenAt || Date.parse(device.lastSeenAt) < Date.parse(seenAt))) device.lastSeenAt = seenAt;
+    });
   }
   async revokeDevice(deviceId: string, revokedAt: string): Promise<boolean> {
     return this.mutate((state) => {

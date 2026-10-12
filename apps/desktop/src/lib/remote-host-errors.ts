@@ -11,6 +11,7 @@ export function remoteHostErrorKey(error: unknown): string {
     case "HOST_AUTH_FAILED":
     case "SSH_AUTH_FAILED":
     case "TOKEN_INVALID":
+    case "REMOTE_DEVICE_TOKEN_EXPIRED":
     case "PAIRING_FAILED": return "remote:authenticationRequired";
     case "HOST_DISCONNECTED":
     case "REMOTE_CONNECTION_FAILED":

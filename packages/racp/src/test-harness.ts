@@ -204,8 +204,10 @@ export const VIEWER_TOKEN = newDeviceToken();
 
 export async function credentialStore(): Promise<{ store: MemoryCredentialStore; authenticator: DeviceTokenAuthenticator }> {
   const store = new MemoryCredentialStore();
-  await store.saveDevice({ deviceId: "dev_owner", label: "desktop", roles: ["owner"], tokenHash: hashToken(OWNER_TOKEN), createdAt: "2026-09-18T00:00:00.000Z" });
-  await store.saveDevice({ deviceId: "dev_viewer", label: "watcher", roles: ["viewer"], tokenHash: hashToken(VIEWER_TOKEN), createdAt: "2026-09-18T00:00:00.000Z" });
+  // Device tokens expire (security §3.4); fixtures are issued "now" so they stay valid.
+  const createdAt = new Date().toISOString();
+  await store.saveDevice({ deviceId: "dev_owner", label: "desktop", roles: ["owner"], tokenHash: hashToken(OWNER_TOKEN), createdAt });
+  await store.saveDevice({ deviceId: "dev_viewer", label: "watcher", roles: ["viewer"], tokenHash: hashToken(VIEWER_TOKEN), createdAt });
   return { store, authenticator: new DeviceTokenAuthenticator(store) };
 }
 
@@ -250,8 +252,12 @@ export async function harness(options: { limits?: Partial<import("@pi-desktop/sh
       const events: import("@pi-desktop/shared").RacpEventEnvelope[] = [];
       let current: MemoryLink | null = null;
       const transport: ClientTransportFactory = async () => {
-        const auth: ConnectionAuth | null = await authenticator.authenticate({ authorization: `Bearer ${token}`, urlHasToken: false, connectionId: "pending" });
-        if (!auth) throw Object.assign(new Error("unauthorized"), { errorCode: "REMOTE_AUTH_FAILED" });
+        const verified = await authenticator.verify({ authorization: `Bearer ${token}`, urlHasToken: false, connectionId: "pending" });
+        if (verified.kind === "rejected") {
+          const errorCode = verified.reason === "expired" ? "REMOTE_DEVICE_TOKEN_EXPIRED" : "REMOTE_AUTH_FAILED";
+          throw Object.assign(new Error("unauthorized"), { errorCode });
+        }
+        const auth: ConnectionAuth = verified;
         const link = new MemoryLink();
         links.push(link);
         current = link;

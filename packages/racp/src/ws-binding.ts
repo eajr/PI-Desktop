@@ -2,10 +2,11 @@ import type { IncomingMessage } from "node:http";
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
 
-import { RACP_WS_PATH, RACP_WS_SUBPROTOCOL } from "@pi-desktop/shared";
+import { ErrorCodes, RACP_UPGRADE_ERROR_HEADER, RACP_WS_PATH, RACP_WS_SUBPROTOCOL } from "@pi-desktop/shared";
 import { WebSocket, WebSocketServer } from "ws";
 
 import { isLoopbackAddress, type DeviceTokenAuthenticator } from "./auth.js";
+import { AuthFailureRateLimiter, type AuthRateLimitOptions } from "./auth-rate-limit.js";
 import type { ClientTransport, ClientTransportFactory } from "./client.js";
 import type { RacpServer, ServerConnectionTransport } from "./server.js";
 
@@ -17,6 +18,9 @@ export type WsBindingOptions = {
   port: number;
   log: (level: "info" | "warn" | "error", message: string, data?: Record<string, unknown>) => void;
   heartbeatMs?: number;
+  /** Failed-authentication throttle per remote address; defaults to {@link DEFAULT_AUTH_RATE_LIMIT}. */
+  authRateLimit?: Partial<AuthRateLimitOptions>;
+  now?: () => number;
 };
 
 export type WsBinding = {
@@ -65,27 +69,51 @@ export async function bindRacpWebSocket(options: WsBindingOptions): Promise<WsBi
   });
   const wss = new WebSocketServer({ noServer: true, handleProtocols: (protocols) => (protocols.has(RACP_WS_SUBPROTOCOL) ? RACP_WS_SUBPROTOCOL : false) });
   const sockets = new Set<WebSocket>();
+  const limiter = new AuthFailureRateLimiter(options.authRateLimit, options.now);
 
   http.on("upgrade", (request: IncomingMessage, socket: Socket, head: Buffer) => {
     void (async () => {
       const url = new URL(request.url ?? "/", "http://localhost");
-      const reject = (status: number, reason: string) => {
-        options.log("warn", "racp upgrade refused", { reason, peer: request.socket.remoteAddress });
-        socket.write(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`);
+      const peer = request.socket.remoteAddress;
+      const reject = (status: number, reason: string, headers: Record<string, string> = {}, data: Record<string, unknown> = {}) => {
+        // Never log the Authorization header or any part of a token.
+        options.log("warn", "racp upgrade refused", { reason, peer, ...data });
+        const extra = Object.entries(headers).map(([name, value]) => `${name}: ${value}\r\n`).join("");
+        socket.write(`HTTP/1.1 ${status} ${reason}\r\n${extra}Connection: close\r\n\r\n`);
         socket.destroy();
       };
       if (url.pathname !== RACP_WS_PATH) return reject(404, "Not Found");
-      if (!isLoopbackAddress(request.socket.remoteAddress)) return reject(403, "Forbidden");
+      if (!isLoopbackAddress(peer)) return reject(403, "Forbidden");
+      const limiterKey = peer ?? "unknown";
+      const allowed = limiter.check(limiterKey);
+      if (!allowed.allowed) {
+        return reject(429, "Too Many Requests", { "Retry-After": String(Math.max(1, Math.ceil(allowed.retryAfterMs / 1000))) });
+      }
       const urlHasToken = [...url.searchParams.keys()].some((key) => /token|auth/i.test(key));
-      const auth = await options.authenticator.authenticate({
+      const auth = await options.authenticator.verify({
         authorization: request.headers.authorization,
         urlHasToken,
         connectionId: "pending",
       });
-      if (!auth) return reject(401, "Unauthorized");
+      if (auth.kind === "rejected") {
+        limiter.recordFailure(limiterKey);
+        if (auth.reason === "expired") {
+          return reject(401, "Unauthorized", { [RACP_UPGRADE_ERROR_HEADER]: ErrorCodes.REMOTE_DEVICE_TOKEN_EXPIRED }, {
+            deviceId: auth.deviceId, expiry: auth.expiry,
+          });
+        }
+        return reject(401, "Unauthorized", { [RACP_UPGRADE_ERROR_HEADER]: ErrorCodes.REMOTE_AUTH_FAILED });
+      }
       wss.handleUpgrade(request, socket, head, (ws) => {
         sockets.add(ws);
-        ws.once("close", () => sockets.delete(ws));
+        ws.once("close", () => {
+          sockets.delete(ws);
+          if (auth.kind !== "device") return;
+          // Use slides the idle window to the end of the connection, not its start.
+          options.authenticator.touch(auth.device.deviceId).catch((error: unknown) => {
+            options.log("warn", "racp device last-use update failed", { deviceId: auth.device.deviceId, error: String(error) });
+          });
+        });
         const connection = options.server.accept(auth, wsTransport(ws));
         if (!connection) return;
         // Heartbeat (spec §11.1): a peer that stops answering pings is dropped.
@@ -178,7 +206,10 @@ export function wsClientTransport(options: WsClientOptions): ClientTransportFact
       socket.once("unexpected-response", (_request, response) => {
         if (settled) return;
         settled = true;
-        const code = response.statusCode === 401 || response.statusCode === 403 ? "REMOTE_AUTH_FAILED" : "REMOTE_CONNECTION_FAILED";
+        const reported = response.headers[RACP_UPGRADE_ERROR_HEADER];
+        const code = response.statusCode === 401 && reported === ErrorCodes.REMOTE_DEVICE_TOKEN_EXPIRED
+          ? ErrorCodes.REMOTE_DEVICE_TOKEN_EXPIRED
+          : response.statusCode === 401 || response.statusCode === 403 ? ErrorCodes.REMOTE_AUTH_FAILED : ErrorCodes.REMOTE_CONNECTION_FAILED;
         reject(Object.assign(new Error(`upgrade refused: ${response.statusCode}`), { errorCode: code }));
         socket.terminate();
       });

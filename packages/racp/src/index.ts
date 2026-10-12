@@ -1,5 +1,6 @@
 export * from "./jsonrpc.js";
 export * from "./auth.js";
+export * from "./auth-rate-limit.js";
 export * from "./host-operations.js";
 export * from "./server.js";
 export * from "./client.js";

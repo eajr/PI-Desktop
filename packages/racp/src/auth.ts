@@ -2,7 +2,13 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 
 import type { Principal } from "@pi-desktop/agent-host";
-import { RACP_DEVICE_TOKEN_PREFIX, RACP_PAIRING_TOKEN_PREFIX, type RacpRole } from "@pi-desktop/shared";
+import {
+  RACP_DEVICE_TOKEN_IDLE_TTL_MS,
+  RACP_DEVICE_TOKEN_MAX_LIFETIME_MS,
+  RACP_DEVICE_TOKEN_PREFIX,
+  RACP_PAIRING_TOKEN_PREFIX,
+  type RacpRole,
+} from "@pi-desktop/shared";
 
 /**
  * Credentials for the header profile (security §3.1, §3.4). A device token
@@ -17,9 +23,45 @@ export type DeviceRecord = {
   /** SHA-256 of the token, hex. */
   tokenHash: string;
   createdAt: string;
+  /**
+   * Start of the token's absolute lifetime. Absent on records written before
+   * device tokens expired; `createdAt` stands in, and a store migrating such
+   * records sets it to the migration time so no device is locked out at once.
+   */
+  tokenIssuedAt?: string;
+  /** Last authenticated use; slides the idle window. */
   lastSeenAt?: string;
   revokedAt?: string;
 };
+
+export type DeviceTokenLifetime = {
+  /** A token unused for longer than this is refused. */
+  idleTtlMs: number;
+  /** A token older than this since issue is refused, however often used. */
+  maxLifetimeMs: number;
+};
+
+export const DEFAULT_DEVICE_TOKEN_LIFETIME: DeviceTokenLifetime = {
+  idleTtlMs: RACP_DEVICE_TOKEN_IDLE_TTL_MS,
+  maxLifetimeMs: RACP_DEVICE_TOKEN_MAX_LIFETIME_MS,
+};
+
+/**
+ * Why a device token is past its lifetime at `now`, or null while it is
+ * still usable. An unparseable timestamp counts as expired: the record
+ * cannot prove it is fresh.
+ */
+export function deviceTokenExpiry(
+  device: DeviceRecord,
+  now: number,
+  lifetime: DeviceTokenLifetime = DEFAULT_DEVICE_TOKEN_LIFETIME,
+): "idle" | "absolute" | null {
+  const issuedAt = Date.parse(device.tokenIssuedAt ?? device.createdAt);
+  if (!Number.isFinite(issuedAt) || now - issuedAt >= lifetime.maxLifetimeMs) return "absolute";
+  const lastUsedAt = device.lastSeenAt ? Date.parse(device.lastSeenAt) : issuedAt;
+  if (!Number.isFinite(lastUsedAt) || now - Math.max(lastUsedAt, issuedAt) >= lifetime.idleTtlMs) return "idle";
+  return null;
+}
 
 export type PairingRecord = {
   tokenHash: string;
@@ -128,6 +170,15 @@ export type ConnectionAuth =
   | { kind: "device"; principal: Principal; device: DeviceRecord }
   | { kind: "pairing"; principal: Principal; tokenHash: string };
 
+/**
+ * A refused credential. `expired` is only reported for a device token that
+ * matched a live, unrevoked record, so it reveals nothing to a guesser; every
+ * other refusal is `invalid`.
+ */
+export type AuthRejection =
+  | { kind: "rejected"; reason: "invalid" }
+  | { kind: "rejected"; reason: "expired"; deviceId: string; expiry: "idle" | "absolute" };
+
 export type AuthenticateInput = {
   authorization: string | undefined;
   /** Rejected outright: a token in the URL is never accepted (security §3.1). */
@@ -144,16 +195,27 @@ export class DeviceTokenAuthenticator {
   constructor(
     private readonly store: DeviceCredentialStore,
     private readonly now: () => number = () => Date.now(),
+    private readonly lifetime: DeviceTokenLifetime = DEFAULT_DEVICE_TOKEN_LIFETIME,
   ) {}
 
+  /** Compatibility form of {@link verify}: any refusal is `null`. */
   async authenticate(input: AuthenticateInput): Promise<ConnectionAuth | null> {
-    if (input.urlHasToken) return null;
+    const outcome = await this.verify(input);
+    return outcome.kind === "rejected" ? null : outcome;
+  }
+
+  /** Authenticate an upgrade and, when refused, say whether the device token expired. */
+  async verify(input: AuthenticateInput): Promise<ConnectionAuth | AuthRejection> {
+    const invalid: AuthRejection = { kind: "rejected", reason: "invalid" };
+    if (input.urlHasToken) return invalid;
     const token = bearerToken(input.authorization);
-    if (!token) return null;
+    if (!token) return invalid;
     const tokenHash = hashToken(token);
     if (isDeviceToken(token)) {
       const device = await this.store.findDeviceByTokenHash(tokenHash);
-      if (!device || device.revokedAt || !hashesEqual(device.tokenHash, tokenHash)) return null;
+      if (!device || device.revokedAt || !hashesEqual(device.tokenHash, tokenHash)) return invalid;
+      const expiry = deviceTokenExpiry(device, this.now(), this.lifetime);
+      if (expiry) return { kind: "rejected", reason: "expired", deviceId: device.deviceId, expiry };
       await this.store.touchDevice(device.deviceId, new Date(this.now()).toISOString());
       return {
         kind: "device",
@@ -168,14 +230,22 @@ export class DeviceTokenAuthenticator {
     }
     if (isPairingToken(token)) {
       const pairing = await this.store.findPairing(tokenHash);
-      if (!pairing || pairing.consumedAt || Date.parse(pairing.expiresAt) <= this.now()) return null;
+      if (!pairing || pairing.consumedAt || Date.parse(pairing.expiresAt) <= this.now()) return invalid;
       return {
         kind: "pairing",
         tokenHash,
         principal: { subject: `pairing:${tokenHash.slice(0, 12)}`, roles: [], connectionId: input.connectionId },
       };
     }
-    return null;
+    return invalid;
+  }
+
+  /**
+   * Record use of a device at the end of a connection, so a long-lived
+   * connection counts toward the idle window as well as its upgrade.
+   */
+  async touch(deviceId: string): Promise<void> {
+    await this.store.touchDevice(deviceId, new Date(this.now()).toISOString());
   }
 
   /** Mint a single-use pairing token; the caller hands it over the bootstrap channel. */
@@ -205,6 +275,7 @@ export class DeviceTokenAuthenticator {
       roles,
       tokenHash: hashToken(token),
       createdAt: consumedAt,
+      tokenIssuedAt: consumedAt,
     });
     return { deviceId, token };
   }

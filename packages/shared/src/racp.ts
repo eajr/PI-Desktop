@@ -621,6 +621,22 @@ export const RACP_INITIALIZED_NOTIFICATION = "notifications/initialized" as cons
 export const RACP_DEVICE_TOKEN_PREFIX = "pdt1." as const;
 export const RACP_PAIRING_TOKEN_PREFIX = "ppt1." as const;
 
+/**
+ * Device token lifetime (security §3.4). A token is refused once it has gone
+ * unused for the idle window, or once the absolute lifetime since issue has
+ * elapsed, whichever comes first. Use slides the idle window; nothing extends
+ * the absolute lifetime. An SSH-paired desktop re-pairs over SSH when refused.
+ */
+export const RACP_DEVICE_TOKEN_IDLE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const RACP_DEVICE_TOKEN_MAX_LIFETIME_MS = 180 * 24 * 60 * 60 * 1000;
+
+/**
+ * Response header on a refused RACP-WS upgrade that names why, so a client
+ * can tell an expired device token (re-pair) from an invalid one (stop).
+ * It carries an error code only, never credential material.
+ */
+export const RACP_UPGRADE_ERROR_HEADER = "x-racp-error" as const;
+
 /** Operations the desktop offers locally that RACP reserves but does not expose. */
 export const RACP_DEFERRED_OPERATIONS = [
   "turn/override",

@@ -15,6 +15,11 @@ export const ADMIN_MAX_BYTES = PROVIDER_SYNC_MAX_BYTES + 128;
 const RESPONSE_MAX_BYTES = 64 * 1024;
 const FAILURE_CODES: readonly ImportFailureCode[] = ["INVALID_REQUEST", "PAYLOAD_TOO_LARGE", "ADMIN_UNAVAILABLE", "ADMIN_BUSY", "TIMEOUT", "IMPORT_FAILED"];
 export type AdminResponse = { ok: true; summary: ProviderImportSummary } | { ok: false; code: ImportFailureCode };
+/** A fresh single-use pairing token, for re-pairing a desktop whose device token expired. */
+export type AdminPairing = { token: string; expiresAt: string };
+export type AdminPairingResponse = { ok: true; pairing: AdminPairing } | { ok: false; code: ImportFailureCode };
+/** Lifetime of a pairing token issued over the admin channel: one exchange, right away. */
+export const ADMIN_PAIRING_LIFETIME_MS = 120_000;
 export type AdminSocket = { path: string; close(): Promise<void> };
 type Log = (level: "info" | "warn", message: string, data?: Record<string, unknown>) => void;
 
@@ -82,9 +87,16 @@ async function claim(dataDir: string): Promise<() => Promise<void>> {
   throw new ImportFailure("ADMIN_BUSY");
 }
 
-/** One owner-only Unix channel, one allowed operation, one active import. */
+/**
+ * One owner-only Unix channel. Two operations: `providers.import` (one active
+ * import at a time) and `pairing.issue`, which mints a single-use pairing
+ * token so a desktop whose device token expired can re-pair over SSH without
+ * restarting the Host. Reaching the socket already requires a login as the
+ * Host's user, the same trust that SSH bootstrap pairing rests on.
+ */
 export async function startAdminSocket(options: {
   dataDir: string; getHost: () => HostCaller | null; log?: Log; timeoutMs?: number;
+  issuePairing?: (lifetimeMs: number) => Promise<AdminPairing>;
 }): Promise<AdminSocket> {
   await prepareAdminDirectory(options.dataDir);
   const release = await claim(options.dataDir);
@@ -96,6 +108,14 @@ export async function startAdminSocket(options: {
   let ready = false;
   const timeoutMs = options.timeoutMs ?? IMPORT_DEADLINE_MS;
   const log = options.log ?? (() => undefined);
+  const issuePairing = async (): Promise<AdminPairingResponse> => {
+    if (!options.issuePairing) throw new ImportFailure("ADMIN_UNAVAILABLE");
+    try {
+      return { ok: true, pairing: await options.issuePairing(ADMIN_PAIRING_LIFETIME_MS) };
+    } catch {
+      throw new ImportFailure("ADMIN_UNAVAILABLE");
+    }
+  };
   const server = createServer({ allowHalfOpen: true }, (socket) => {
     if (!ready || stopping || sockets.size >= 4) { socket.destroy(); return; }
     sockets.add(socket);
@@ -109,11 +129,16 @@ export async function startAdminSocket(options: {
       sockets.delete(socket);
     });
     socket.on("error", () => undefined); // errors are represented by the bounded response/closed channel
-    void readCapped(socket, ADMIN_MAX_BYTES, timeoutMs).then(async (raw): Promise<AdminResponse> => {
+    void readCapped(socket, ADMIN_MAX_BYTES, timeoutMs).then(async (raw): Promise<AdminResponse | AdminPairingResponse> => {
       if (controller.signal.aborted || stopping) throw new ImportFailure("TIMEOUT");
+      let request: unknown;
+      try { request = JSON.parse(raw); } catch { throw new ImportFailure("INVALID_REQUEST"); }
+      if (request && typeof request === "object" && !Array.isArray(request) && "op" in request && request.op === "pairing.issue") {
+        if (Object.keys(request).length !== 1) throw new ImportFailure("INVALID_REQUEST");
+        return issuePairing();
+      }
       let payload: ProviderImportPayload;
       try {
-        const request: unknown = JSON.parse(raw);
         if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).some((key) => !["op", "payload"].includes(key))
           || !("op" in request) || request.op !== "providers.import" || !("payload" in request)) throw new ImportFailure("INVALID_REQUEST");
         payload = parseProviderImportPayload(request.payload);
@@ -134,7 +159,8 @@ export async function startAdminSocket(options: {
     }).catch((error: unknown): AdminResponse => ({ ok: false, code: importFailureCode(error) }))
       .then((response) => {
         if (socket.destroyed) return;
-        if (!response.ok) log("warn", "provider import failed", { code: response.code });
+        if (!response.ok) log("warn", "admin request failed", { code: response.code });
+        else if ("pairing" in response) log("info", "pairing token issued over the admin socket", { expiresAt: response.pairing.expiresAt });
         else log("info", "providers imported", { imported: response.summary.imported.length, skipped: response.summary.skipped.length });
         socket.end(`${JSON.stringify(response)}\n`);
         socket.destroySoon();
@@ -176,6 +202,43 @@ export async function startAdminSocket(options: {
       return closing;
     },
   };
+}
+
+/** Check the admin channel's directories and socket before connecting; never creates anything. */
+async function connectAdmin(dataDir: string): Promise<Socket> {
+  for (const dir of [dataDir, join(dataDir, "pi-host")]) {
+    const stat = await lstat(dir);
+    if (!stat.isDirectory() || stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0) throw new ImportFailure("ADMIN_UNAVAILABLE");
+  }
+  const path = adminSocketPath(dataDir);
+  await privateSocket(path);
+  const socket = createConnection(path);
+  socket.on("error", () => undefined); // the reader returns a sanitized failure
+  return socket;
+}
+
+/** CLI client for `pairing.issue`; the token goes to stdout only, never to a log. */
+export async function requestAdminPairing(dataDir: string): Promise<AdminPairing> {
+  try {
+    const socket = await connectAdmin(dataDir);
+    const response = readCapped(socket, RESPONSE_MAX_BYTES, 15_000);
+    socket.once("connect", () => socket.end(JSON.stringify({ op: "pairing.issue" })));
+    try {
+      const raw: unknown = JSON.parse(await response);
+      if (raw && typeof raw === "object" && "ok" in raw && raw.ok === true && "pairing" in raw && Object.keys(raw).length === 2) {
+        const pairing = raw.pairing as Partial<AdminPairing> | null;
+        if (pairing && typeof pairing.token === "string" && pairing.token.length > 0 && typeof pairing.expiresAt === "string") {
+          return { token: pairing.token, expiresAt: pairing.expiresAt };
+        }
+      }
+      if (raw && typeof raw === "object" && "ok" in raw && raw.ok === false && "code" in raw && FAILURE_CODES.some((code) => code === raw.code)) {
+        throw new ImportFailure(raw.code as ImportFailureCode);
+      }
+      throw new ImportFailure("ADMIN_UNAVAILABLE");
+    } finally { socket.destroy(); }
+  } catch (error) {
+    throw new ImportFailure(error instanceof ImportFailure ? error.code : "ADMIN_UNAVAILABLE");
+  }
 }
 
 /** CLI client: reject unsafe paths before writing even one secret-bearing byte. */

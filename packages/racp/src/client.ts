@@ -337,6 +337,6 @@ function toRacpError(error: unknown, fallbackCode: string): RacpError {
   if (error instanceof RacpError) return error;
   const fields = error && typeof error === "object" ? error as { errorCode?: string; retriable?: boolean } : undefined;
   const code = fields?.errorCode ?? fallbackCode;
-  const retriable = fields?.retriable ?? !["HOST_AUTH_FAILED", "REMOTE_AUTH_FAILED", "HOST_VERSION_MISMATCH", "TOKEN_INVALID", "TOKEN_EXPIRED", "TOKEN_REVOKED"].includes(code);
+  const retriable = fields?.retriable ?? !["HOST_AUTH_FAILED", "REMOTE_AUTH_FAILED", "REMOTE_DEVICE_TOKEN_EXPIRED", "HOST_VERSION_MISMATCH", "TOKEN_INVALID", "TOKEN_EXPIRED", "TOKEN_REVOKED"].includes(code);
   return new RacpError(code, error instanceof Error ? error.message : String(error), { retriable });
 }

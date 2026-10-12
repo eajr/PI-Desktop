@@ -14763,6 +14763,43 @@ browser milestones are scheduled.
   required. The credential seam itself is covered offline by
   `apps/desktop/test/remote-host-ssh-password.test.mjs`.
 
+#### E2E-REMOTE-HOST-expired-device-token-re-pairs-over-ssh
+
+- **Preconditions**: An isolated Desktop profile paired over SSH to a Linux
+  test Host running a matching `pi-host` release. A second, unpaired local
+  process can reach the Host's loopback RACP port. No production credential.
+- **Steps**: 1) With the Host stopped, rewrite the paired device's
+  `tokenIssuedAt` in `~/.pi-desktop/pi-host/credentials.json` to more than 180
+  days ago (or `lastSeenAt` to more than 30 days ago), then start the Host.
+  2) Start a long-running turn from another paired client, then relaunch the
+  Desktop or reconnect the Host from Settings. 3) Inspect `remote-hosts.json`,
+  `credentials.json`, the Host log, and the Desktop log. 4) Revoke the new
+  device and reconnect. 5) From the second process, send repeated upgrades with
+  a wrong bearer token, then reconnect the Desktop. 6) Start the upgraded Host on
+  a `credentials.json` written by the previous release (no `version` field) with
+  a device paired more than 30 days earlier.
+- **Expected**: Step 2 reconnects without a prompt: the Host refuses the old
+  token with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED`, the Desktop runs
+  `pi-host pairing-issue` over SSH and exchanges the token, the stored device
+  token changes, and the other client's turn keeps running (the Host is not
+  restarted or reinstalled). No log line contains a `pdt1.` or `ppt1.` value.
+  Step 4 is refused with `REMOTE_AUTH_FAILED` and is not re-paired; the Host
+  shows `action-required`. Step 5 answers `429` with `Retry-After` once the
+  failure budget is spent, and the Desktop connects after the backoff. Step 6
+  connects, and the file is rewritten as `version: 2` with the device's
+  lifetime starting at the upgrade.
+- **Specs linked**: `05-security/02-remote-control-security.md` §§3.4, 4.3,
+  and 13 (gate 16), `03-runtime/08-error-codes.md`, ADR
+  `racp-device-token-lifetime`
+- **Acceptance**: Security, Recovery
+- **Milestone**: Post-MVP (rollout R2)
+- **Status**: Draft; remote harness with a Linux SSH target required. The
+  lifetime, migration, throttle, admin-socket and Desktop re-pair seams are
+  covered offline by `packages/racp/src/auth-expiry.test.ts`,
+  `packages/racp/src/ws-binding.test.ts`, `apps/pi-host/src/config.test.ts`,
+  `apps/pi-host/src/pairing-issue.test.ts`, and
+  `apps/desktop/test/remote-device-repair.test.mjs`.
+
 
 #### E2E-REMOTE-HOST-settings-compact-inventory
 
