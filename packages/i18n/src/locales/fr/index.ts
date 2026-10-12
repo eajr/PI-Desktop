@@ -2271,7 +2271,7 @@ sklm: {
       "speech.adapter.register": "Peut ajouter un protocole de transcription ou de synthèse qui réutilise vos clés fournisseur. Le plugin ne voit jamais la clé.",
       "keyboard.globalShortcut": "Enregistre des raccourcis clavier système qui déclenchent les commandes propres à ce plugin lorsque PI-Desktop n'est pas au premier plan.",
       "net.websocket": "Ouvre des connexions bidirectionnelles en temps réel vers les hôtes déclarés par le plugin.",
-      "net.anyHost": "Peut joindre n'importe quel serveur en HTTP(S) ou WebSocket(S), y compris les adresses auto-hébergées saisies par l'utilisateur. Les points de terminaison de métadonnées cloud restent bloqués.",
+      "net.anyHost": "Peut joindre n'importe quel serveur public en HTTP(S) ou WebSocket(S), y compris les adresses auto-hébergées saisies par l'utilisateur. Les adresses de loopback et du réseau local ne sont joignables que si le plugin les déclare ; les points de terminaison de métadonnées cloud restent bloqués.",
       "bus.publish": "Peut envoyer des messages sur les sujets qu'il a déclarés.",
       "bus.subscribe": "Peut recevoir des messages sur les sujets qu'il a déclarés.",
       "browser.cdp": "Peut naviguer dans le navigateur du panneau de travail, lire la page, exécuter JavaScript et envoyer des commandes Chrome DevTools sur liste autorisée. Les cookies et les méthodes de stockage sont bloqués.",

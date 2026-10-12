@@ -2294,7 +2294,7 @@ importConfirm: "İçe aktarılan uzantılar ajan sürecinde, ajanın kendi araç
       "speech.adapter.register": "Mevcut sağlayıcı anahtarlarınızı kullanan bir yazıya dökme veya konuşma protokolü ekleyebilir. Eklenti anahtarı asla görmez.",
       "keyboard.globalShortcut": "PI-Desktop odakta değilken bu eklentinin kendi komutlarını tetikleyen sistem geneli klavye kısayollarını kaydeder.",
       "net.websocket": "Eklentinin bildirdiği ana makinelere gerçek zamanlı iki yönlü bağlantılar açar.",
-      "net.anyHost": "Kullanıcının girdiği kendi sunucuları dahil HTTP(S) veya WebSocket(S) üzerinden herhangi bir sunucuya bağlanabilir. Bulut meta veri uç noktaları her zaman engellenir.",
+      "net.anyHost": "Kullanıcının girdiği kendi sunucuları dahil HTTP(S) veya WebSocket(S) üzerinden herhangi bir genel sunucuya bağlanabilir. Geri döngü ve yerel ağ adreslerine yalnızca eklenti bunları bildirdiğinde erişilebilir; bulut meta veri uç noktaları her zaman engellenir.",
       "bus.publish": "Bildirdiği konularda ileti gönderebilir.",
       "bus.subscribe": "Bildirdiği konularda ileti alabilir.",
       "browser.cdp":

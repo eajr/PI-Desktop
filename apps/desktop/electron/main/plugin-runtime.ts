@@ -13,6 +13,12 @@ import { open as openFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pluginNetFetch, parseFetchRedirect, type PluginFetchTransport } from "./plugin-net-fetch";
+import {
+  createPluginFetchTransport,
+  createPluginNetLookup,
+  PluginNetAddressError,
+  type PluginNetResolve,
+} from "./plugin-net-guard";
 import type { LoadedSkillDocument } from "./skill-document";
 import { getModuleDirectory } from "./module-path";
 import {
@@ -369,8 +375,15 @@ export type PluginHostServices = {
   readClipboardHistory: () => Promise<ClipboardHistoryEntry[]>;
   openPanel: (request: PluginPanelRequest) => Promise<void>;
   closePanel: (pluginId: string) => Promise<void>;
-  /** Single-hop transport; the runtime owns redirect and timeout policy. */
+  /**
+   * Single-hop transport; the runtime owns redirect and timeout policy. When
+   * absent, every hop is resolved, checked and pinned (`plugin-net-guard.ts`).
+   */
   fetch?: PluginFetchTransport;
+  /** Chromium's proxy decision for a URL (`Session.resolveProxy`). */
+  resolveNetRoute?: (url: string) => Promise<string>;
+  /** DNS for plugin egress checks; injectable so tests never resolve. */
+  resolveNetAddresses?: PluginNetResolve;
   /** The reviewed desktop operation controller shared with MCP. */
   desktopControl?: McpControlController;
   /**
@@ -2730,6 +2743,10 @@ export class PluginRuntime {
             protocols: descriptor.protocols,
             timeoutMs:
               typeof descriptor.timeoutMs === "number" ? descriptor.timeoutMs : undefined,
+            lookup: createPluginNetLookup({
+              grant: this.netEgressGrant(loaded),
+              resolve: this.services.resolveNetAddresses,
+            }),
           });
           this.services.audit?.({
             pluginId,
@@ -5960,7 +5977,12 @@ export class PluginRuntime {
             const { url, result } = await pluginNetFetch(
               { ...input, redirect },
               (url) => this.assertEgress(loaded, url, "net.fetch"),
-              this.services.fetch,
+              this.services.fetch ??
+                createPluginFetchTransport({
+                  grant: this.netEgressGrant(loaded),
+                  resolve: this.services.resolveNetAddresses,
+                  resolveRoute: this.services.resolveNetRoute,
+                }),
             );
             this.services.audit?.(netFetchAuditEntry(pluginId, url, result.status, result.headers));
             return result;
@@ -5968,6 +5990,10 @@ export class PluginRuntime {
             if (error instanceof Error && "code" in error && error.code === "REDIRECT_DISALLOWED") {
               this.services.audit?.({ pluginId, api: "net.fetch", ok: false,
                 errorCode: error.code, ts: Date.now() });
+            }
+            if (error instanceof PluginNetAddressError) {
+              this.services.audit?.({ pluginId, api: "net.fetch", ok: false,
+                errorCode: error.code, host: error.host, address: error.address, ts: Date.now() });
             }
             throw error;
           }

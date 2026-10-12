@@ -2271,7 +2271,7 @@ sklm: {
       "speech.adapter.register": "Kann ein Transkriptions- oder Sprachprotokoll hinzufügen, das vorhandene Anbieterschlüssel nutzt. Das Plugin sieht den Schlüssel nie.",
       "keyboard.globalShortcut": "Registriert systemweite Tastaturkürzel, die die eigenen Befehle dieses Plugins auslösen, während PI-Desktop nicht fokussiert ist.",
       "net.websocket": "Öffnet bidirektionale Echtzeitverbindungen zu den Hosts, die das Plugin deklariert hat.",
-      "net.anyHost": "Kann jeden Server über HTTP(S) oder WebSocket(S) erreichen, einschließlich vom Nutzer eingegebener selbst gehosteter Adressen. Cloud-Metadata-Endpunkte bleiben blockiert.",
+      "net.anyHost": "Kann jeden öffentlichen Server über HTTP(S) oder WebSocket(S) erreichen, einschließlich vom Nutzer eingegebener selbst gehosteter Adressen. Loopback- und lokale Netzwerkadressen sind nur erreichbar, wenn das Plugin sie deklariert; Cloud-Metadata-Endpunkte bleiben blockiert.",
       "bus.publish": "Kann Nachrichten zu den angegebenen Themen senden.",
       "bus.subscribe": "Kann Nachrichten zu den angegebenen Themen empfangen.",
       "browser.cdp": "Kann im Arbeitsbereichsbrowser navigieren, die Seite lesen, JavaScript ausführen und auf der Zulassungsliste stehende Chrome DevTools-Befehle senden. Cookies und Speichermethoden sind blockiert.",

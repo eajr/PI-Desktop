@@ -2307,7 +2307,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
       "speech.adapter.register": "Can add a transcription or speech protocol that uses your existing provider keys. The plugin never sees the key.",
       "keyboard.globalShortcut": "Registers system-wide keyboard shortcuts that trigger this plugin's own commands while PI-Desktop is not focused.",
       "net.websocket": "Opens real-time two-way connections to the hostnames the plugin declared.",
-      "net.anyHost": "Can reach any server over HTTP(S) or WebSocket(S), including user-entered self-hosted addresses. Cloud metadata endpoints stay blocked.",
+      "net.anyHost": "Can reach any public server over HTTP(S) or WebSocket(S), including user-entered self-hosted addresses. Loopback and local-network addresses are reachable only when the plugin declares them; cloud metadata endpoints stay blocked.",
       "bus.publish": "Can send messages on the topics it declared.",
       "bus.subscribe": "Can receive messages on the topics it declared.",
       "browser.cdp":

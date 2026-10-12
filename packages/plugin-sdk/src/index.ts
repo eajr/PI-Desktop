@@ -2377,15 +2377,19 @@ export {
   type McpValidationResult,
 } from "./mcp-config.js";
 export {
+  classifyNetHost,
   isLocalNetDomain,
   isMetadataNetHost,
+  isNetAddressAllowedWithGrant,
   isNetHostAllowed,
   isNetSocketUrlAllowedWithGrant,
   isNetUrlAllowed,
   isNetUrlAllowedWithGrant,
+  normalizeNetHost,
   parseNetDomains,
   type PluginNetDomain,
   type PluginNetEgressGrant,
+  type PluginNetHostClass,
 } from "./net-policy.js";
 export {
   fsGlobIgnoresCase,

@@ -8,10 +8,22 @@ export type PinnedNetworkAddress = {
   family: 4 | 6;
 };
 
+/**
+ * Optional request shape. Absent, the request is the bare `GET` the public
+ * catalog guard has always made; a caller that needs a method, headers or a
+ * body (plugin `pi.net.fetch`) passes them. `Host` always names the URL's host.
+ */
+export type PinnedRequestInit = {
+  signal: AbortSignal;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+};
+
 /** Make a direct request to the exact address already accepted by the guard. */
 export function fetchPinnedDirect(
   url: string,
-  init: { signal: AbortSignal },
+  init: PinnedRequestInit,
   resolved: PinnedNetworkAddress,
 ): Promise<Response> {
   const parsed = new URL(url);
@@ -32,9 +44,16 @@ export function fetchPinnedDirect(
         family: resolved.family,
         ...(parsed.port ? { port: parsed.port } : {}),
         path: `${parsed.pathname}${parsed.search}`,
-        method: "GET",
+        method: init.method ?? "GET",
         ...(secure && !isIP(hostname) ? { servername: hostname } : {}),
-        headers: { Host: parsed.host, Accept: "*/*" },
+        headers: {
+          Accept: "*/*",
+          ...(init.headers ?? {}),
+          ...(init.body !== undefined
+            ? { "Content-Length": String(Buffer.byteLength(init.body)) }
+            : {}),
+          Host: parsed.host,
+        },
         lookup: (_hostname, _options, callback) =>
           callback(null, resolved.address, resolved.family),
         signal: init.signal,
@@ -62,6 +81,6 @@ export function fetchPinnedDirect(
       },
     );
     req.once("error", reject);
-    req.end();
+    req.end(init.body);
   });
 }

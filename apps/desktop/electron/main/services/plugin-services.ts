@@ -1,4 +1,4 @@
-import { dialog, globalShortcut, shell, type BrowserWindow } from "electron";
+import { dialog, globalShortcut, session, shell, type BrowserWindow } from "electron";
 import { join } from "node:path";
 import {
   IPC,
@@ -279,6 +279,10 @@ export function createPluginServices({
     // implementation follows redirects by hand and re-checks the manifest
     // egress allowlist before every hop. A plain `fetch` service would let an
     // allowlisted host 30x the request straight out to an undeclared one.
+    // The route lets that implementation pin a direct hop to the address it
+    // checked, while a proxied hop keeps using the user's proxy
+    // (docs/adr/plugin-net-resolved-address-guard.md).
+    resolveNetRoute: (url) => session.defaultSession.resolveProxy(url),
     audit: (entry) => {
       logger.app("plugin", "info", "plugin.api", entry);
     },

@@ -2238,7 +2238,7 @@ export const ptBR = {
       "speech.adapter.register": "Pode adicionar um protocolo de transcrição ou fala usando suas chaves de provedor existentes. O plugin nunca vê a chave.",
       "keyboard.globalShortcut": "Registra atalhos de teclado do sistema que acionam comandos próprios deste plugin mesmo quando o PI-Desktop não está em foco.",
       "net.websocket": "Abre conexões bidirecionais em tempo real com os nomes de host declarados pelo plugin.",
-      "net.anyHost": "Pode acessar qualquer servidor via HTTP(S) ou WebSocket(S), incluindo endereços self-hosted informados pelo usuário. Endpoints de metadados de nuvem permanecem bloqueados.",
+      "net.anyHost": "Pode acessar qualquer servidor público via HTTP(S) ou WebSocket(S), incluindo endereços self-hosted informados pelo usuário. Endereços de loopback e da rede local só são acessíveis quando o plugin os declara; endpoints de metadados de nuvem permanecem bloqueados.",
       "bus.publish": "Pode enviar mensagens nos tópicos que declarou.",
       "bus.subscribe": "Pode receber mensagens nos tópicos que declarou.",
       "browser.cdp": "Pode navegar pelo navegador do painel de trabalho, ler páginas, executar JavaScript e enviar comandos permitidos do Chrome DevTools. Métodos de cookies e armazenamento são bloqueados.",

@@ -2267,7 +2267,7 @@ sklm: {
       "speech.adapter.register": "可以添加转写或朗读协议，复用你已有的服务密钥。插件拿不到密钥。",
       "keyboard.globalShortcut": "注册系统级快捷键，在 PI-Desktop 未聚焦时触发本插件自己的命令。",
       "net.websocket": "与插件声明的域名建立实时双向连接。",
-      "net.anyHost": "可访问任意服务器(HTTP(S)/WebSocket(S)),包括用户自行填写的自建服务地址。云元数据地址始终拒绝。",
+      "net.anyHost": "可访问任意公网服务器(HTTP(S)/WebSocket(S)),包括用户自行填写的自建服务地址。本机和局域网地址仅在插件声明后可访问;云元数据地址始终拒绝。",
       "bus.publish": "可在其声明的主题上发送消息。",
       "bus.subscribe": "可在其声明的主题上接收消息。",
       "browser.cdp":
