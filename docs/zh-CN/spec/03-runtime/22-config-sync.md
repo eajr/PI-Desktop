@@ -117,8 +117,9 @@ Host 负责自动同步启用后的启动即时检查、30 秒本地变更防抖
 S3 uses `configSyncS3/config` and `config-sync/s3/<state-id>/`. Encrypted
 shared/observed baselines, pending bundles and recovery points use temp-file
 rename. Malformed or unauthenticated state is an error, never an empty state.
-The existing local secret store uses encrypted files plus a colocated
-`.machine-key`, not OS Keychain protection. SQLite schema is unchanged.
+The existing local secret store uses encrypted files whose master key lives
+in the OS credential store; an owner-only `.machine-key` remains only as the
+fallback when no credential store is reachable. SQLite schema is unchanged.
 
 Only the new S3 format is supported. Old configuration and backups are not
 detected, interpreted or migrated. Existing unrelated files and cloud objects

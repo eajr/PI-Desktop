@@ -7,53 +7,64 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+mod master_key;
+mod private_fs;
+
+pub use master_key::KeyLocation;
+pub(crate) use private_fs::{create_private_dir_all, restrict_existing_dir};
+
+use master_key::{BlobCheck, KeyVault, MasterKey};
+
 pub struct SecretStore {
     dir: PathBuf,
-    key: [u8; 32],
+    /// `None` while the master key's credential store is unreachable: blobs
+    /// stay on disk, reads and writes fail instead of re-keying.
+    key: Option<[u8; 32]>,
+    location: Option<KeyLocation>,
 }
 
 impl SecretStore {
     pub fn open(data_dir: &Path) -> Result<Self> {
-        let dir = data_dir.join("secrets");
-        fs::create_dir_all(&dir)?;
-        let key_path = dir.join(".machine-key");
-        let key = if key_path.exists() {
-            let bytes = fs::read(&key_path)?;
-            if bytes.len() != 32 {
-                return Err(anyhow!("invalid machine key length"));
-            }
-            let mut key = [0u8; 32];
-            key.copy_from_slice(&bytes);
-            key
-        } else {
-            let mut key = [0u8; 32];
-            rng().fill_bytes(&mut key);
-            // Create the file owner-only from the first byte instead of
-            // tightening it afterwards, so no umask-dependent window exists.
-            let mut options = fs::OpenOptions::new();
-            options.write(true).create_new(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                options.mode(0o600);
-            }
-            {
-                use std::io::Write;
-                let mut file = options.open(&key_path)?;
-                file.write_all(&key)?;
-                file.sync_all()?;
-            }
-            key
-        };
-        Ok(Self { dir, key })
+        Self::open_with_vault(data_dir, master_key::default_vault().as_ref())
     }
 
-    /// AES-256-GCM under the machine key.
+    pub(crate) fn open_with_vault(data_dir: &Path, vault: &dyn KeyVault) -> Result<Self> {
+        let dir = data_dir.join("secrets");
+        private_fs::create_private_dir_all(&dir)?;
+        // Directories created by earlier builds used the process umask.
+        if let Err(error) = private_fs::restrict_existing_dir(&dir) {
+            tracing::warn!(%error, "could not restrict the secrets directory to its owner");
+        }
+        let verify = |key: &[u8; 32]| check_blobs(&dir, key);
+        let (key, location) = match master_key::resolve(&dir, vault, &verify)? {
+            MasterKey::Ready { key, location } => (Some(key), Some(location)),
+            MasterKey::Locked => (None, None),
+        };
+        let store = Self { dir, key, location };
+        match store.location {
+            Some(location) => tracing::info!(?location, "secret store opened"),
+            None => tracing::warn!("secret store opened locked"),
+        }
+        Ok(store)
+    }
+
+    /// Where the master key currently lives; `None` while it is unreachable.
+    #[cfg(test)]
+    pub fn key_location(&self) -> Option<KeyLocation> {
+        self.location
+    }
+
+    /// AES-256-GCM under the master key.
     ///
-    /// Infallible on purpose: `Key<Aes256Gcm>` is exactly the 32 bytes `self.key`
-    /// holds, so there is no length for `new_from_slice` to reject.
-    fn cipher(&self) -> Aes256Gcm {
-        Aes256Gcm::new(&self.key.into())
+    /// `Key<Aes256Gcm>` is exactly the 32 bytes `self.key` holds, so the only
+    /// failure is a master key whose credential store is unreachable.
+    fn cipher(&self) -> Result<Aes256Gcm> {
+        let key = self.key.ok_or_else(|| {
+            anyhow!(
+                "secret store is locked: the OS credential store holding its key is unavailable"
+            )
+        })?;
+        Ok(Aes256Gcm::new(&key.into()))
     }
 
     fn path_for(&self, secret_ref: &str) -> PathBuf {
@@ -64,7 +75,7 @@ impl SecretStore {
     }
 
     pub fn set(&self, secret_ref: &str, value: &str) -> Result<String> {
-        let cipher = self.cipher();
+        let cipher = self.cipher()?;
         let mut nonce_bytes = [0u8; 12];
         rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from(nonce_bytes);
@@ -74,7 +85,10 @@ impl SecretStore {
         let mut blob = Vec::with_capacity(12 + ciphertext.len());
         blob.extend_from_slice(&nonce_bytes);
         blob.extend_from_slice(&ciphertext);
-        fs::write(self.path_for(secret_ref), B64.encode(blob))?;
+        private_fs::write_private_file_atomic(
+            &self.path_for(secret_ref),
+            B64.encode(blob).as_bytes(),
+        )?;
         Ok("file_fallback".into())
     }
 
@@ -84,17 +98,7 @@ impl SecretStore {
             return Ok(None);
         }
         let raw = fs::read_to_string(path)?;
-        let blob = B64.decode(raw.trim()).context("decode secret blob")?;
-        if blob.len() < 13 {
-            return Err(anyhow!("secret blob too short"));
-        }
-        let (nonce_bytes, ciphertext) = blob.split_at(12);
-        let cipher = self.cipher();
-        let nonce =
-            Nonce::try_from(nonce_bytes).map_err(|_| anyhow!("secret nonce is not 12 bytes"))?;
-        let plain = cipher
-            .decrypt(&nonce, ciphertext)
-            .map_err(|e| anyhow!("decrypt failed: {e}"))?;
+        let plain = decrypt_blob(&self.cipher()?, &raw)?;
         Ok(Some(String::from_utf8(plain)?))
     }
 
@@ -108,6 +112,47 @@ impl SecretStore {
             fs::remove_file(path)?;
         }
         Ok(())
+    }
+}
+
+fn decrypt_blob(cipher: &Aes256Gcm, raw: &str) -> Result<Vec<u8>> {
+    let blob = B64.decode(raw.trim()).context("decode secret blob")?;
+    if blob.len() < 13 {
+        return Err(anyhow!("secret blob too short"));
+    }
+    let (nonce_bytes, ciphertext) = blob.split_at(12);
+    let nonce =
+        Nonce::try_from(nonce_bytes).map_err(|_| anyhow!("secret nonce is not 12 bytes"))?;
+    cipher
+        .decrypt(&nonce, ciphertext)
+        .map_err(|e| anyhow!("decrypt failed: {e}"))
+}
+
+/// Whether any blob under `dir` authenticates under `key`. Read-only; used to
+/// prove a migrated key before the legacy key file is given up.
+fn check_blobs(dir: &Path, key: &[u8; 32]) -> BlobCheck {
+    // An unreadable directory proves nothing, so it never passes.
+    let Ok(entries) = fs::read_dir(dir) else {
+        return BlobCheck::Fails;
+    };
+    let cipher = Aes256Gcm::new(&(*key).into());
+    let mut saw_blob = false;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().is_none_or(|ext| ext != "bin") {
+            continue;
+        }
+        saw_blob = true;
+        if let Ok(raw) = fs::read_to_string(&path) {
+            if decrypt_blob(&cipher, &raw).is_ok() {
+                return BlobCheck::Decrypts;
+            }
+        }
+    }
+    if saw_blob {
+        BlobCheck::Fails
+    } else {
+        BlobCheck::NoBlobs
     }
 }
 

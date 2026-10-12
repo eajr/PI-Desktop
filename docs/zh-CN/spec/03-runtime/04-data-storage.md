@@ -54,7 +54,7 @@ host-core 之前被解析为绝对路径。
  │    ├── <sessionId>.jsonl           # live transcript (header + messages)
  │    ├── <sessionId>.revisions.jsonl # regenerate branches, append-only
  │    └── <sessionId>.inflight.json   # streaming reply checkpoint (D299), transient
- ├── secrets/             # encrypted secret blobs + .machine-key (unchanged)
+ ├── secrets/             # encrypted secret blobs + .keychain-account（.machine-key 仅为回退）
  ├── attachments/         # content-addressed blobs (sha256 name), refs from messages
  ├── plugins/             # code + data + registry.json (unchanged, spec 07-11)
  ├── logs/                # NDJSON app/<category>, host/<category>, agent/<category> logs
@@ -977,10 +977,12 @@ CREATE TABLE secrets_meta (
 ```
 
 秘密*值*永远不会进入数据库（D028/D031）。实际交付的后端是 host-core 的文件存储：
-`secrets/` 下的 AES-256-GCM 密文，密钥是 host-core 一次性生成并与密文放在一起的
-机器密钥 `secrets/.machine-key`（仅属主可读写的文件模式）。host-core 对每次写入都记录
-`file_fallback`；`safe_storage` 值为尚未实现的操作系统钥匙串后端保留，host-core 与
-Electron main 目前都没有实现它，因此能读取数据目录的同用户进程也能解密这些秘密。
+`secrets/` 下的 AES-256-GCM 密文（目录 `0700`，密文文件 `0600` 并原子替换）。32 字节主密钥
+保存在操作系统凭据存储（macOS 钥匙串、Windows 凭据管理器、Linux Secret Service）中，
+服务名 `net.aiuo.pi-desktop`，账户由 `secrets/.keychain-account` 指定。无法访问凭据存储时，
+密钥保留在仅属主可读写的 `secrets/.machine-key` 并记录警告；旧版本的 `.machine-key` 会在启动时
+迁移到凭据存储（ADR secret-master-key-os-credential-store）。host-core 仍对每次写入记录
+`file_fallback`，因为该列描述密文位置，未改变；无 schema 变更。
 
 ### 4.13 audit_log
 

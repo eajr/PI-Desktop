@@ -16,6 +16,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 globset = "0.4"
 hex = "0.4"
+keyring = "4.2"
 ignore = "0.4"
 regex = "1"
 ring = "0.17"
