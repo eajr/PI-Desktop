@@ -7,6 +7,8 @@
  * real sidecar never boots — no filesystem, no RPC transport, no host.
  */
 import assert from "node:assert/strict";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { register } from "node:module";
 import test from "node:test";
@@ -14,9 +16,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "..", "..", "test", "helpers", "ts-import-hooks.mjs")));
-const { runSkillImport, runMcpImport } = await import(
+const { runSkillImport, runMcpImport, scanMcpForRenderer, runMcpImportFromScan } = await import(
   "../main/ipc/agent-import-ipc.ts"
 );
+const { McpScanCache } = await import("../main/importers/agent-mcp-scan-cache.ts");
+const { scanExternalMcp } = await import("../main/importers/agent-mcp-scan.ts");
 
 /** Build a host-call stub whose responses are queued per method. */
 function stubHost(responsesByMethod) {
@@ -211,4 +215,127 @@ test("runMcpImport reports an `already exists` upsert as skipped, not failed", a
   assert.equal(result.skipped[0].reason, "exists");
   assert.equal(result.imported.length, 1);
   assert.equal(result.failed.length, 0);
+});
+
+const SECRET_ENV = "sk-env-secret-value-1234";
+const SECRET_HEADER = "Bearer header-secret-value-5678";
+
+/** Write a Cursor global config whose servers carry secret env / header values. */
+async function withSecretCursorHome(fn) {
+  const home = await mkdtemp(join(tmpdir(), "pi-mcp-import-redact-"));
+  try {
+    await mkdir(join(home, ".cursor"), { recursive: true });
+    await writeFile(
+      join(home, ".cursor", "mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          local: { command: "node", args: ["server.js"], env: { API_TOKEN: SECRET_ENV, EMPTY: "" } },
+          remote: { url: "https://mcp.example.test/v1", headers: { Authorization: SECRET_HEADER } },
+        },
+      }),
+    );
+    await fn(home);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+}
+
+const scanIn = (home) => () =>
+  scanExternalMcp({ homeDir: home, platform: "linux", env: { XDG_CONFIG_HOME: join(home, ".config") } });
+
+test("MCP scan result sent to the renderer carries no env / header secret values", async () => {
+  await withSecretCursorHome(async (home) => {
+    const cache = new McpScanCache();
+    const result = await scanMcpForRenderer(cache, scanIn(home));
+    const serialized = JSON.stringify(result);
+    assert.ok(!serialized.includes(SECRET_ENV), "env value must not reach the renderer");
+    assert.ok(!serialized.includes("header-secret-value"), "header value must not reach the renderer");
+    assert.equal(typeof result.scanId, "string");
+    assert.ok(result.scanId.length > 0);
+    const local = result.candidates.find((c) => c.id === "local");
+    const remote = result.candidates.find((c) => c.id === "remote");
+    assert.deepEqual(local.env, [
+      { name: "API_TOKEN", hasValue: true },
+      { name: "EMPTY", hasValue: false },
+    ]);
+    assert.deepEqual(remote.headers, [{ name: "Authorization", hasValue: true }]);
+    assert.equal(cache.size, 1, "full candidates are retained in main");
+  });
+});
+
+test("MCP import resolves selections in main and writes the real secret values", async () => {
+  await withSecretCursorHome(async (home) => {
+    const cache = new McpScanCache();
+    const scan = await scanMcpForRenderer(cache, scanIn(home));
+    const host = stubHost({
+      "mcp.upsert": [{ server: { id: "local" } }, { server: { id: "remote" } }],
+    });
+    const selections = scan.candidates.map(({ source, sourcePath, id }) => ({ source, sourcePath, id }));
+    const result = await runMcpImportFromScan(host.call, cache, {
+      scanId: scan.scanId,
+      level: "global",
+      items: selections,
+    });
+    assert.equal(result.imported.length, 2);
+    assert.equal(result.failed.length, 0);
+    const servers = host.calls.map((call) => call.params.server);
+    const local = servers.find((server) => server.id === "local");
+    const remote = servers.find((server) => server.id === "remote");
+    assert.deepEqual(local.env, { API_TOKEN: SECRET_ENV, EMPTY: "" });
+    assert.deepEqual(local.args, ["server.js"]);
+    assert.deepEqual(remote.headers, { Authorization: SECRET_HEADER });
+    assert.ok(!("warnings" in local), "scan-only warnings are not sent to the host");
+    assert.ok(!JSON.stringify(result).includes(SECRET_ENV), "run result echoes selections only");
+    assert.ok(!JSON.stringify(result).includes("header-secret-value"));
+    assert.equal(cache.size, 0, "the scan handle is consumed by the import");
+  });
+});
+
+test("MCP import ignores renderer-supplied values and rejects stale or unknown scans", async () => {
+  await withSecretCursorHome(async (home) => {
+    let now = 1_000;
+    const cache = new McpScanCache({ ttlMs: 100, now: () => now });
+    const scan = await scanMcpForRenderer(cache, scanIn(home));
+    const host = stubHost({ "mcp.upsert": [{ server: { id: "local" } }] });
+    const local = scan.candidates.find((c) => c.id === "local");
+
+    // Extra fields from the renderer are not trusted; only the selection is.
+    const injected = await runMcpImportFromScan(host.call, cache, {
+      scanId: scan.scanId,
+      items: [{ source: local.source, sourcePath: local.sourcePath, id: local.id, command: "evil", env: { X: "y" } }],
+    });
+    assert.equal(injected.imported.length, 1);
+    assert.equal(host.calls[0].params.server.command, "node");
+    assert.deepEqual(host.calls[0].params.server.env, { API_TOKEN: SECRET_ENV, EMPTY: "" });
+
+    // Single use: replaying the consumed handle imports nothing.
+    const replay = await runMcpImportFromScan(host.call, cache, {
+      scanId: scan.scanId,
+      items: [{ source: local.source, sourcePath: local.sourcePath, id: local.id }],
+    });
+    assert.equal(replay.imported.length, 0);
+    assert.equal(replay.failed.length, 1);
+    assert.match(replay.failed[0].error, /scan again/);
+
+    // Expired: a scan past its TTL is dropped before the import resolves.
+    const fresh = await scanMcpForRenderer(cache, scanIn(home));
+    now += 101;
+    const expired = await runMcpImportFromScan(host.call, cache, {
+      scanId: fresh.scanId,
+      items: [{ source: local.source, sourcePath: local.sourcePath, id: local.id }],
+    });
+    assert.equal(expired.imported.length, 0);
+    assert.equal(expired.failed.length, 1);
+    assert.equal(host.calls.length, 1, "no host write for stale scans");
+  });
+});
+
+test("McpScanCache keeps at most maxEntries scans", () => {
+  let n = 0;
+  const cache = new McpScanCache({ maxEntries: 2, newId: () => `scan-${(n += 1)}` });
+  cache.put([]);
+  cache.put([]);
+  cache.put([]);
+  assert.equal(cache.size, 2);
+  assert.equal(cache.take("scan-1", [{ source: "codex", sourcePath: "/x", id: "a" }]).missing.length, 1);
 });

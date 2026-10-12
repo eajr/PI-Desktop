@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   ExternalMcpCandidate,
-  ExternalMcpImportItem,
+  ExternalMcpImportSelection,
   ExternalMcpScanResult,
   ExternalMcpSourceKind,
 } from "../../../lib/api";
@@ -67,27 +67,20 @@ export function AgentMcpImportPanel({
 
   const runImport = async () => {
     if (!result) return;
-    const items: ExternalMcpImportItem[] = result.candidates
+    // Only identifiers cross back to main; it resolves the full candidate
+    // (including secret env / header values) from the scan it retained.
+    const items: ExternalMcpImportSelection[] = result.candidates
       .filter((candidate) => selected.has(keyOf(candidate)))
       .map((candidate) => ({
         source: candidate.source,
         sourcePath: candidate.sourcePath,
         id: candidate.id,
-        rawKey: candidate.rawKey,
-        label: candidate.label,
-        description: candidate.description,
-        transport: candidate.transport,
-        command: candidate.command,
-        args: candidate.args,
-        env: candidate.env,
-        url: candidate.url,
-        headers: candidate.headers,
-        disabled: candidate.disabled,
       }));
     if (items.length === 0) return;
     setImporting(true);
     try {
       const res = await api.runExternalMcpImport({
+        scanId: result.scanId,
         level,
         ...(level === "project" && projectPath ? { projectPath } : {}),
         items,

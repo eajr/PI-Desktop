@@ -2,6 +2,9 @@ import { projectPlanHistory } from "./plan-history";
 import { guardRemoteInvocation } from "./remote-ipc-safety";
 import { isRemoteSession, safeSessionSummary } from "./remote-session-safety";
 import type {
+  ExternalMcpImportPayload,
+  ExternalMcpImportRunResult as SharedExternalMcpImportRunResult,
+  ExternalMcpScanResult,
   ConfigSyncTestInput,
   ConfigSyncTestResult,
   ScheduledTaskRun,
@@ -241,73 +244,18 @@ export interface ExternalSkillImportRunResult {
   failed: Array<{ item: ExternalSkillImportItem; error: string }>;
 }
 
-export type ExternalMcpSourceKind =
-  | "claude-desktop"
-  | "claude-code"
-  | "cursor-global"
-  | "cursor-project"
-  | "codex"
-  | "opencode"
-  | "chatgpt-desktop";
-
-export interface ExternalMcpCandidate {
-  source: ExternalMcpSourceKind;
-  sourcePath: string;
-  id: string;
-  rawKey: string;
-  label?: string;
-  description?: string;
-  transport: "stdio" | "http";
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  headers?: Record<string, string>;
-  disabled?: boolean;
-  warnings: string[];
-}
-
-export interface ExternalMcpSourceReport {
-  kind: ExternalMcpSourceKind | "error";
-  path: string;
-  exists: boolean;
-  error?: string;
-  count: number;
-}
-
-export interface ExternalMcpScanResult {
-  candidates: ExternalMcpCandidate[];
-  sources: ExternalMcpSourceReport[];
-}
-
-export interface ExternalMcpImportItem {
-  source: ExternalMcpSourceKind;
-  sourcePath: string;
-  id: string;
-  rawKey: string;
-  label?: string;
-  description?: string;
-  transport: "stdio" | "http";
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  headers?: Record<string, string>;
-  disabled?: boolean;
-}
-
-export interface ExternalMcpImportPayload {
-  /** Defaults to global for existing callers. */
-  level?: "global" | "project";
-  projectPath?: string;
-  items: ExternalMcpImportItem[];
-}
-
-export interface ExternalMcpImportRunResult {
-  imported: Array<{ item: ExternalMcpImportItem; server: McpServerRecord }>;
-  skipped: Array<{ item: ExternalMcpImportItem; reason: string }>;
-  failed: Array<{ item: ExternalMcpImportItem; error: string }>;
-}
+// External MCP import DTOs live in `@pi-desktop/shared`. Candidates are
+// redacted in main: `env` / `headers` carry names only, never values.
+export type {
+  ExternalMcpCandidate,
+  ExternalMcpImportPayload,
+  ExternalMcpImportSelection,
+  ExternalMcpRedactedEntry,
+  ExternalMcpScanResult,
+  ExternalMcpSourceKind,
+  ExternalMcpSourceReport,
+} from "@pi-desktop/shared";
+export type ExternalMcpImportRunResult = SharedExternalMcpImportRunResult<McpServerRecord>;
 
 declare global {
   interface Window {

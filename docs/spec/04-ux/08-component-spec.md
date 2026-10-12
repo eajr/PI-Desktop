@@ -3887,7 +3887,9 @@ The scanner covers supported Claude Desktop, Claude Code, Cursor, Codex,
 OpenCode, and ChatGPT Desktop stores. Candidate rows show a label, safe
 metadata, source, and transport. URL metadata is reduced to its host so
 userinfo, paths, and query credentials never render; environment and header
-values are not shown. Imported servers follow the selected Global / Project
+values are not shown and never reach the renderer: the scan returns only their
+names, and the import sends back selections that main resolves against the scan
+it retained. Imported servers follow the selected Global / Project
 scope and project path. A disabled source server remains disabled after the
 host write succeeds.
 
