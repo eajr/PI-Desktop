@@ -44,6 +44,7 @@ import type {
   FsEntry,
   FsImageDataUrlResult,
   FsIndexResult,
+  FsOpenResult,
   FsReadResult,
   HostHealth,
   HostStatusEvent,
@@ -1445,7 +1446,7 @@ export const api = {
     }),
   fsReveal: (path: string, sessionId?: string) => invoke(IPC.invoke.fsReveal, { path, ...(sessionId ? { sessionId } : {}) }),
   fsOpen: (path: string, mimeType?: string, sessionId?: string) =>
-    invoke(IPC.invoke.fsOpen, { path, mimeType, ...(sessionId ? { sessionId } : {}) }),
+    invoke<FsOpenResult>(IPC.invoke.fsOpen, { path, mimeType, ...(sessionId ? { sessionId } : {}) }),
   fsIndex: (sessionId?: string) => invoke<FsIndexResult>(IPC.invoke.fsIndex, { ...(sessionId ? { sessionId } : {}) }),
   /**
    * Complete a file reference from chat text to a real file (D320 follow-up).

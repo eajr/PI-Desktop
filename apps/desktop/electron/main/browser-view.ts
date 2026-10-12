@@ -4,6 +4,8 @@ import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BrowserState } from "@pi-desktop/shared";
 import { isAllowedHttpUrl, parseAllowedExternalUrl } from "./safe-open-external";
+import { openPathOrReveal } from "./safe-open-path";
+import { electronOpenPathDeps } from "./safe-open-path-electron";
 
 /**
  * Work panel embedded preview browser (D100, ADR 0019).
@@ -112,10 +114,16 @@ export class BrowserPane {
   private cancelPending: (() => void) | null = null;
 
   private readonly onOpenUrl?: (url: string) => void;
+  private readonly onLaunchableRevealed?: () => void;
 
-  constructor(onState: (state: BrowserState) => void, onOpenUrl?: (url: string) => void) {
+  constructor(
+    onState: (state: BrowserState) => void,
+    onOpenUrl?: (url: string) => void,
+    onLaunchableRevealed?: () => void,
+  ) {
     this.onState = onState;
     this.onOpenUrl = onOpenUrl;
+    this.onLaunchableRevealed = onLaunchableRevealed;
   }
 
   setWindow(window: BrowserWindow | null): void {
@@ -328,7 +336,7 @@ export class BrowserPane {
     else this.detach();
   }
 
-  openExternal(): void {
+  async openExternal(): Promise<void> {
     const url = this.getWebContents()?.getURL();
     if (!url) return;
     const allowed = parseAllowedExternalUrl(url);
@@ -336,12 +344,20 @@ export class BrowserPane {
       void shell.openExternal(allowed);
       return;
     }
-    if (this.isAllowedFileUrl(url)) {
-      try {
-        void shell.openPath(fileURLToPath(url));
-      } catch {
-        // Invalid file URL — leave the preview in place.
-      }
+    if (!this.isAllowedFileUrl(url)) return;
+    let path: string;
+    try {
+      path = fileURLToPath(url);
+    } catch {
+      // Invalid file URL — leave the preview in place.
+      return;
+    }
+    try {
+      // A launchable file is revealed, never launched (safe-open-path).
+      const result = await openPathOrReveal(path, electronOpenPathDeps);
+      if (result.outcome === "revealed") this.onLaunchableRevealed?.();
+    } catch {
+      // The OS refused the handoff — leave the preview in place, as before.
     }
   }
 

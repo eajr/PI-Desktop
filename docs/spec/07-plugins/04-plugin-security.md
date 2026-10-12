@@ -334,7 +334,9 @@ Plan is an additional host policy boundary for agent tools:
   `fs.reveal` are separate: each accepts only an existing root-relative file
   that already passes the plugin's `fs.read` policy. They are intended for
   explicit file-view actions, not arbitrary URL or absolute-path opening;
-  `fs.reveal` only asks the OS file manager to select the file.
+  `fs.reveal` only asks the OS file manager to select the file. `fs.openDefault`
+  never launches an application, script, installer, shortcut, or POSIX
+  executable: those are revealed instead (`05-security/01-security.md` §2a).
 - Plugins are forbidden from silently downloading and executing binaries (not done at all in MVP)
 
 ### 8.0 Egress allowlist

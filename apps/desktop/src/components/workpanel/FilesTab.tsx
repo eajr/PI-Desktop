@@ -259,7 +259,11 @@ export function FilesTab() {
   const openMp4 = useCallback(async () => {
     if (!selected || remote) return;
     try {
-      await api.fsOpen(selected, selectedMimeType, sessionId);
+      const result = await api.fsOpen(selected, selectedMimeType, sessionId);
+      // A file that could run code is shown in its folder instead of opened.
+      if (result?.outcome === "revealed") {
+        showToast(t("panel.files.launchableRevealed"), { variant: "info" });
+      }
     } catch {
       showToast(t("panel.files.openFailed"), { variant: "error" });
     }

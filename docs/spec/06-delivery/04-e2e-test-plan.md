@@ -9193,6 +9193,31 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
   is Draft (run only in a capable environment when this surface changes)
 
+#### E2E-SECURITY-launchable-file-is-revealed-not-opened
+
+- **Preconditions**: A project contains `run.command` (macOS), `run.bat`
+  (Windows), or `run.desktop` / an extensionless file with the execute bit
+  (Linux), plus `report.pdf`. The bundled File Manager view, the work-panel
+  Files tab, and the browser pane are available.
+- **Steps**:
+  1) From the File Manager view, choose "Open with default app" on the
+     launchable file. 2) Load an allowed `file:` preview of a launchable name
+     in the browser pane and choose "Open externally". 3) Repeat both on
+     `report.pdf`.
+- **Expected**: The launchable file never runs. The OS file manager opens with
+  it selected and the app shows "This file can run programs, so it was shown
+  in its folder instead of opened." The plugin audit entry records
+  `outcome: "revealed"`. `report.pdf` opens in its default application.
+- **Specs linked**: `05-security/01-security.md` §2a,
+  `03-runtime/01-ipc-protocol.md` (`fs/open`), `07-plugins/03-plugin-api.md`,
+  ADR launchable-files-reveal-instead-of-open, ADR 0109
+- **Acceptance**: Security, D (workspace), G (plugins)
+- **Status**: Unit coverage in `apps/desktop/test/safe-open-path.test.mjs`
+  (policy table and source contract), `apps/desktop/test/plugin-fs-scope.test.mjs`
+  (`fs.openDefault` reveals, never opens), and
+  `apps/desktop/test/browser-pane-navigation.test.mjs` (browser pane). The
+  native OS handoff is manual (needs a desktop session per platform).
+
 #### E2E-PLUGIN-file-view-collapse-persists
 
 - **Preconditions**: The bundled File Manager view is open on a project with

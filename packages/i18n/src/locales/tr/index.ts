@@ -1949,6 +1949,7 @@ sklm: {
       binary: "İkili dosya — önizleme yok",
       tooLarge: "Dosya önizlemek için çok büyük",
       openFailed: "Dosya varsayılan uygulamayla açılamadı.",
+      launchableRevealed: "Bu dosya program çalıştırabildiği için açılmadı, klasöründe gösterildi.",
     },
   },
   palette: {

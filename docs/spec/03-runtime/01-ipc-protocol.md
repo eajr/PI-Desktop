@@ -1870,6 +1870,11 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   `attachments/<sha256>` blob declared as `video/mp4`, the host creates a
   `.mp4` symlink inside its private app-data directory before the OS handoff,
   so the extensionless blob has a media association without copying its bytes.
+  Returns `FsOpenResult`. A launchable file (application, script, installer,
+  shortcut, POSIX executable; `05-security/01-security.md` §2a) is never
+  opened: it is revealed in the file manager and the result is
+  `{ ok: true, outcome: "revealed", reason }`; otherwise
+  `{ ok: true, outcome: "opened" }`.
 - `fs/resolveRef({ref, sessionId?})` → `FsChatRefResolveResult`
   (`{ match: FsChatRefMatch | null, reason?: "outside-allowed-roots" }`, the match naming the answering `root`
   (`workspace` / `scratch` / `attachments`), the `relativePath` relative to that

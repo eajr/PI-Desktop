@@ -107,6 +107,7 @@ import {
 } from "./plugin-renderer-extension";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 import { parseAllowedExternalUrl } from "./safe-open-external";
+import { launchableRevealedNotice, openPathOrReveal, type OpenPathOutcome } from "./safe-open-path";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import type { McpControlController, McpControlInvokeInput } from "./mcp-control";
 import {
@@ -5578,8 +5579,17 @@ export class PluginRuntime {
             });
             throw apiError("INVALID_ARGUMENT", "only files can be opened with the default app");
           }
+          // A launchable file (app, script, installer, shortcut, executable)
+          // is revealed instead: opening it would run code (safe-open-path).
+          let result: OpenPathOutcome;
           try {
-            await this.services.openPath(full);
+            result = await openPathOrReveal(full, {
+              openPath: (path) => this.services.openPath(path),
+              revealPath: async (path) => {
+                if (!this.services.revealPath) throw new Error("revealPath service missing");
+                await this.services.revealPath(path);
+              },
+            });
           } catch (error) {
             this.services.audit?.({
               pluginId,
@@ -5591,12 +5601,18 @@ export class PluginRuntime {
             });
             throw apiError("OPEN_FAILED", error instanceof Error ? error.message : String(error));
           }
+          if (result.outcome === "revealed") {
+            this.services.showToast(launchableRevealedNotice(this.services.getLocale?.()), "warn");
+          }
           this.services.audit?.({
             pluginId,
             api: "fs.openDefault",
             ok: true,
             ts: Date.now(),
             path: rel,
+            data: result.outcome === "revealed"
+              ? { outcome: "revealed", reason: result.reason }
+              : { outcome: "opened" },
           });
         },
         reveal: async (pathFromRoot: string) => {

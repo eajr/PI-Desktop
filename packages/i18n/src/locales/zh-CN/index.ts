@@ -1934,6 +1934,7 @@ sklm: {
       binary: "二进制文件，无法预览",
       tooLarge: "文件过大，无法预览",
       openFailed: "无法使用系统默认应用打开文件。",
+      launchableRevealed: "此文件可以运行程序，因此已在所在文件夹中显示，而未直接打开。",
     },
   },
   palette: {

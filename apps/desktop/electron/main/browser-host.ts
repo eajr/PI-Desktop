@@ -435,7 +435,7 @@ export class BrowserHost {
     this.assertBrowserViewVisible();
     const page = sessionId !== undefined && tabId !== undefined
       ? this.pages.get(this.key(sessionId, tabId)) : this.active;
-    if (page?.started) page.pane.openExternal();
+    if (page?.started) void page.pane.openExternal();
   }
 
   private currentPage(): BrowserPage {
