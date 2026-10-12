@@ -293,3 +293,32 @@ test("the renderer turns only a well-formed unknown-key error into a confirmatio
   assert.equal(remoteHostErrorKey({ code: "SSH_HOST_KEY_CHANGED" }), "remote:hostKeyChanged");
   assert.equal(remoteHostErrorKey({ code: "SSH_HOST_KEY_UNKNOWN" }), "remote:hostKeyUntrusted");
 });
+
+test("every production SSH transport consults the app-managed known_hosts", async () => {
+  // A transport built without `knownHostsFile` falls back to the user's own
+  // files only, so a host the user confirmed in the app would be refused.
+  // The RACP device re-pair path once missed it (integration of ADR 0328
+  // with racp-device-token-lifetime).
+  const { readdir } = await import("node:fs/promises");
+  const mainDir = join(here, "../electron/main");
+  const files = (await readdir(mainDir, { recursive: true })).filter((name) => name.endsWith(".ts"));
+  let calls = 0;
+  for (const name of files) {
+    if (name.endsWith("ssh-transport.ts")) continue;
+    const source = await readFile(join(mainDir, name), "utf8");
+    for (const match of source.matchAll(/createSystemSshTransport\(/g)) {
+      let depth = 1;
+      let end = match.index + match[0].length;
+      while (depth > 0 && end < source.length) {
+        const char = source[end++];
+        if (char === "(") depth += 1;
+        else if (char === ")") depth -= 1;
+      }
+      const call = source.slice(match.index, end);
+      if (/^createSystemSshTransport\(\s*target\s*:/.test(call)) continue; // the declaration
+      calls += 1;
+      assert.match(call, /knownHostsFile/, `${name}: ${call.slice(0, 160)}`);
+    }
+  }
+  assert.ok(calls >= 4, `found ${calls} transport constructions`);
+});

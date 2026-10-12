@@ -250,7 +250,8 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
     if (!ssh) throw Object.assign(new Error("re-pairing requires an SSH host"), { errorCode: "CAPABILITY_UNAVAILABLE" });
     return repairDeviceOverSsh({
       ssh, sshSecret: record.sshSecret, url, label: record.label,
-      buildTransport: (target) => createSystemSshTransport(target, { log: (level, message, data) => log(level, message, data) }),
+      buildTransport: (target) =>
+        createSystemSshTransport(target, { knownHostsFile, log: (level, message, data) => log(level, message, data) }),
       exchangePairing: (input) => exchangePairingToken({ ...input, clientInfo: options.clientInfo, requireWorkspace: true, log }),
     });
   });
