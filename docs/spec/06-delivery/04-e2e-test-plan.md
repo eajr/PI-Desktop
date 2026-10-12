@@ -37,6 +37,27 @@
   and Rust `data_relocation` tests cover rollback and path/filesystem boundaries.
 
 
+### E2E-SECRETS-master-key-in-os-credential-store
+
+- **Preconditions:** A data root written by an earlier build (`secrets/.machine-key`
+  plus at least one stored provider key), on macOS, Windows, or Linux with a
+  running Secret Service. Manual only: automated E2E profiles set
+  `PI_DESKTOP_SECRET_KEY_STORE=file` so they never touch a developer's
+  credential store.
+- **Steps:** 1) Start the app; allow the Keychain prompt on macOS if shown.
+  2) Confirm the stored provider still works. 3) Inspect `secrets/`. 4) Restart
+  and repeat step 2. 5) Repeat from a fresh copy with the credential store
+  unavailable (Linux without Secret Service, or the environment override).
+- **Expected:** After step 1 `.machine-key` is gone, `.keychain-account` exists,
+  the credential store holds `net.aiuo.pi-desktop` / `secret-master-key:<uuid>`,
+  `secrets/` is `0700` and blobs are `0600` (Unix). The provider key keeps
+  working across restart. With the store unavailable `.machine-key` stays
+  (`0600`), host logs a key-free warning, and secrets keep working.
+- **Coverage:** Rust `secrets::master_key` tests cover migration, verification
+  failure, read-back mismatch, fallback, locked state, interrupted migration,
+  per-root accounts, relocation and file modes with an in-memory credential
+  store. Real platform stores are verified manually.
+
 ### E2E-LEGACY-DICTATION-idle-model-release
 
 - **Preconditions:** Exercise the retained local Dictation service through its

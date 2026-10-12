@@ -95,8 +95,9 @@ outbox, installed plugin registry and agent capability metadata. It does not boo
 RPC, upgrade schemas, recover turns, or sweep scratch. It changes only known
 path-bearing fields under the old root. External projects, dev/builtin plugins,
 narrative text, commands, source code, secrets, and arbitrary plugin-private formats
-are preserved. Credentials and their machine key migrate as bytes with their
-permissions. SQLite ownership stays exclusively in Rust.
+are preserved. Credentials, the credential-store account marker and any
+fallback machine key migrate as bytes with their permissions; the copied root
+reads the same OS credential-store entry as its source. SQLite ownership stays exclusively in Rust.
 
 Only after validation/relocation succeeds is the flushed bootstrap pointer
 atomically replaced. Errors keep the old profile active and visible in settings;
@@ -135,7 +136,8 @@ to an absolute path before it reaches host-core as a child-process variable.
  │    ├── <sessionId>.jsonl           # live transcript (header + messages)
  │    ├── <sessionId>.revisions.jsonl # regenerate branches, append-only
  │    └── <sessionId>.inflight.json   # streaming reply checkpoint (D299), transient
- ├── secrets/             # encrypted secret blobs + .machine-key (unchanged)
+ ├── secrets/             # encrypted secret blobs + .keychain-account marker
+ │                        # (.machine-key only as fallback; ADR secret-master-key-os-credential-store)
  ├── config-sync/         # encrypted sync base/pending bundles — host-core only
  ├── attachments/         # content-addressed blobs (sha256 name), refs from messages
  ├── plugins/             # code + data + registry.json (unchanged, spec 07-11)
@@ -1262,13 +1264,17 @@ CREATE TABLE secrets_meta (
 ```
 
 Secret *values* never enter the DB (D028/D031). The shipped backend is the
-host-core file store: AES-256-GCM ciphertexts under `secrets/`, keyed by a
-machine key that host-core generates once and keeps beside them as
-`secrets/.machine-key` (owner-only file mode). host-core records
-`file_fallback` for every write; the `safe_storage` value is reserved for an
-OS keychain backend that neither host-core nor Electron main implements today,
-so a same-user process that can read the data directory can also decrypt the
-secrets.
+host-core file store: AES-256-GCM ciphertexts under `secrets/` (owner-only
+`0700` directory, `0600` blobs replaced atomically). The 32-byte master key
+lives in the OS credential store (macOS Keychain, Windows Credential Manager,
+Linux Secret Service) under service `net.aiuo.pi-desktop` and the account named
+by `secrets/.keychain-account`. Where no credential store is reachable, the key
+stays in an owner-only `secrets/.machine-key` and host-core logs a warning;
+earlier builds' `.machine-key` files are migrated into the credential store on
+startup (ADR secret-master-key-os-credential-store). host-core still records
+`file_fallback` for every write because the column describes where the blob
+lives, which did not change; the `safe_storage` value stays reserved. No schema
+change.
 
 ### 4.13 audit_log
 
@@ -1607,9 +1613,9 @@ columns for anything the host filters, joins, sums, or indexes.
 ## 10. Secrets rules (unchanged)
 
 1. The renderer never persists secrets
-2. OS safeStorage remains the target primary backend; the shipped store is the
-   encrypted-file backend (`file_fallback`) with its machine key beside the
-   ciphertexts, and Settings must state that risk
+2. The shipped store is the encrypted-file backend (`file_fallback`); its master
+   key lives in the OS credential store, with an owner-only `.machine-key`
+   beside the ciphertexts only when no credential store is reachable
 3. Secret values never in SQLite; only `secrets_meta` bookkeeping
 4. Exported sessions exclude secrets by default
 

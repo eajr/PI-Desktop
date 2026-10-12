@@ -34,6 +34,17 @@ Node pi sidecar 可能会通过主机 RPC 接收**临时内存中**的秘密，�
 
 MVP 必须实现两条路径的自动选择。
 
+### 已交付的主密钥保管方式
+
+密文仍以 AES-256-GCM 文件保存在 `secrets/` 下，只有 32 字节主密钥移入操作系统凭据存储
+（macOS 钥匙串、Windows 凭据管理器、Linux Secret Service；ADR
+secret-master-key-os-credential-store）。服务名为 `net.aiuo.pi-desktop`，账户
+`secret-master-key:<uuid>` 记录在非机密文件 `secrets/.keychain-account` 中。启动时旧的
+`.machine-key` 会写入凭据存储、回读并用现有密文验证后才删除；任何失败都保留文件。
+无法访问凭据存储或设置 `PI_DESKTOP_SECRET_KEY_STORE=file` 时，使用仅属主可读写的
+`.machine-key` 并记录警告。迁移后凭据存储不可用时，存储处于锁定状态，不会重新生成密钥。
+Unix 上数据目录和 `secrets/` 为 `0700`，文件为 `0600`，密文通过临时文件 + rename 原子替换。
+
 ## 4. 数据模型
 
 ```ts

@@ -31,6 +31,25 @@ If primary backend unavailable:
 
 MVP must implement both paths with automatic selection.
 
+### Shipped master-key custody
+
+The shipped implementation keeps secret blobs as AES-256-GCM files under
+`secrets/` and moves only their 32-byte master key into the OS credential store
+(ADR secret-master-key-os-credential-store):
+
+| Item | Behavior |
+|---|---|
+| Credential store | macOS Keychain, Windows Credential Manager, Linux Secret Service (`keyring` crate) |
+| Service / account | `net.aiuo.pi-desktop` / `secret-master-key:<uuid>`; the account is recorded in the non-secret `secrets/.keychain-account`, so every data root has its own key and a relocated copy keeps it |
+| Legacy migration | an existing `.machine-key` is stored, read back, and proven against an existing blob before the marker is written and the file deleted; any failure keeps the file |
+| Fallback | no reachable store, or `PI_DESKTOP_SECRET_KEY_STORE=file`: owner-only `.machine-key`, warning logged without key material; migrated on the next start with a reachable store |
+| Store unreachable after migration | store opens locked: `has`/`delete` work, `get`/`set` fail, nothing is re-keyed or overwritten |
+| Entry deleted from the store | a new key is created; existing blobs stay undecryptable until re-entered |
+| File modes (Unix) | data root and `secrets/` `0700`; blobs, marker and fallback key `0600`; blobs replaced via temp file + rename |
+
+`secrets_meta.backend` keeps recording `file_fallback`: it describes the blob
+location, which did not change.
+
 ## 4. Data model
 
 ```ts

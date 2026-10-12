@@ -232,8 +232,10 @@ password or machine key. SigV4 uses scoped S3 credentials; bucket identity,
 request timing and object sizes remain visible. Credential export and import
 require opt-in. Raw exported secrets are absent from status, preview, conflict
 labels and logs. Provider/MCP secrets use the Host secret store; OAuth sessions
-and cookies are not portable. The local secret store uses encrypted files plus
-a colocated `.machine-key`, not an OS Keychain backend.
+and cookies are not portable. The local secret store uses encrypted files whose
+master key lives in the OS credential store (ADR
+secret-master-key-os-credential-store); a colocated owner-only `.machine-key`
+remains only as the explicit fallback when no credential store is reachable.
 
 Imported commands, endpoints, scripts, skills, plugins, and automations are
 staged behind a digest-bound local approval. Local paths and approvals are

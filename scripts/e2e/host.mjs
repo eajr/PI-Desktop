@@ -64,7 +64,9 @@ export class Host {
   constructor(binary, dataDir, { env = {}, quiet = false } = {}) {
     this.binary = binary;
     this.dataDir = dataDir;
-    this.env = { ...env };
+    // Temporary E2E profiles keep their secret master key in an owner-only
+    // file so runs never add entries to the developer's OS credential store.
+    this.env = { PI_DESKTOP_SECRET_KEY_STORE: "file", ...env };
     this.quiet = quiet;
     this.child = null;
     this.stdoutReader = null;

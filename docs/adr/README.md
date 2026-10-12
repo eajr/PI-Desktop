@@ -21,6 +21,7 @@ Each ADR includes:
 | ID | Title | Status |
 |---|---|---|
 | electron-fuses-and-packaged-code-paths | [Electron fuses, minimum macOS entitlements, and packaged code paths](electron-fuses-and-packaged-code-paths.md) | Accepted |
+| secret-master-key-os-credential-store | [Keep the secret master key in the OS credential store](secret-master-key-os-credential-store.md) | Accepted |
 | device-local-project-lists-in-config-sync | [Device-local project lists in configuration sync](device-local-project-lists-in-config-sync.md) | Accepted |
 | s3-only-configuration-backup-sync | [S3-only encrypted configuration backup and synchronization](s3-only-configuration-backup-sync.md) | Accepted; supersedes WebDAV decisions in 0300 / 0301 |
 | remote-provider-import | [Explicit provider import into a running remote Host](remote-provider-import.md) | Accepted for the experimental SSH MVP |
