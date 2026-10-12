@@ -1283,6 +1283,8 @@ ASCII slug：frontmatter `name` 能 slugify 时用它，否则 `SKILL.md` 用技
 
 HTTP MCP 服务的基于浏览器的 OAuth 2.1 认证在 Electron 主进程中通过非阻塞 IPC 与事件流处理：
 
+发现流程把令牌绑定到所配置的服务：受保护资源元数据中的 `resource` 必须在规范化后（scheme/host 小写，去掉默认端口和 fragment，忽略末尾斜杠）等于 MCP 服务 URL，或与其同源且为按路径段的前缀，否则在打开浏览器前即失败。元数据缺少 `resource` 时使用服务 URL。授权服务器元数据的 `issuer` 必须等于获取它所用的授权服务器（RFC 8414 §3.3）。发现请求从不跟随重定向。
+
 - `pi-desktop/mcp/oauth/start({ id, level?, projectPath? }) -> { ok: true, loginId }`
   启动 OAuth 元数据发现与 PKCE 授权码流程。立即返回，用户的浏览器交互与回调交换在后台异步执行。
 - `pi-desktop/mcp/oauth/cancel({ loginId?, id? }) -> { ok: boolean }`
@@ -1306,7 +1308,7 @@ type McpOAuthLoginEvent = {
 - `McpServerStatus` 包含：
   - `hasOauth: boolean` — 服务是否在 host-core 加密凭据库存储有 OAuth 凭据（`secret:mcp:<serverId>:oauth`）。
   - `authRequired: boolean` — 连接握手或 `tools/call` 是否收到 HTTP 401 Unauthorized，提示用户需要认证/重新授权。
-- OAuth 令牌（`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`, `redirectUris`）仅持久化在 host-core 的加密 secret 中（`secret:mcp:<serverId>:oauth`），绝不向渲染层暴露。授权服务器端点必须是 HTTPS（仅回环 HTTP 例外）。token 端点错误响应体只记入主进程日志，不进入渲染层事件。
+- OAuth 令牌（`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`, `redirectUris`）仅持久化在 host-core 的加密 secret 中（`secret:mcp:<serverId>:oauth`），绝不向渲染层暴露。授权服务器端点必须是 HTTPS（仅回环 HTTP 例外）。token 端点错误响应体只记入主进程日志，不进入渲染层事件。仅当已存令牌的 `resource` 仍与服务 URL 匹配时，`UserMcpRuntime` 才会附带该令牌；URL 被改为其他资源后令牌不再发送，服务显示需要重新授权。
 
 ## 12c. 子代理 API (D202)
 

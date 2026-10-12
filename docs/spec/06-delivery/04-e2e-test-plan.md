@@ -8041,6 +8041,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   6. Settings UI updates status to `Ready` with discovered tools, shows localized success toast, and displays `OAuth` badge.
   7. When access token expires, `UserMcpRuntime` transparently uses refresh token to obtain a fresh access token without user prompt.
   8. Moving the server via `mcp.transfer` preserves and re-keys the OAuth token secret under the destination ID.
+  9. A server whose protected-resource metadata names a different `resource`, or whose authorization-server metadata names a different `issuer`, fails with an error event before any browser launch or client registration; a stored token is not sent after the server URL is changed to another resource.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, ADR 0283, ADR 0142
 - **Acceptance**: E (tools & permissions), Security
 - **Milestone**: M5

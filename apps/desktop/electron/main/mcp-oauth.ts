@@ -8,7 +8,13 @@ import {
   type McpServerStatus,
 } from "@pi-desktop/shared";
 import { allowInsecureUserEndpointsEnabled } from "./endpoint-policy.ts";
-import { authorizationMetadataUrls, parseBearerChallenge, selectOAuthScope } from "./mcp-oauth-discovery.ts";
+import {
+  authorizationMetadataUrls,
+  issuerMatches,
+  parseBearerChallenge,
+  resourceCoversServerUrl,
+  selectOAuthScope,
+} from "./mcp-oauth-discovery.ts";
 export type StoredMcpOAuthToken = {
   clientId: string;
   clientSecret?: string;
@@ -125,6 +131,13 @@ function sameHostname(left: string, right: string): boolean {
   };
   const target = host(left);
   return target !== "" && target === host(right);
+}
+
+/** Render an untrusted metadata identifier for an error message. */
+function describeIdentifier(value: unknown): string {
+  if (typeof value !== "string") return value === undefined ? "(missing)" : `(${typeof value})`;
+  const trimmed = value.length > 200 ? `${value.slice(0, 200)}…` : value;
+  return JSON.stringify(trimmed);
 }
 
 export function loopbackRedirectUri(port: number): string {
@@ -268,6 +281,19 @@ export class McpOAuthManager {
       }
     }
 
+    // RFC 9728 §3.3: never let the server name another service's resource.
+    // A metadata document without `resource` falls back to the URL the user
+    // configured, which is the audience this login is for anyway.
+    let resource = serverUrl;
+    if (prm && prm.resource !== undefined) {
+      if (!resourceCoversServerUrl(prm.resource, serverUrl)) {
+        throw new Error(
+          `MCP OAuth protected resource metadata names resource ${describeIdentifier(prm.resource)}, which does not match the MCP server URL ${serverUrl}`,
+        );
+      }
+      resource = prm.resource as string;
+    }
+
     const authServersRaw = Array.isArray(prm?.authorization_servers)
       ? (prm.authorization_servers as string[])
       : [];
@@ -291,6 +317,14 @@ export class McpOAuthManager {
       }
     }
 
+    // RFC 8414 §3.3: metadata served for one issuer must claim that issuer,
+    // or an attacker-controlled document could stand in for another AS.
+    if (asMeta && !issuerMatches(asMeta.issuer, authServer)) {
+      throw new Error(
+        `MCP OAuth authorization server metadata issuer ${describeIdentifier(asMeta.issuer)} does not match authorization server ${authServer}`,
+      );
+    }
+
     const authorizationEndpoint =
       typeof asMeta?.authorization_endpoint === "string" ? asMeta.authorization_endpoint : "";
     const tokenEndpoint =
@@ -311,7 +345,7 @@ export class McpOAuthManager {
     const scope = selectOAuthScope(challengeScope, prm?.scopes_supported);
 
     return {
-      resource: typeof prm?.resource === "string" ? prm.resource : serverUrl,
+      resource,
       authorizationServers: authServersRaw.length > 0 ? authServersRaw : [authServer],
       authorizationEndpoint,
       tokenEndpoint,
@@ -774,11 +808,21 @@ export class McpOAuthManager {
   /**
    * Get a valid access token for the given MCP server, automatically refreshing if expired.
    * Serialized per serverId so rotating refresh tokens never race.
+   *
+   * When `serverUrl` is given, a token whose RFC 8707 `resource` does not cover
+   * that URL is withheld: editing a server's URL must not carry the token minted
+   * for the old resource to a new host. The user re-authorizes instead.
    */
-  async getValidAccessToken(serverId: string): Promise<string | null> {
+  async getValidAccessToken(serverId: string, serverUrl?: string): Promise<string | null> {
     return this.serialize(serverId, async () => {
       const token = await this.readStoredToken(serverId);
       if (!token) return null;
+      if (serverUrl !== undefined && token.resource && !resourceCoversServerUrl(token.resource, serverUrl)) {
+        this.deps.log?.("warn", "mcp oauth token resource does not match server url; re-authorization required", {
+          serverId,
+        });
+        return null;
+      }
 
       if (token.expiresAt && Date.now() > token.expiresAt - 60_000 && token.refreshToken) {
         try {

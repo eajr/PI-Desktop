@@ -54,3 +54,50 @@ export function selectOAuthScope(challengeScope: string | undefined, resourceSco
   if (!Array.isArray(resourceScopes)) return undefined;
   return resourceScopes.filter(isScopeToken).join(" ") || undefined;
 }
+
+/**
+ * Canonical resource / issuer identifier for comparison (MCP authorization
+ * spec, RFC 8707 §2): lowercase scheme and host, default port dropped, no
+ * fragment, and no trailing slash on the path. Returns undefined for a value
+ * that is not an absolute http(s) URL.
+ */
+export function canonicalOAuthIdentifier(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return undefined;
+  url.hash = "";
+  const path = url.pathname.replace(/\/+$/, "");
+  return `${url.protocol}//${url.host}${path}${url.search}`;
+}
+
+/**
+ * RFC 9728 §3.3 / §7.3: the `resource` in protected-resource metadata must name
+ * the MCP server the user configured, or a token minted for it could be scoped
+ * to (and replayed against) another service. Accepted when the canonical forms
+ * are equal, or when `resource` is the same origin and a whole-segment path
+ * prefix of the server URL (the MCP SDK's `checkResourceAllowed` rule, so a
+ * server at `/mcp` may advertise its origin as the resource). A `resource`
+ * with a query must match exactly.
+ */
+export function resourceCoversServerUrl(resource: unknown, serverUrl: string): boolean {
+  const claimed = canonicalOAuthIdentifier(resource);
+  const server = canonicalOAuthIdentifier(serverUrl);
+  if (!claimed || !server) return false;
+  if (claimed === server) return true;
+  const claimedUrl = new URL(claimed);
+  const serverObj = new URL(server);
+  if (claimedUrl.origin !== serverObj.origin || claimedUrl.search) return false;
+  const prefix = claimedUrl.pathname.replace(/\/+$/, "");
+  return prefix === "" || serverObj.pathname === prefix || serverObj.pathname.startsWith(`${prefix}/`);
+}
+
+/** RFC 8414 §3.3: the metadata `issuer` must be the issuer the client asked for. */
+export function issuerMatches(issuer: unknown, expectedIssuer: string): boolean {
+  const claimed = canonicalOAuthIdentifier(issuer);
+  return claimed !== undefined && claimed === canonicalOAuthIdentifier(expectedIssuer);
+}

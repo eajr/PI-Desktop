@@ -38,7 +38,7 @@ export type UserMcpClient = Pick<
 export type UserMcpClientConfig = ConstructorParameters<typeof McpServerClient>[0];
 
 export type UserMcpOAuthHandler = {
-  getValidAccessToken: (serverId: string) => Promise<string | null>;
+  getValidAccessToken: (serverId: string, serverUrl?: string) => Promise<string | null>;
   hasOAuth: (serverId: string) => Promise<boolean>;
 };
 
@@ -367,7 +367,7 @@ export class UserMcpRuntime {
     let oauthToken: string | null = null;
     if (record.transport === "http" && this.options.oauth) {
       try {
-        oauthToken = await this.options.oauth.getValidAccessToken(record.id);
+        oauthToken = await this.options.oauth.getValidAccessToken(record.id, record.url);
       } catch {
         oauthToken = null;
       }
