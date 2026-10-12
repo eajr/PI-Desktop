@@ -349,9 +349,15 @@ jobs:
         # same names electron-updater requests on those architectures — so the
         # two lanes cannot overwrite each other's feed when the publish job
         # merges their artifacts.
+        # Builds with `build.publish: null` (updater compiled out, see
+        # apps/desktop/electron/main/update-build-flag.ts) emit no feed.
         if: matrix.platform == 'linux'
         run: |
           set -euo pipefail
+          if [[ "$(node -p "require('./apps/desktop/package.json').build.publish === null")" == "true" ]]; then
+            echo "Update feed disabled (build.publish is null); skipping."
+            exit 0
+          fi
           feed="apps/desktop/release/${{ matrix.feed }}"
           if [[ ! -f "$feed" ]]; then
             echo "::error::Expected the Linux updater feed at $feed"
@@ -385,7 +391,11 @@ jobs:
 
       - name: Disambiguate macOS update metadata
         if: matrix.platform == 'macos'
-        run: mv apps/desktop/release/latest-mac.yml apps/desktop/release/latest-mac-${{ matrix.arch }}.yml
+        # Absent when build.publish is null (updater compiled out).
+        run: |
+          if [[ -f apps/desktop/release/latest-mac.yml ]]; then
+            mv apps/desktop/release/latest-mac.yml apps/desktop/release/latest-mac-${{ matrix.arch }}.yml
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -531,6 +541,11 @@ jobs:
         working-directory: dist
         run: |
           set -euo pipefail
+          # No feeds when build.publish is null (updater compiled out).
+          if ! compgen -G "latest-mac-*.yml" > /dev/null; then
+            echo "No macOS updater feeds; skipping merge."
+            exit 0
+          fi
           ruby <<'RUBY'
           require "yaml"
 

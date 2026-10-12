@@ -127,6 +127,7 @@ export const zhTW = {
     error: "檢查更新失敗：{{message}}",
     dismiss: "忽略",
     devDisabled: "開發版本不支援自動更新。",
+    buildDisabled: "此版本已停用更新。",
     cardDesc: "保持 PI-Desktop 為最新版本，以取得修復與新功能。",
     backgroundLabel: "正在背景下載",
     backgroundHint: "下載完成後會提示重新啟動，期間可以繼續使用。",

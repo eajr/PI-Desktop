@@ -134,6 +134,7 @@ export const tr = {
     error: "Güncellemeler denetlenemedi: {{message}}",
     dismiss: "Kapat",
     devDisabled: "Geliştirme derlemelerinde güncellemeler kapalıdır.",
+    buildDisabled: "Bu derlemede güncellemeler devre dışıdır.",
     cardDesc: "Düzeltmeler ve yeni özellikler için PI-Desktop'u güncel tutun.",
     backgroundLabel: "Arka planda indiriliyor",
     backgroundHint: "İndirme bittiğinde yeniden başlatmanız istenir; bu sırada uygulamayı kullanmaya devam edebilirsiniz.",

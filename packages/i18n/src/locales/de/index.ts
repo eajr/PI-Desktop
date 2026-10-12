@@ -125,6 +125,7 @@ export const de = {
     "error": "Konnte nicht nach Updates suchen: {{message}}",
     "dismiss": "Verwerfen",
     "devDisabled": "Updates sind in Entwicklungs-Builds deaktiviert.",
+    "buildDisabled": "Updates sind in diesem Build deaktiviert.",
     "cardDesc": "Halten Sie PI-Desktop aktuell, um Korrekturen und neue Funktionen zu erhalten.",
     "backgroundLabel": "Wird im Hintergrund heruntergeladen",
     "backgroundHint": "Nach Abschluss des Downloads werden Sie zum Neustart aufgefordert; Sie können die App währenddessen weiter verwenden.",

@@ -124,6 +124,7 @@ export const ptBR = {
     error: "Não foi possível verificar atualizações: {{message}}",
     dismiss: "Dispensar",
     devDisabled: "As atualizações estão desativadas em compilações de desenvolvimento.",
+    buildDisabled: "As atualizações estão desativadas nesta compilação.",
     cardDesc: "Mantenha o PI-Desktop atualizado para receber correções e novos recursos.",
     backgroundLabel: "Baixando em segundo plano",
     backgroundHint: "Quando o download terminar, você será avisado para reiniciar; nesse íntervalo pode continuar usando o aplicativo.",

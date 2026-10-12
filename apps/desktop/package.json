@@ -85,13 +85,7 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "vastsa",
-        "repo": "PI-Desktop"
-      }
-    ],
+    "publish": null,
     "extraMetadata": {
       "piDistribution": "installed"
     },

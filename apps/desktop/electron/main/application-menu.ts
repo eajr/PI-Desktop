@@ -11,6 +11,7 @@ import {
   type ShortcutPlatform,
 } from "@pi-desktop/shared";
 import { catalogs, resolveLocale } from "@pi-desktop/i18n";
+import { APP_UPDATES_ENABLED } from "./update-build-flag";
 
 export type ApplicationMenuOptions = {
   platform?: NodeJS.Platform;
@@ -18,6 +19,8 @@ export type ApplicationMenuOptions = {
   keybindings?: KeybindingOverrides;
   /** Adds the devtools item to the View menu (settings.developerMode). */
   developerMode?: boolean;
+  /** Offers "Check for Updates"; defaults to the build's updater switch. */
+  updatesEnabled?: boolean;
   dispatch: (command: AppMenuCommand) => void;
   /** Executes configurable native menu actions when their shortcut is unbound. */
   dispatchNative: (action: NativeMenuAction) => void;
@@ -55,6 +58,7 @@ export function buildApplicationMenuTemplate({
   locale = "en",
   keybindings,
   developerMode = false,
+  updatesEnabled = APP_UPDATES_ENABLED,
   dispatch,
   dispatchNative,
 }: ApplicationMenuOptions): MenuItemConstructorOptions[] {
@@ -77,7 +81,9 @@ export function buildApplicationMenuTemplate({
       label: APP_NAME,
       submenu: [
         { role: "about" },
-        appCommand(labels.menu.checkForUpdates, "checkForUpdates", dispatch),
+        ...(updatesEnabled
+          ? [appCommand(labels.menu.checkForUpdates, "checkForUpdates", dispatch)]
+          : []),
         { type: "separator" },
         appCommand(
           labels.menu.settings,
@@ -221,7 +227,7 @@ export function buildApplicationMenuTemplate({
       submenu: [
         appCommand(labels.menu.appHelp, "openHelp", dispatch),
         appCommand(labels.menu.openLogs, "openLogs", dispatch),
-        ...(!isMac
+        ...(!isMac && updatesEnabled
           ? ([
               { type: "separator" },
               appCommand(

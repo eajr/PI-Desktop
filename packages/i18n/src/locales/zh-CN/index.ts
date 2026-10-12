@@ -127,6 +127,7 @@ export const zhCN = {
     error: "检查更新失败：{{message}}",
     dismiss: "忽略",
     devDisabled: "开发版本不支持自动更新。",
+    buildDisabled: "此版本已停用更新。",
     cardDesc: "保持 PI-Desktop 为最新版本，以获取修复与新功能。",
     backgroundLabel: "正在后台下载",
     backgroundHint: "下载完成后会提示重启，期间可以继续使用。",

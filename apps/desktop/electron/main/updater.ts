@@ -12,6 +12,8 @@
  *    NSIS installer must not replace a no-install run.
  *  - Linux deb (no $APPIMAGE in env) → notify + link.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
+ *  - Builds with `APP_UPDATES_ENABLED = false` (./update-build-flag) →
+ *    disabled: no listeners, no timers, no feed contact on any platform.
  *
  * The installer download cache lives in the user cache directory rather than
  * beside the installation; `PI_DESKTOP_UPDATE_CACHE_DIR` relocates it, and
@@ -26,6 +28,8 @@ import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import {
   formatChangelogNotes,
   IPC,
+  type UpdateDisabledReason,
+  type UpdateMode,
   type UpdatePreference,
   type UpdateState,
 } from "@pi-desktop/shared";
@@ -51,6 +55,7 @@ import {
   type WindowsDistribution,
 } from "./update-policy";
 import { ManualUpdateReminderTracker } from "./manual-update-reminder";
+import { APP_UPDATES_ENABLED } from "./update-build-flag";
 
 export { resolveUpdateMode } from "./update-policy";
 export type { WindowsDistribution } from "./update-policy";
@@ -111,6 +116,8 @@ export type UpdaterOptions = {
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
   distribution?: WindowsDistribution;
+  /** Overrides the compile-time `APP_UPDATES_ENABLED` switch in tests. */
+  updatesEnabled?: boolean;
 };
 
 export class AppUpdaterController {
@@ -119,6 +126,8 @@ export class AppUpdaterController {
   private readonly getLocale: () => string | null | undefined;
   private readonly platform: NodeJS.Platform;
   private readonly isPackaged: boolean;
+  /** False when the updater is compiled out of this build. */
+  private readonly updatesEnabled: boolean;
   private readonly env: NodeJS.ProcessEnv;
   private readonly distribution?: WindowsDistribution;
   private readonly defaultPreference: UpdatePreference;
@@ -197,6 +206,7 @@ export class AppUpdaterController {
         : undefined);
     this.platform = platform;
     this.isPackaged = isPackaged;
+    this.updatesEnabled = options.updatesEnabled ?? APP_UPDATES_ENABLED;
     this.env = process.env;
     this.distribution = distribution;
     this.defaultPreference = resolveDefaultUpdatePreference(
@@ -214,13 +224,7 @@ export class AppUpdaterController {
     this.readUpdateSettings = options.readUpdateSettings;
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
     this.persistDismissedVersion = options.persistDismissedVersion;
-    const mode = resolveUpdateModePolicy(
-      platform,
-      isPackaged,
-      this.env,
-      distribution,
-      this.preference,
-    );
+    const mode = this.resolveMode(this.preference);
     const defaultCacheBasePath = defaultUpdateCacheBasePath({
       platform,
       env: process.env,
@@ -255,6 +259,7 @@ export class AppUpdaterController {
     });
     this.state = {
       mode,
+      disabledReason: this.disabledReasonFor(mode),
       preference: this.preference,
       defaultPreference: this.defaultPreference,
       automaticSupported: this.automaticSupported,
@@ -264,6 +269,23 @@ export class AppUpdaterController {
       releasesUrl: RELEASES_URL,
     };
     if (mode !== "disabled") this.attachListeners();
+  }
+
+  /** Delivery mode for `preference`; always "disabled" when compiled out. */
+  private resolveMode(preference: UpdatePreference): UpdateMode {
+    if (!this.updatesEnabled) return "disabled";
+    return resolveUpdateModePolicy(
+      this.platform,
+      this.isPackaged,
+      this.env,
+      this.distribution,
+      preference,
+    );
+  }
+
+  private disabledReasonFor(mode: UpdateMode): UpdateDisabledReason | undefined {
+    if (mode !== "disabled") return undefined;
+    return this.updatesEnabled ? "development" : "build";
   }
 
   /** Localized product notes for a discovered version, if catalogued. */
@@ -342,13 +364,13 @@ export class AppUpdaterController {
       preference,
       this.automaticSupported,
     );
-    const mode = resolveUpdateModePolicy(
-      this.platform,
-      this.isPackaged,
-      this.env,
-      this.distribution,
-      effectivePreference,
-    );
+    if (!this.updatesEnabled) {
+      // Compiled out: nothing is wired to a feed, so only remember the stored
+      // preference and never arm autoDownload / install-on-quit.
+      this.preference = effectivePreference;
+      return;
+    }
+    const mode = this.resolveMode(effectivePreference);
     const preferenceChanged =
       effectivePreference !== this.preference || mode !== previousMode;
     this.preference = effectivePreference;
@@ -597,7 +619,11 @@ export class AppUpdaterController {
   async check(options: { manual?: boolean } = {}): Promise<UpdateState> {
     await this.ensureSettingsLoaded();
     if (this.state.mode === "disabled") {
-      throw new Error("updates are disabled in development builds");
+      throw new Error(
+        this.state.disabledReason === "build"
+          ? "updates are disabled in this build"
+          : "updates are disabled in development builds",
+      );
     }
     if (
       this.state.status === "checking" ||
@@ -686,6 +712,9 @@ export class AppUpdaterController {
   }
 
   async openReleases(): Promise<void> {
+    if (!this.updatesEnabled) {
+      throw new Error("updates are disabled in this build");
+    }
     const url = parseAllowedExternalUrl(RELEASES_URL);
     if (!url) throw new Error("DISALLOWED_EXTERNAL_URL");
     await shell.openExternal(url);

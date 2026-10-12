@@ -134,6 +134,7 @@ export const ko = {
     error: "업데이트를 확인할 수 없습니다: {{message}}",
     dismiss: "닫기",
     devDisabled: "개발 빌드에서는 업데이트가 비활성화됩니다.",
+    buildDisabled: "이 빌드에서는 업데이트가 비활성화되어 있습니다.",
     cardDesc: "PI-Desktop를 최신 상태로 유지하여 수정 사항과 새로운 기능을 받아보세요.",
     backgroundLabel: "백그라운드에서 다운로드 중",
     backgroundHint: "다운로드가 완료되면 재시작을 안내합니다. 그동안에도 앱을 계속 사용할 수 있습니다.",
