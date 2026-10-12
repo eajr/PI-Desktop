@@ -3,7 +3,6 @@ import { sessionAllows } from "../lib/remote-session-safety";
 import { useSlotSessionId } from "../plugins/renderer-slots/use-slots";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { isActiveInProject } from "@pi-desktop/shared";
 import { useAppStore } from "../stores/app-store";
 import { api } from "../lib/api";
 import { isHtmlFilePath, toWorkspaceRel, type ChatPreviewTarget } from "../lib/chat-links";
@@ -20,9 +19,9 @@ import {
  * A file never opens its own path directly. It goes through the same
  * completion the message body uses (`useOpenChatFileRef`, ADR 0262), so the
  * surface that named the file stops deciding where it shows: a tool row's
- * summary and a tool result's file/match list land in the bundled file view on
- * a project file exactly like a chat chip, and fall back the same way when the
- * view, the file, or the reference is not there. One opener for the whole
+ * summary and a tool result's file/match list land where a chat chip would,
+ * and fall back the same way when the view, the file, or the reference is not
+ * there. One opener for the whole
  * transcript is also what keeps a shorthand honest — a click opens the file
  * that matched, or reports that nothing did. HTTP(S) URLs follow the Link
  * open destination setting.
@@ -86,62 +85,20 @@ export type ResolvedChatFileRef = {
 };
 
 /**
- * Load the bundled file view on demand when a user explicitly opens a project
- * file. Its enabled state can be off or its runtime can have failed even though
- * the app still ships the plugin; project scope and the recorded ui.view grant
- * remain authoritative.
+ * Whether a file view registered as `pi.file-manager` is launchable right now.
+ *
+ * This build ships no file-manager plugin (ADR
+ * fork-removes-plugin-marketplace), so the view is present only when the user
+ * installed and enabled one themselves. Nothing is enabled or reloaded on the
+ * user's behalf: an absent view quietly leaves the host file tab.
  */
-const fileManagerViewLoads = new Map<string, Promise<boolean>>();
-
-async function ensureFileManagerView(workspacePath: string | null): Promise<boolean> {
-  const key = workspacePath ?? "";
-  const pending = fileManagerViewLoads.get(key);
-  if (pending) return pending;
-
-  const load = (async () => {
-    try {
-      const views = await api.listPluginViews();
-      useAppStore.setState({ pluginViews: views });
-      if (hasPluginView(views, FILE_MANAGER_PLUGIN_TAB)) return true;
-
-      const { plugins } = await api.listPlugins();
-      const fileManager = plugins.find(
-        (plugin) => plugin.id === FILE_MANAGER_PLUGIN_TAB.pluginId,
-      );
-      if (
-        !fileManager?.bundled ||
-        !fileManager.permissions.includes("ui.view") ||
-        useAppStore.getState().workspace?.path !== workspacePath ||
-        !isActiveInProject(
-          { ...fileManager, enabled: true },
-          workspacePath,
-        )
-      ) {
-        return false;
-      }
-
-      if (!fileManager.enabled) {
-        await api.enablePlugin(fileManager.id);
-      } else {
-        // The host can finish booting before the bundled plugin runtime has
-        // restored its view. Reloading here joins that gap and retries a failed
-        // startup without changing the user's scope or permission grants.
-        const result = await api.reloadPlugin(fileManager.id);
-        if (result.review) return false;
-      }
-
-      const refreshedViews = await api.listPluginViews();
-      useAppStore.setState({ pluginViews: refreshedViews });
-      return hasPluginView(refreshedViews, FILE_MANAGER_PLUGIN_TAB);
-    } catch {
-      return false;
-    }
-  })();
-  fileManagerViewLoads.set(key, load);
+async function fileManagerViewAvailable(): Promise<boolean> {
   try {
-    return await load;
-  } finally {
-    if (fileManagerViewLoads.get(key) === load) fileManagerViewLoads.delete(key);
+    const views = await api.listPluginViews();
+    useAppStore.setState({ pluginViews: views });
+    return hasPluginView(views, FILE_MANAGER_PLUGIN_TAB);
+  } catch {
+    return false;
   }
 }
 
@@ -214,7 +171,8 @@ function useResolveChatFileRef() {
  *
  * A workspace `.html` page in the primary folder stays with the side browser
  * (ADR 0163): it is a page to run, not a file to read. A direct click on a
- * plain project file starts or retries the bundled file view; a positioned
+ * plain project file uses a user-installed `pi.file-manager` view when one is
+ * launchable and the host file tab otherwise; a positioned
  * `path:line` reference uses the host file tab, which can scroll to the line.
  * The plugin view accepts opaque path locations and has no line-navigation
  * contract, so positioned references keep their path unchanged and use the
@@ -222,7 +180,6 @@ function useResolveChatFileRef() {
  * the host file tab.
  */
 export function useOpenChatFileRef() {
-  const { t } = useTranslation();
   const paneSessionId = useSlotSessionId();
   const resolveRef = useResolveChatFileRef();
   const workspacePath = useAppStore((s) => s.workspace?.path ?? null);
@@ -230,7 +187,6 @@ export function useOpenChatFileRef() {
   const openFile = useAppStore((s) => s.openFileInWorkPanel);
   const openUrl = useAppStore((s) => s.openUrlInWorkPanel);
   const openTab = useAppStore((s) => s.openWorkPanelTab);
-  const showToast = useAppStore((s) => s.showToast);
 
   return useCallback(
     (
@@ -264,7 +220,7 @@ export function useOpenChatFileRef() {
           return;
         }
         if (!current.workspace?.remote && resolved.inProject && !hasPosition) {
-          if (await ensureFileManagerView(workspacePath)) {
+          if (await fileManagerViewAvailable()) {
             const latest = useAppStore.getState();
             if (
               latest.workspace?.path !== workspacePath ||
@@ -282,7 +238,6 @@ export function useOpenChatFileRef() {
           ) {
             return;
           }
-          showToast(t("chat.fileManagerUnavailable"), { variant: "error" });
         }
         openFile(resolved.path, mimeType, { line, column });
       })();
@@ -293,8 +248,6 @@ export function useOpenChatFileRef() {
       openUrl,
       resolveRef,
       sessionId,
-      showToast,
-      t,
       workspacePath,
     ],
   );

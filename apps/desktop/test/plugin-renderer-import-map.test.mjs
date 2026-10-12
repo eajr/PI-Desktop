@@ -78,11 +78,12 @@ test("the map is installed once per document", (t) => {
   assert.equal(scripts.length, 1);
 });
 
-test("the page lets the shims and plugin modules load", () => {
+test("the page lets the shims load", () => {
   // A script-src without blob: blocks every plugin module at load (seen live
-  // as PLUGIN_SLOT_LOAD_FAILED after a CSP security error).
+  // as PLUGIN_SLOT_LOAD_FAILED after a CSP security error). `plugin-renderer:`
+  // itself is out of script-src while renderer extensions are disabled in this
+  // build (app-csp.test.mjs); re-enabling them must add it back.
   const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
   const scriptSrc = html.match(/script-src([^;]*);/)?.[1] ?? "";
   assert.match(scriptSrc, /\bblob:/);
-  assert.match(scriptSrc, /\bplugin-renderer:/);
 });

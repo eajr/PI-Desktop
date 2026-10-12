@@ -1521,6 +1521,23 @@ application-local `<data>/agent-capabilities/mcp.json` state file.
 - `mcp.setEnabled({ id, enabled, level, projectPath? })`
 - `mcp.setScope` remains a compatibility-shaped call; the Settings page uses
   the explicit capability level and local state instead
+- `mcp.approve({ id, projectPath, configHash })` → `{ server }` approves and
+  switches on one project server (D659). `configHash` must equal the record's
+  current hash or the call fails with `MCP_INVALID`. Desktop IPC:
+  `pi-desktop/mcp/approve`.
+
+Project records additionally carry `configHash` (SHA-256 of transport,
+command, args, env, url, headers) and `approval`
+(`approved` | `pending` | `changed`). A project record is `enabled` only when
+its switch is on and its approval matches `configHash`; a project server with
+no stored state is `pending`, not enabled. `mcp.setEnabled({ enabled: true })`
+on an unapproved project record fails with `MCP_INVALID`. `mcp.upsert`
+approves a new project server it writes (unless saved disabled) and keeps an
+approved one approved; editing a pending one leaves it pending. A transfer into
+a project approves the arriving server only if it was running at its source.
+Global records carry neither field and keep their default-on meaning.
+Approvals live in the `approvals` map of `<data>/agent-capabilities/mcp.json`
+and are excluded from configuration-sync payloads.
 
 A project-level request without `projectPath` is invalid. `mcp.active` removes
 project records from the global set by id or case-insensitive label before it
@@ -1553,16 +1570,24 @@ desktop is listed as a placeholder because it has no public configuration path
 yet.
 
 - `pi-desktop/mcp/importScan` — `{ projectPath? }` →
-  `{ candidates: ExternalMcpCandidate[], sources: ExternalMcpSourceReport[] }`.
+  `{ scanId, candidates: ExternalMcpCandidate[], sources: ExternalMcpSourceReport[] }`.
   Missing files, ENOENT and parse errors surface on `sources[].error`; one bad
   source never fails the scan. Per-source de-duplication keeps the cross-source
-  copies so the user can pick which install to import.
-- `pi-desktop/mcp/importRun` — `{ items: ExternalMcpImportItem[] }` →
-  `{ imported, skipped, failed }`. Main calls `mcp.upsert` once per item,
-  omitting `disabled` from the server payload and following up with
+  copies so the user can pick which install to import. Candidate `env` and
+  `headers` are redacted to `Array<{ name, hasValue }>`: secret values never
+  cross IPC. Main keeps the full candidates in memory under the opaque
+  `scanId` (bounded count, 10-minute lifetime) until an import consumes them.
+- `pi-desktop/mcp/importRun` — `{ scanId, level?, projectPath?, items:
+  Array<{ source, sourcePath, id }> }` → `{ imported, skipped, failed }`.
+  Main resolves each selection against the retained scan, ignores any other
+  renderer-supplied field, and consumes the handle; selections for an unknown,
+  expired or already-consumed scan land in `failed` and the user rescans. Main
+  calls `mcp.upsert` once per resolved candidate with its real `env` /
+  `headers`, omitting `disabled` from the server payload and following up with
   `mcp.setEnabled({ enabled: false })` when the source marked the server
   disabled. One failure never blocks the rest; conflicts land in `skipped`
-  and every other error lands in `failed`.
+  and every other error lands in `failed`. Result rows echo only the
+  selection. The DTOs live in `@pi-desktop/shared` (`external-mcp-import.ts`).
 
 ```ts
 type McpServerStatus = {
@@ -1603,8 +1628,26 @@ one-liner.
 - `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
 - `skills.remove({ id, level?, projectPath? })`
 - `skills.setEnabled({ id, enabled, level, projectPath? })`
+- `skills.approve({ id, projectPath, contentHash })` → `{ skill }` approves and
+  switches on one project skill (D661). `contentHash` must equal the record's
+  current hash or the call fails with `SKILL_INVALID`. Desktop IPC:
+  `pi-desktop/skill/approve`.
 - `skills.disabledBuiltins()` → `{ disabled: string[] }`
 - `skills.setBuiltinEnabled({ id, enabled })` → `{ id, enabled }`
+
+Project skill records additionally carry `contentHash` (SHA-256 of the raw
+skill document) and `approval` (`approved` | `pending` | `changed`). A project
+skill is `enabled`, and so listed by `skills.active`, only when its switch is on
+and its approval matches `contentHash`; a project skill with no stored state is
+`pending`. `skills.setEnabled({ enabled: true })` on an unapproved project skill
+fails with `SKILL_INVALID`, and `skills.read` fails with `SKILL_INVALID` if a
+project document changed between the scan and the read. `skills.create` and
+`skills.import` approve the project skill they write (unless saved disabled);
+`skills.update` keeps an approved skill approved and leaves a pending one
+pending; a transfer into a project approves the arriving skill only if it was
+active at its source. Global records carry neither field. Approvals live in the
+`approvals` map of `<data>/agent-capabilities/skills.json` and are excluded
+from configuration-sync payloads.
 
 Built-in skill activation is global and defaults to enabled. Host stores only
 disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately
@@ -1703,6 +1746,14 @@ The authorization request uses the initial 401 Bearer challenge's `scope`, other
 all valid protected-resource `scopes_supported` entries, otherwise omits `scope`.
 Authorization-server scope catalogs do not add or select requested permissions.
 
+Discovery binds every token to the configured server. The protected-resource
+`resource` must match the MCP server URL after canonicalization (lowercase
+scheme/host, default port and fragment dropped, trailing slash ignored), or be
+the same origin and a whole-segment path prefix of it; anything else fails the
+login before the browser opens. Metadata without `resource` uses the server URL.
+Authorization-server metadata must carry an `issuer` equal to the authorization
+server it was fetched for (RFC 8414 §3.3). Discovery never follows redirects.
+
 - `pi-desktop/mcp/oauth/start({ id, level?, projectPath? }) -> { ok: true, loginId }`
   Initiates OAuth metadata discovery and PKCE authorization code flow. Returns immediately; user browser navigation and callback exchange proceed asynchronously in the background.
 - `pi-desktop/mcp/oauth/cancel({ loginId?, id? }) -> { ok: boolean }`
@@ -1726,7 +1777,7 @@ type McpOAuthLoginEvent = {
 - `McpServerStatus` includes:
   - `hasOauth: boolean` — whether the server has an encrypted OAuth secret stored in host-core (`secret:mcp:<serverId>:oauth`).
   - `authRequired: boolean` — flags that a connection attempt or `tools/call` returned HTTP 401 Unauthorized and user re-authentication is required.
-- OAuth tokens (`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`, `redirectUris`) are persisted exclusively in host-core encrypted secrets under `secret:mcp:<serverId>:oauth` and never exposed to the renderer. Authorization-server endpoints must be HTTPS (loopback HTTP is the only exception). Token-endpoint error bodies stay in main-process logs and are not copied into renderer events.
+- OAuth tokens (`accessToken`, `refreshToken`, `expiresAt`, `resource`, `clientId`, `redirectUris`) are persisted exclusively in host-core encrypted secrets under `secret:mcp:<serverId>:oauth` and never exposed to the renderer. Authorization-server endpoints must be HTTPS (loopback HTTP is the only exception). Token-endpoint error bodies stay in main-process logs and are not copied into renderer events. `UserMcpRuntime` attaches a stored token only when its `resource` still matches the server URL; after the URL is edited to another resource the token is withheld and the server reports `authRequired` until the user re-authorizes.
 
 ## 12c. Subagent API (D202)
 
@@ -1870,6 +1921,11 @@ Renderer IPC kept for the Plan-safe preview facade and URL fallback:
   `attachments/<sha256>` blob declared as `video/mp4`, the host creates a
   `.mp4` symlink inside its private app-data directory before the OS handoff,
   so the extensionless blob has a media association without copying its bytes.
+  Returns `FsOpenResult`. A launchable file (application, script, installer,
+  shortcut, POSIX executable; `05-security/01-security.md` §2a) is never
+  opened: it is revealed in the file manager and the result is
+  `{ ok: true, outcome: "revealed", reason }`; otherwise
+  `{ ok: true, outcome: "opened" }`.
 - `fs/resolveRef({ref, sessionId?})` → `FsChatRefResolveResult`
   (`{ match: FsChatRefMatch | null, reason?: "outside-allowed-roots" }`, the match naming the answering `root`
   (`workspace` / `scratch` / `attachments`), the `relativePath` relative to that

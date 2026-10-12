@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -9,7 +9,6 @@ const [
   releaseWorkflowSource,
   desktopPackageSource,
   linuxPackageWorkflowSource,
-  mirrorToCnbWorkflowSource,
   agentRuntimePackageSource,
   i18nPackageSource,
   pluginSdkPackageSource,
@@ -21,7 +20,6 @@ const [
   read("../../../.github/workflows/release.yml"),
   read("../package.json"),
   read("../../../.github/workflows/linux-package.yml"),
-  read("../../../.github/workflows/mirror-to-cnb.yml"),
   read("../../../packages/agent-runtime/package.json"),
   read("../../../packages/i18n/package.json"),
   read("../../../packages/plugin-sdk/package.json"),
@@ -114,7 +112,7 @@ test("release builds are gated on the CI checks and least-privilege permissions"
 test("release artifacts bypass redundant Actions compression", () => {
   assert.match(
     releaseWorkflowSource,
-    /uses: actions\/upload-artifact@v7[\s\S]*?compression-level: 0/,
+    /uses: actions\/upload-artifact@[0-9a-f]{40} # v7\.[\s\S]*?compression-level: 0/,
   );
 });
 
@@ -143,7 +141,7 @@ test("manual Linux package validation covers the RPM desktop identity", () => {
   assert.match(linuxPackageWorkflowSource, /StartupWMClass=pi-desktop/);
   assert.match(
     linuxPackageWorkflowSource,
-    /uses: actions\/upload-artifact@v7[\s\S]*path: apps\/desktop\/release\/\*\.rpm/,
+    /uses: actions\/upload-artifact@[0-9a-f]{40} # v7\.[\s\S]*path: apps\/desktop\/release\/\*\.rpm/,
   );
 });
 
@@ -450,38 +448,54 @@ test("macOS signing instrumentation stays out of the Windows and Linux lanes", (
   assert.doesNotMatch(unsignedBlock, instrumentation);
 });
 
-test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", () => {
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /release:\s+types:\s+\[published, edited\]/,
+test("workflows pin every action to a full commit SHA", async () => {
+  const workflowsDir = new URL("../../../.github/workflows/", import.meta.url);
+  const files = (await readdir(workflowsDir)).filter((name) =>
+    /\.ya?ml$/.test(name),
   );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /workflow_dispatch:\s+inputs:\s+tag:/,
+  assert.ok(files.length > 0, "no workflow files found");
+  for (const file of files) {
+    const source = await readFile(new URL(file, workflowsDir), "utf8");
+    for (const match of source.matchAll(/^\s*(?:-\s+)?uses:\s*(\S+)(.*)$/gm)) {
+      const [, ref, rest] = match;
+      if (ref.startsWith("./")) continue;
+      assert.match(
+        ref,
+        /^[\w.-]+\/[\w./-]+@[0-9a-f]{40}$/,
+        `${file}: ${ref} must be pinned to a full commit SHA`,
+      );
+      assert.match(
+        rest,
+        /^ # \S+/,
+        `${file}: ${ref} needs a trailing "# <version>" comment`,
+      );
+    }
+  }
+});
+
+test("workflows default GITHUB_TOKEN to read-only contents", async () => {
+  const workflowsDir = new URL("../../../.github/workflows/", import.meta.url);
+  const files = (await readdir(workflowsDir)).filter((name) =>
+    /\.ya?ml$/.test(name),
   );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /if: github\.repository == 'vastsa\/PI-Desktop'/,
+  for (const file of files) {
+    const source = await readFile(new URL(file, workflowsDir), "utf8");
+    assert.match(
+      source,
+      /^permissions:\n  contents: read$/m,
+      `${file} must declare top-level read-only permissions`,
+    );
+  }
+});
+
+test("Dependabot keeps pinned workflow actions current", async () => {
+  const dependabot = await read("../../../.github/dependabot.yml");
+  assert.match(dependabot, /package-ecosystem: github-actions\n\s+directory: \//);
+});
+
+test("releases are not mirrored to third-party hosts", async () => {
+  await assert.rejects(
+    access(new URL("../../../.github/workflows/mirror-to-cnb.yml", import.meta.url)),
   );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /CNB_MIRROR_TOKEN: \$\{\{\s*secrets\.CNB_MIRROR_TOKEN\s*\}\}/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /Missing repository secret CNB_MIRROR_TOKEN/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /https:\/\/api\.cnb\.cool\/aixk\/Pi-Desktop\/-\/build\/start/,
-  );
-  assert.match(mirrorToCnbWorkflowSource, /event: "api_trigger_mirror"/);
-  assert.match(mirrorToCnbWorkflowSource, /env: \{ MIRROR_TAGS: \$tag \}/);
-  assert.match(mirrorToCnbWorkflowSource, /jq -n --arg tag "\$MIRROR_TAG"/);
-  assert.match(mirrorToCnbWorkflowSource, /curl --fail-with-body/);
-  assert.doesNotMatch(
-    mirrorToCnbWorkflowSource,
-    /-d ".*github\.event\.release\.tag_name/,
-    "JSON payload must not interpolate the release tag through YAML string escaping",
-  );
+  assert.doesNotMatch(releaseWorkflowSource, /cnb\.cool/);
 });

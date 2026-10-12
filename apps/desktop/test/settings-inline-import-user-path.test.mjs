@@ -103,7 +103,7 @@ window.piDesktop = {
         };
         break;
       case IPC.invoke.mcpImportScan:
-        data = { candidates: imported ? [] : [candidate], sources: [] };
+        data = { scanId: "fixture-scan", candidates: imported ? [] : [candidate], sources: [] };
         break;
       case IPC.invoke.mcpImportRun:
         imported = true;
@@ -412,20 +412,16 @@ app.whenReady().then(async () => {
     assert.deepEqual(result.scanCalls[0].input, {
       projectPath: "/tmp/pi-settings-inline-import-project",
     });
+    // The renderer only names the selection; main resolves the full
+    // candidate (and its secret env / header values) from the scan handle.
     assert.deepEqual(result.runCall.input, {
+      scanId: "fixture-scan",
       level: "project",
       projectPath: "/tmp/pi-settings-inline-import-project",
       items: [{
         source: "claude-code",
         sourcePath: "/tmp/pi-settings-inline-import-project/.mcp.json",
         id: "fixture-project-server",
-        rawKey: "fixture-project-server",
-        label: "Workspace Fixture MCP",
-        description: "Local fixture server",
-        transport: "stdio",
-        command: "node",
-        args: ["server.js"],
-        disabled: true,
       }],
     });
     assert.equal(result.visibleToast, "Import done: 1 imported, 0 skipped, 0 failed");

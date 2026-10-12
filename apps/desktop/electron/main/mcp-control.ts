@@ -182,7 +182,7 @@ const spec = (
  * IPC operations exposed through the local control plane.
  *
  * First-version surface is the project/session/Agent/workspace flow plus
- * reviewed reads. Secret writes, native pickers, plugin/marketplace install,
+ * reviewed reads. Secret writes, native pickers, plugin install,
  * window/OS control, and provider/OAuth credential mutations stay out.
  * A future IPC channel is not automatically exposed until reviewed here.
  */
@@ -254,8 +254,6 @@ const CONTROL_OPERATION_SPECS: OperationSpec[] = [
   spec("subagentList", "subagent/list", "List user-owned Subagents.", "read", ["query"]),
   spec("subagentCatalog", "subagent/catalog", "Read the effective Subagent catalog.", "read", ["query"]),
   spec("subagentRead", "subagent/read", "Read a user-owned Subagent.", "read", ["input"]),
-  spec("marketSearch", "market/search", "Search the plugin marketplace.", "read", ["query"]),
-  spec("marketGetDetail", "market/getDetail", "Read marketplace plugin details.", "read", ["input"]),
   spec("commandPaletteSearch", "commandPalette/search", "Search command-palette commands.", "read", ["query"]),
   // Trusted extensions (spec 16 §10.2): reads and session-scoped command runs
   // are exposed; enablement, paths, and removal stay local (blocked below).

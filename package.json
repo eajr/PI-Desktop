@@ -64,7 +64,6 @@
     "test:e2e:subagents": "node scripts/e2e-subagents.mjs",
     "test:e2e:subagent-parent-error": "node scripts/e2e-subagent-parent-error.mjs",
     "test:e2e:subagent-models": "node scripts/e2e-subagent-models.mjs",
-    "check:marketplace": "node scripts/check-marketplace-catalog.mjs",
     "check:pi-dependencies": "node scripts/check-pi-dependencies.mjs",
     "check:pi-patches": "node scripts/check-pi-patches.mjs",
     "check:release-docs": "node scripts/check-release-docs.mjs",

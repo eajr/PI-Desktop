@@ -12,6 +12,7 @@ export * from "./inline-attachments.js";
 export * from "./session-link.js";
 export * from "./fuzzy.js";
 export * from "./mcp-import.js";
+export * from "./external-mcp-import.js";
 export * from "./mcp-catalog.js";
 export * from "./mcp-catalog-builtin.js";
 export {
@@ -61,6 +62,7 @@ export * from "./font-size.js";
 export * from "./chat-content-width.js";
 export * from "./racp.js";
 export * from "./trusted-extensions.js";
+export * from "./renderer-extensions.js";
 export * from "./provider-retry.js";
 export * from "./message-stream.js";
 export * from "./session-collaboration.js";

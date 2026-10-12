@@ -160,10 +160,34 @@ function parseContext(value: unknown): ClassifierContext | undefined {
   return context;
 }
 
-/** Agent-only, deferred call to pi-ai's TypeSafe System One classifier. */
-export function createJevClassifierTool(apiKey: string): AgentTool {
+export const JEV_CLASSIFY_TOOL_NAME = "JevClassify";
+
+/** Outcome of the host permission gate for one JevClassify call. */
+export type JevAuthorization =
+  | { ok: true }
+  | { ok: false; errorCode: string; denied: boolean };
+
+/**
+ * Ask the host to authorize sending `context` to TypeSafe. Resolves only after
+ * the host decided (an `ask`-mode card waits for the user). Nothing leaves the
+ * machine unless this resolves `{ ok: true }`.
+ */
+export type JevAuthorize = (input: {
+  toolCallId: string;
+  context: ClassifierContext;
+  signal?: AbortSignal;
+}) => Promise<JevAuthorization>;
+
+/**
+ * Agent-only, deferred call to pi-ai's TypeSafe System One classifier. Every
+ * call passes the host-core permission gate before any network request.
+ */
+export function createJevClassifierTool(
+  apiKey: string,
+  authorize: JevAuthorize,
+): AgentTool {
   return {
-    name: "JevClassify",
+    name: JEV_CLASSIFY_TOOL_NAME,
     label: "Jev classify",
     description:
       "Classify JSON state with TypeSafe Jev and return structured choice, score, or boolean answers. The state and questions are sent directly to TypeSafe; include only information the user has approved for that service.",
@@ -182,7 +206,7 @@ export function createJevClassifierTool(apiKey: string): AgentTool {
       { additionalProperties: false },
     ),
     executionMode: "sequential",
-    execute: async (_toolCallId, rawParams, signal) => {
+    execute: async (toolCallId, rawParams, signal) => {
       const context = parseContext(rawParams);
       if (!context) {
         return {
@@ -193,6 +217,50 @@ export function createJevClassifierTool(apiKey: string): AgentTool {
             },
           ],
           details: { errorCode: "JEV_INVALID_ARGUMENT" },
+          isError: true,
+        };
+      }
+      let authorization: JevAuthorization;
+      try {
+        authorization = await authorize({ toolCallId, context, signal });
+      } catch (error) {
+        const message = (error instanceof Error ? error.message : String(error))
+          .replaceAll(apiKey, "[redacted]")
+          .slice(0, 1_000);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `JevClassify could not be authorized; nothing was sent to TypeSafe: ${message}`,
+            },
+          ],
+          details: { errorCode: "JEV_AUTHORIZATION_FAILED" },
+          isError: true,
+        };
+      }
+      if (!authorization.ok || signal?.aborted) {
+        const aborted = signal?.aborted === true ||
+          (!authorization.ok && authorization.errorCode === "TOOL_ABORTED");
+        const denied = !aborted && !authorization.ok && authorization.denied;
+        return {
+          content: [
+            {
+              type: "text",
+              text: aborted
+                ? "JevClassify was cancelled before anything was sent to TypeSafe."
+                : denied
+                  ? "JevClassify was denied; nothing was sent to TypeSafe."
+                  : "JevClassify was not authorized; nothing was sent to TypeSafe.",
+            },
+          ],
+          details: {
+            errorCode: aborted
+              ? "JEV_ABORTED"
+              : authorization.ok
+                ? "JEV_AUTHORIZATION_FAILED"
+                : authorization.errorCode,
+            ...(denied ? { denied: true } : {}),
+          },
           isError: true,
         };
       }

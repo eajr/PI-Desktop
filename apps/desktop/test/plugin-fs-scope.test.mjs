@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fork } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -492,6 +493,50 @@ test("default-app opening reuses the readable file scope", async (t) => {
     "PERMISSION_DENIED",
     /outside manifest\.fs\.read\.scope/,
   );
+});
+
+test("default-app opening reveals a launchable file instead of running it", async (t) => {
+  const ws = makeWorkspace({
+    "docs/run.command": "#!/bin/sh\necho owned\n",
+    "docs/report.pdf.exe": "MZ",
+    "docs/payload": "#!/bin/sh\necho owned\n",
+  });
+  if (process.platform !== "win32") chmodSync(join(ws, "docs/payload"), 0o755);
+  const { runtime, opened, revealed, audits } = await harness(t, {
+    id: "fs.open-default.launchable",
+    permissions: ["fs.read"],
+    fs: { read: { scope: ["docs/**"] } },
+    workspace: ws,
+  });
+  runtime.drainToasts();
+
+  const launchable = ["docs/run.command", "docs/report.pdf.exe"];
+  if (process.platform !== "win32") launchable.push("docs/payload");
+  for (const path of launchable) {
+    assert.deepEqual(
+      await runtime.invokePanelBridge("fs.open-default.launchable", "fs.openDefault", { path }),
+      { ok: true },
+    );
+  }
+  assert.deepEqual(opened, [], "a launchable file never reaches the OS opener");
+  assert.deepEqual(
+    revealed,
+    launchable.map((path) => realpathSync(join(ws, path))),
+  );
+  assert.equal(
+    audits.filter(
+      (entry) => entry.api === "fs.openDefault" && entry.ok === true && entry.data?.outcome === "revealed",
+    ).length,
+    launchable.length,
+  );
+  const toasts = runtime.drainToasts();
+  assert.equal(toasts.length, launchable.length);
+  assert.match(toasts[0], /run programs/);
+
+  await runtime.invokePanelBridge("fs.open-default.launchable", "fs.openDefault", {
+    path: "docs/a.md",
+  });
+  assert.deepEqual(opened, [realpathSync(join(ws, "docs/a.md"))]);
 });
 
 test("file reveal reuses the readable file scope", async (t) => {

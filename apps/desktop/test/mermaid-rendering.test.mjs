@@ -75,6 +75,8 @@ test("mermaid output keeps strict configuration and a second SVG sanitizer", () 
   assert.match(mermaidSource, /USE_PROFILES: \{ svg: true, svgFilters: true \}/);
   assert.match(mermaidSource, /"foreignObject"/);
   assert.match(mermaidSource, /FORBID_ATTR: \["href", "target", "xlink:href"\]/);
+  // CSS inside the SVG may not reference anything off-document (ADR 0327).
+  assert.match(mermaidSource, /const purifier = DOMPurify\(window\);\s+installSvgCssGuards\(purifier\);\s+const sanitized = purifier\.sanitize\(svg,/);
 });
 
 test("diagram chrome is bounded, theme-aware, and reduced-motion safe", () => {

@@ -129,6 +129,16 @@ export type PublicHttpsClient = {
     kind: "json" | "text",
     origin?: PublicHttpsEndpointOrigin,
   ) => Promise<unknown>;
+  /**
+   * One attempt at `url` under the same per-hop policy as `request`, returning
+   * the final non-redirect response unread so the caller can bound its body.
+   * `maxRedirects` may only tighten the client's own limit; `signal` aborts
+   * every hop and the body read.
+   */
+  open: (
+    url: string,
+    options?: { maxRedirects?: number; signal?: AbortSignal },
+  ) => Promise<Response>;
 };
 
 /**
@@ -317,20 +327,22 @@ export function createPublicHttpsClient(options: {
     await inspectPublicUrl(url, origin);
   }
 
-  async function requestOnce(
+  async function follow(
     url: string,
-    kind: "json" | "text",
     origin: PublicHttpsEndpointOrigin,
-  ): Promise<unknown> {
+    maxHops: number,
+    signal?: AbortSignal,
+  ): Promise<Response> {
     let current = url;
-    for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+    for (let hop = 0; hop <= maxHops; hop += 1) {
       // Only the first hop is the address the user chose. Every redirect is a
       // destination this app learned from someone else, so it is judged by the
       // third-party policy without exception.
       const target = await inspectPublicUrl(current, hop === 0 ? origin : "third-party", true);
+      const hopSignal = AbortSignal.timeout(timeoutMs);
       const init = {
         redirect: "manual",
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: signal ? AbortSignal.any([signal, hopSignal]) : hopSignal,
       } as const;
       const response =
         target.address && options.pinnedFetchImpl
@@ -338,14 +350,32 @@ export function createPublicHttpsClient(options: {
           : await options.fetchImpl(current, init);
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get("location");
+        await response.body?.cancel().catch(() => undefined);
         if (!location) throw new Error("redirect without a location header");
         current = new URL(location, current).toString();
         continue;
       }
-      if (!response.ok) throw new Error(`responded ${response.status}`);
-      return kind === "json" ? ((await response.json()) as unknown) : await response.text();
+      return response;
     }
     throw new PublicNetworkPolicyError("too many redirects", { reason: "redirect-limit" });
+  }
+
+  async function requestOnce(
+    url: string,
+    kind: "json" | "text",
+    origin: PublicHttpsEndpointOrigin,
+  ): Promise<unknown> {
+    const response = await follow(url, origin, MAX_HOPS);
+    if (!response.ok) throw new Error(`responded ${response.status}`);
+    return kind === "json" ? ((await response.json()) as unknown) : await response.text();
+  }
+
+  async function open(
+    url: string,
+    openOptions: { maxRedirects?: number; signal?: AbortSignal } = {},
+  ): Promise<Response> {
+    const maxHops = Math.max(0, Math.min(MAX_HOPS, openOptions.maxRedirects ?? MAX_HOPS));
+    return follow(url, "third-party", maxHops, openOptions.signal);
   }
 
   async function request(
@@ -372,5 +402,5 @@ export function createPublicHttpsClient(options: {
     throw lastError;
   }
 
-  return { assertPublicUrl, request };
+  return { assertPublicUrl, request, open };
 }

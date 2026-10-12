@@ -1,3 +1,5 @@
+import { installSvgCssGuards } from "./svg-css-guard.ts";
+
 export const MAX_MERMAID_SOURCE_LENGTH = 20_000;
 export const MAX_MERMAID_EDGES = 500;
 
@@ -87,7 +89,10 @@ export async function renderMermaidSvg({
     });
 
     const { svg } = await mermaid.render(id, source);
-    const sanitized = DOMPurify.sanitize(svg, {
+    // A dedicated instance, so the CSS guards never touch another sanitizer.
+    const purifier = DOMPurify(window);
+    installSvgCssGuards(purifier);
+    const sanitized = purifier.sanitize(svg, {
       USE_PROFILES: { svg: true, svgFilters: true },
       FORBID_TAGS: [
         "a",

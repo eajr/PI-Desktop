@@ -1111,7 +1111,14 @@ export class NativePiSessionService {
       lease.assertUnchanged();
       const manager = SessionManager.open(record.path);
       this.guardManagerWrites(manager, lease, (_message, entryId) => runtime?.rememberMessage(entryId));
-      const settingsManager = SettingsManager.create(record.cwd, this.agentDir, { projectTrusted: true });
+      // Project resources (`.pi/` settings and extensions, `.agents/skills`)
+      // load only for a cwd the user trusted in Pi itself. The check above
+      // refuses untrusted projects that have such resources *now*; passing the
+      // stored decision here, rather than `true`, keeps a resource that appears
+      // between that check and loading from running unreviewed.
+      const settingsManager = SettingsManager.create(record.cwd, this.agentDir, {
+        projectTrusted: trustStore.get(record.cwd) === true,
+      });
       const resourceLoader = new DefaultResourceLoader({ cwd: record.cwd, agentDir: this.agentDir, settingsManager });
       await resourceLoader.reload();
       const created = await createAgentSession({

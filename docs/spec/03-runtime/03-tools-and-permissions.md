@@ -86,6 +86,23 @@ timeout, and returns only structured answers and reported usage. Plan and Goal
 never receive the tool. The settings disclosure warns users not to pass secrets
 or personal information.
 
+Every `JevClassify` call is authorized by host-core before anything is sent.
+After validating its input, the sidecar calls `tools.execute` with
+`toolName: "JevClassify"` and the validated `state`/`questions`; host-core
+answers only `{ authorized: true }` (it never contacts TypeSafe) and the sidecar
+makes the request only after that allow result. The tool is `high` risk, the
+same class as `GenerateImages`, so it follows the normal permission modes:
+`ask` and `accept-edits` show an approval card, `allow-session` suppresses
+further cards for the session, and `auto` auto-allows it, as it already does for
+the other third-party request tool. The card's reason names the destination
+(`Sends data to a third-party service (api.typesafe.ai)`) and its preview is
+built by host-core, not taken from the caller: `destination`,
+`payloadBytes` (size of the serialized `state` + `questions`), and the
+`state`/`questions` themselves under the usual string-leaf preview truncation.
+Deny, cancellation (`tools.abort` cancels a pending card), or a gate error
+returns a tool error and no network request is made. Plan/Goal stay denied by
+the contract-mode hard deny. See ADR `jev-classify-permission-gate`.
+
 An explicit composer MCP selection carries exact server IDs to the runtime.
 The current host-supplied catalog associates each MCP tool with its server ID;
 selection activates all mode-allowed tools for that server before the request,
@@ -119,9 +136,9 @@ selected label remains the answer value. Stopping the turn resolves outstanding
 questions as skipped.
 
 `JevClassify` is an external provider operation rather than a workspace
-execution tool. It validates its structured request, observes cancellation,
-uses a bounded provider timeout, and returns typed classifier results; it has
-no filesystem path or host-core workspace permission surface.
+execution tool. It validates its structured request, passes the host-core
+permission gate (§2), observes cancellation, uses a bounded provider timeout,
+and returns typed classifier results; it has no filesystem path surface.
 
 ## 4. Path Rules
 
@@ -437,7 +454,7 @@ Initial denylist (extensible):
 |---|---|---|
 | low | Read/Glob/Grep inside the session roots | Auto-allow |
 | medium | low-risk network/metadata | Confirm or allow by policy |
-| high | Write/Edit/Bash | Confirm by default |
+| high | Write/Edit/Bash, third-party requests (`GenerateImages`, `JevClassify`) | Confirm by default |
 
 Tools from user-configured MCP servers (`mcp_<serverId>_<tool>`) are classified
 `medium`, the same as a plugin tool without a valid declared risk. A risk level

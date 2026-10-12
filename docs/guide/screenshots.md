@@ -103,12 +103,10 @@ Choosing a settings hit navigates to the tab and flashes the row.
 
 ## Plugins
 
-Installed plugins, the marketplace, and the package workflow live on the plugins
+Installed plugins and the local package workflow live on the plugins
 destination.
 
 ![Installed plugins](../public/screenshots/app/en/plugins-live.webp)
-
-![The plugin marketplace](../public/screenshots/app/en/plugins-market.webp)
 
 ![The plugins page menu](../public/screenshots/app/en/plugins-menu.webp)
 

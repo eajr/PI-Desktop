@@ -2,6 +2,9 @@ import { projectPlanHistory } from "./plan-history";
 import { guardRemoteInvocation } from "./remote-ipc-safety";
 import { isRemoteSession, safeSessionSummary } from "./remote-session-safety";
 import type {
+  ExternalMcpImportPayload,
+  ExternalMcpImportRunResult as SharedExternalMcpImportRunResult,
+  ExternalMcpScanResult,
   ConfigSyncTestInput,
   ConfigSyncTestResult,
   ScheduledTaskRun,
@@ -44,8 +47,11 @@ import type {
   FsEntry,
   FsImageDataUrlResult,
   FsIndexResult,
+  FsOpenResult,
   FsReadResult,
   HostHealth,
+  RemoteMediaFetchRequest,
+  RemoteMediaFetchResult,
   HostStatusEvent,
   MarketSource,
   McpCatalogEntry,
@@ -68,10 +74,6 @@ import type {
   PluginViewMeta,
   PluginScenicThemesDestinationMeta,
   PluginTheme,
-  MarketPluginSummary,
-  MarketPluginDetail,
-  PluginInstallResult,
-  PluginInstallProgress,
   ProjectRecord,
   ProjectGroupRecord,
   ProjectMemory,
@@ -241,73 +243,18 @@ export interface ExternalSkillImportRunResult {
   failed: Array<{ item: ExternalSkillImportItem; error: string }>;
 }
 
-export type ExternalMcpSourceKind =
-  | "claude-desktop"
-  | "claude-code"
-  | "cursor-global"
-  | "cursor-project"
-  | "codex"
-  | "opencode"
-  | "chatgpt-desktop";
-
-export interface ExternalMcpCandidate {
-  source: ExternalMcpSourceKind;
-  sourcePath: string;
-  id: string;
-  rawKey: string;
-  label?: string;
-  description?: string;
-  transport: "stdio" | "http";
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  headers?: Record<string, string>;
-  disabled?: boolean;
-  warnings: string[];
-}
-
-export interface ExternalMcpSourceReport {
-  kind: ExternalMcpSourceKind | "error";
-  path: string;
-  exists: boolean;
-  error?: string;
-  count: number;
-}
-
-export interface ExternalMcpScanResult {
-  candidates: ExternalMcpCandidate[];
-  sources: ExternalMcpSourceReport[];
-}
-
-export interface ExternalMcpImportItem {
-  source: ExternalMcpSourceKind;
-  sourcePath: string;
-  id: string;
-  rawKey: string;
-  label?: string;
-  description?: string;
-  transport: "stdio" | "http";
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  headers?: Record<string, string>;
-  disabled?: boolean;
-}
-
-export interface ExternalMcpImportPayload {
-  /** Defaults to global for existing callers. */
-  level?: "global" | "project";
-  projectPath?: string;
-  items: ExternalMcpImportItem[];
-}
-
-export interface ExternalMcpImportRunResult {
-  imported: Array<{ item: ExternalMcpImportItem; server: McpServerRecord }>;
-  skipped: Array<{ item: ExternalMcpImportItem; reason: string }>;
-  failed: Array<{ item: ExternalMcpImportItem; error: string }>;
-}
+// External MCP import DTOs live in `@pi-desktop/shared`. Candidates are
+// redacted in main: `env` / `headers` carry names only, never values.
+export type {
+  ExternalMcpCandidate,
+  ExternalMcpImportPayload,
+  ExternalMcpImportSelection,
+  ExternalMcpRedactedEntry,
+  ExternalMcpScanResult,
+  ExternalMcpSourceKind,
+  ExternalMcpSourceReport,
+} from "@pi-desktop/shared";
+export type ExternalMcpImportRunResult = SharedExternalMcpImportRunResult<McpServerRecord>;
 
 declare global {
   interface Window {
@@ -1067,8 +1014,6 @@ export const api = {
   enablePlugin: (id: string) => invoke(IPC.invoke.pluginEnable, id),
   disablePlugin: (id: string) => invoke(IPC.invoke.pluginDisable, id),
   uninstallPlugin: (id: string) => invoke(IPC.invoke.pluginUninstall, id),
-  setPluginAutoUpdate: (id: string, enabled: boolean) =>
-    invoke(IPC.invoke.pluginSetAutoUpdate, { id, enabled }),
   getPluginSettings: (id: string) =>
     invoke<{ settings: PluginSettingDefinition[] }>(IPC.invoke.pluginSettingsGet, id),
   runPluginComposerTransform: (input: {
@@ -1107,6 +1052,16 @@ export const api = {
     enabled: boolean,
     query?: Partial<AgentCapabilityQuery>,
   ) => invoke(IPC.invoke.mcpSetEnabled, { id, enabled, ...query }),
+  /**
+   * Approve a project server's exact reviewed content. `configHash` is the hash
+   * of the record the user was shown; a file changed since is refused.
+   */
+  approveMcpServer: (id: string, projectPath: string, configHash: string) =>
+    invoke<{ server: McpServerRecord | null }>(IPC.invoke.mcpApprove, {
+      id,
+      projectPath,
+      configHash,
+    }),
   setMcpServerScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.mcpSetScope, { id, scope }),
   /**
@@ -1233,6 +1188,16 @@ export const api = {
     enabled: boolean,
     query?: Partial<AgentCapabilityQuery>,
   ) => invoke(IPC.invoke.skillSetEnabled, { id, enabled, ...query }),
+  /**
+   * Approve a project skill's exact reviewed document. `contentHash` is the
+   * hash of the document the user was shown; a file changed since is refused.
+   */
+  approveUserSkill: (id: string, projectPath: string, contentHash: string) =>
+    invoke<{ skill: UserSkillRecord | null }>(IPC.invoke.skillApprove, {
+      id,
+      projectPath,
+      contentHash,
+    }),
   setUserSkillScope: (id: string, scope: ActivationScope) =>
     invoke(IPC.invoke.skillSetScope, { id, scope }),
   /**
@@ -1334,44 +1299,6 @@ export const api = {
       visible,
       sessionId,
     }),
-  marketRefresh: (force = true) =>
-    invoke<{
-      providerId: string;
-      name?: string;
-      homepage?: string;
-      updatedAt?: string;
-      pluginCount: number;
-      sourceUrl: string;
-    }>(IPC.invoke.marketRefresh, { force }),
-  marketSearch: (query = "", category = "") =>
-    invoke<{
-      plugins: MarketPluginSummary[];
-      providerId: string;
-      sourceUrl: string;
-    }>(IPC.invoke.marketSearch, { query, category }),
-  marketGetDetail: (id: string) =>
-    invoke<{ plugin: MarketPluginDetail }>(IPC.invoke.marketGetDetail, id),
-  marketInstall: (input: {
-    id: string;
-    version?: string;
-    enable?: boolean;
-    autoUpdate?: boolean;
-    grantedPermissions?: string[];
-  }) =>
-    invoke<{ result: PluginInstallResult }>(IPC.invoke.marketInstall, input),
-  marketCheckUpdates: (refreshRemote = true) =>
-    invoke<{ updates: unknown[]; plugins: PluginSummary[] }>(
-      IPC.invoke.marketCheckUpdates,
-      { refreshRemote },
-    ),
-  marketApplyUpdates: (onlyAuto = true) =>
-    invoke<{ results: PluginInstallResult[]; plugins: PluginSummary[] }>(
-      IPC.invoke.marketApplyUpdates,
-      { onlyAuto },
-    ),
-  /** Ask the running install to stop. Only a download can be interrupted. */
-  marketCancelInstall: (id: string) =>
-    invoke<{ cancelled: boolean; id: string }>(IPC.invoke.marketCancelInstall, { id }),
   /** Import a pi CLI extension file or directory as a development plugin (spec 16 §3). */
   importPiExtension: () =>
     invoke<
@@ -1443,9 +1370,12 @@ export const api = {
       ...(mimeType ? { mimeType } : {}),
       ...(sessionId ? { sessionId } : {}),
     }),
+  /** One reader-clicked remote media URL, fetched by Main (ADR 0327). */
+  mediaFetchRemote: (request: RemoteMediaFetchRequest) =>
+    invoke<RemoteMediaFetchResult>(IPC.invoke.mediaFetchRemote, request),
   fsReveal: (path: string, sessionId?: string) => invoke(IPC.invoke.fsReveal, { path, ...(sessionId ? { sessionId } : {}) }),
   fsOpen: (path: string, mimeType?: string, sessionId?: string) =>
-    invoke(IPC.invoke.fsOpen, { path, mimeType, ...(sessionId ? { sessionId } : {}) }),
+    invoke<FsOpenResult>(IPC.invoke.fsOpen, { path, mimeType, ...(sessionId ? { sessionId } : {}) }),
   fsIndex: (sessionId?: string) => invoke<FsIndexResult>(IPC.invoke.fsIndex, { ...(sessionId ? { sessionId } : {}) }),
   /**
    * Complete a file reference from chat text to a real file (D320 follow-up).
@@ -1721,13 +1651,6 @@ export const api = {
       listener(payload as UpdateState),
     );
   },
-  onPluginInstallProgress: (listener: (event: PluginInstallProgress) => void) => {
-    if (!window.piDesktop?.on) return () => undefined;
-    return window.piDesktop.on(IPC.event.pluginInstallProgress, (payload) =>
-      listener(payload as PluginInstallProgress),
-    );
-  },
-
   onPluginChanged: (
     listener: (event: { reason?: string; pluginId?: string }) => void,
   ) => {

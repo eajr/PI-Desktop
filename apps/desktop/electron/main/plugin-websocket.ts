@@ -6,7 +6,9 @@
  * makes the three things this file enforces possible at all:
  *
  * - Egress stays on the existing allowlist. `connect` is refused for any host
- *   outside `manifest.net.domains`, exactly like `pi.net.fetch`.
+ *   outside `manifest.net.domains`, exactly like `pi.net.fetch`, and the
+ *   caller's lookup hook (`plugin-net-guard.ts`) decides which resolved
+ *   address the socket may dial.
  * - Every socket is bounded: a per-plugin count, a maximum frame size in both
  *   directions, and a send queue that refuses rather than growing without
  *   limit, so a plugin that stops reading cannot pin memory in the host.
@@ -16,6 +18,7 @@
  * The socket factory is injected, so tests drive the whole surface with a fake
  * transport and CI never needs a real server.
  */
+import type { LookupFunction } from "node:net";
 import { WebSocket } from "ws";
 
 /** Four sockets is already several more than a voice session needs. */
@@ -31,6 +34,7 @@ export type PluginSocketErrorCode =
   | "LIMIT_EXCEEDED"
   | "NOT_FOUND"
   | "CONNECT_FAILED"
+  | "PERMISSION_DENIED"
   | "TIMEOUT";
 
 /** Thrown for every refusal; `code` is what the plugin sees as `error`. */
@@ -68,7 +72,13 @@ export type PluginSocket = {
 };
 
 export type PluginSocketFactory = (
-  init: { url: string; headers?: Record<string, string>; protocols?: string[] },
+  init: {
+    url: string;
+    headers?: Record<string, string>;
+    protocols?: string[];
+    /** Replaces the client's DNS lookup; the socket dials only what it answers. */
+    lookup?: LookupFunction;
+  },
   handlers: PluginSocketHandlers,
 ) => PluginSocket;
 
@@ -122,6 +132,11 @@ export class PluginWebSocketRegistry {
     headers?: Record<string, string>;
     protocols?: string[];
     timeoutMs?: number;
+    /**
+     * The caller's resolved-address guard (`createPluginNetLookup`). The
+     * socket connects only to an address this lookup answered with.
+     */
+    lookup?: LookupFunction;
   }): Promise<{ socketId: string }> {
     const { pluginId, url } = request;
     let parsed: URL;
@@ -170,7 +185,7 @@ export class PluginWebSocketRegistry {
     };
 
     const socket = (this.deps.createSocket ?? this.defaultFactory)(
-      { url, headers: request.headers, protocols },
+      { url, headers: request.headers, protocols, lookup: request.lookup },
       {
         onOpen: ({ protocol }) => {
           if (meta.state !== "connecting") return;
@@ -206,7 +221,13 @@ export class PluginWebSocketRegistry {
         },
         onError: ({ code, message }) => {
           if (meta.state === "connecting") {
-            decide(new PluginSocketError("CONNECT_FAILED", message));
+            // A refused address stays a refusal, not a generic network failure.
+            decide(
+              new PluginSocketError(
+                code === "PERMISSION_DENIED" ? "PERMISSION_DENIED" : "CONNECT_FAILED",
+                message,
+              ),
+            );
           }
           this.deps.onEvent(pluginId, { type: "error", socketId, code, message });
         },
@@ -328,6 +349,7 @@ export class PluginWebSocketRegistry {
       headers: init.headers,
       handshakeTimeout: this.connectTimeoutMs,
       maxPayload: this.maxFrameBytes,
+      ...(init.lookup ? { lookup: init.lookup } : {}),
     });
     socket.on("open", () => handlers.onOpen({ protocol: socket.protocol ?? "" }));
     socket.on("message", (data: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
@@ -342,7 +364,11 @@ export class PluginWebSocketRegistry {
       handlers.onClose({ code, reason: reason.toString(), wasClean: code === 1000 }),
     );
     socket.on("error", (error: Error) => {
-      handlers.onError({ code: "SOCKET_ERROR", message: error.message });
+      const refused = (error as { code?: unknown }).code === "PERMISSION_DENIED";
+      handlers.onError({
+        code: refused ? "PERMISSION_DENIED" : "SOCKET_ERROR",
+        message: error.message,
+      });
     });
     return {
       send: (data) => socket.send(data),

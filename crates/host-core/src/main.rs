@@ -74,11 +74,16 @@ async fn main() -> anyhow::Result<()> {
                 .join(".pi-desktop")
         });
 
-    std::fs::create_dir_all(&data_dir)?;
+    // The data root is owner-only on Unix: it holds transcripts, the database
+    // and the encrypted secret store. Electron may have created it first with
+    // the process umask, so an existing root is tightened as well.
+    secrets::create_private_dir_all(&data_dir)?;
+    if let Err(error) = secrets::restrict_existing_dir(&data_dir) {
+        tracing::warn!(%error, "could not restrict the data directory to its owner");
+    }
     std::fs::create_dir_all(data_dir.join("logs"))?;
     std::fs::create_dir_all(data_dir.join("plugins/installed"))?;
     std::fs::create_dir_all(data_dir.join("plugins/data"))?;
-    std::fs::create_dir_all(data_dir.join("plugins/market"))?;
     std::fs::create_dir_all(data_dir.join("plugins/cache/download"))?;
     std::fs::create_dir_all(data_dir.join("cache"))?;
     std::fs::create_dir_all(data_dir.join("scratch"))?;

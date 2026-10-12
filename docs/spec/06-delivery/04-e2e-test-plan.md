@@ -37,6 +37,27 @@
   and Rust `data_relocation` tests cover rollback and path/filesystem boundaries.
 
 
+### E2E-SECRETS-master-key-in-os-credential-store
+
+- **Preconditions:** A data root written by an earlier build (`secrets/.machine-key`
+  plus at least one stored provider key), on macOS, Windows, or Linux with a
+  running Secret Service. Manual only: automated E2E profiles set
+  `PI_DESKTOP_SECRET_KEY_STORE=file` so they never touch a developer's
+  credential store.
+- **Steps:** 1) Start the app; allow the Keychain prompt on macOS if shown.
+  2) Confirm the stored provider still works. 3) Inspect `secrets/`. 4) Restart
+  and repeat step 2. 5) Repeat from a fresh copy with the credential store
+  unavailable (Linux without Secret Service, or the environment override).
+- **Expected:** After step 1 `.machine-key` is gone, `.keychain-account` exists,
+  the credential store holds `net.aiuo.pi-desktop` / `secret-master-key:<uuid>`,
+  `secrets/` is `0700` and blobs are `0600` (Unix). The provider key keeps
+  working across restart. With the store unavailable `.machine-key` stays
+  (`0600`), host logs a key-free warning, and secrets keep working.
+- **Coverage:** Rust `secrets::master_key` tests cover migration, verification
+  failure, read-back mismatch, fallback, locked state, interrupted migration,
+  per-root accounts, relocation and file modes with an in-memory credential
+  store. Real platform stores are verified manually.
+
 ### E2E-LEGACY-DICTATION-idle-model-release
 
 - **Preconditions:** Exercise the retained local Dictation service through its
@@ -922,27 +943,6 @@ identify the platform validation still needed.
 - **Milestone**: M6+
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
   each release (run only in a capable environment when this surface changes)
-
-#### E2E-212: GitHub Release starts the CNB mirror pipeline
-
-- **Preconditions**: Repository secret `CNB_MIRROR_TOKEN` is configured on
-  `vastsa/PI-Desktop`; the CNB pipeline at `aixk/Pi-Desktop` listens for
-  `api_trigger_mirror`; a GitHub Release tag such as `vX.Y.Z` exists with
-  uploaded artifacts.
-- **Steps**: 1) Publish or edit that GitHub Release, or dispatch
-  `mirror-to-cnb.yml` with the same tag. 2) Inspect the Actions log for the
-  resolved tag and the POST to `api.cnb.cool`. 3) Confirm the CNB pipeline
-  starts with `MIRROR_TAGS` equal to that tag.
-- **Expected**: The job runs only on `vastsa/PI-Desktop`. Manual dispatch
-  without a `vX.Y.Z` tag fails before calling CNB. A missing
-  `CNB_MIRROR_TOKEN` fails closed. The JSON body is built with `jq` (not
-  YAML string interpolation). GitHub Release artifacts and updater feeds are
-  unchanged; CNB is a mirror of the same tag.
-- **Specs linked**: `06-delivery/06-release-runbook.md`
-- **Acceptance**: Quality (release mirroring)
-- **Milestone**: M6+
-- **Status**: Source-contract covered (`ci-workflow.test.mjs`); live CNB
-  start remains operator validation (run only in a capable environment when this surface changes)
 
 ### Boot & Healthcheck
 
@@ -3272,7 +3272,41 @@ identify the platform validation still needed.
 - **Milestone**: M4
 - **Status**: Automated (protocol smoke: dispatch roundtrip host->runner->host; in-app JS execution via PluginRuntime)
 
+#### E2E-PLUGIN-no-remote-marketplace: Plugins install locally and nothing is fetched
+
+- **Preconditions**: A fresh profile, and a profile upgraded from a build that
+  had the marketplace. The upgraded profile has a `plugins/market/` directory
+  (cached catalog, `device.json`), a plugin installed from the marketplace, and
+  a bundled `pi.file-manager` registry row.
+- **Steps**:
+  1. Open Extensions while capturing the app's outbound network traffic.
+  2. Install a `.piplug` file through Install package.
+  3. Click a project file reference in chat.
+- **Expected**:
+  - The page lists installed plugins only, with no Marketplace tab, update
+    check, or auto-update control.
+  - No request goes to `plugins.aiuo.net`, `cnb.cool`, or a catalog URL, and
+    no device identifier is derived or sent.
+  - The local install goes through the permission review.
+  - The legacy `plugins/market/` files are left untouched.
+  - The marketplace-installed plugin still loads.
+  - `pi.file-manager` is gone from the list, and `pi.browser` stays bundled.
+  - The file reference opens in the host file tab with no error toast.
+- **Specs linked**: `07-plugins/07-plugin-marketplace.md`, ADR
+  fork-removes-plugin-marketplace
+- **Acceptance**: G (plugins), Privacy
+- **Status**: Unit-covered (`host-core` tests
+  `host_core_has_no_plugin_marketplace_client`,
+  `legacy_marketplace_state_is_ignored_and_preserved`,
+  `a_previously_bundled_file_manager_is_dropped_on_upgrade`;
+  `apps/desktop/test/extensions-page.test.mjs`,
+  `apps/desktop/test/tool-row-file-refs.test.mjs`). The packaged UI journey
+  with traffic capture is Draft.
+
 #### E2E-024G: Marketplace detail sheet shows README, permissions, versions
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: Official marketplace catalog available.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Open details for `demo.workspace-summary`. 3) Inspect README / risk-grouped permissions / version rows. 4) Pick a version and install after permission review. 5) Dismiss the sheet with Escape and by clicking the scrim.
@@ -3285,6 +3319,9 @@ identify the platform validation still needed.
 
 #### E2E-024F: Refresh the official marketplace catalog
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: Network available to `plugins.aiuo.net`.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Use the header Refresh marketplace action. 3) Confirm the official catalog refreshes and the card grid updates.
 - **Expected**: The marketplace uses `plugins.aiuo.net/catalog.json`; the page has no source selector; the cached official catalog remains available if refresh fails.
@@ -3293,6 +3330,9 @@ identify the platform validation still needed.
 - **Status**: Documented / host-core unit covered
 
 #### E2E-024P: The marketplace ignores legacy source settings
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: Profiles can be seeded with legacy `pluginMarketSource` values `github`, `mirror`, and `custom`, including a custom URL. Network or a local request stub is available for the official catalog.
 - **Steps**: 1) Start the app with each seeded profile. 2) Open Extensions → Marketplace and refresh. 3) Inspect the catalog request. 4) Install a published plugin from the marketplace.
@@ -3326,6 +3366,9 @@ identify the platform validation still needed.
 
 #### E2E-024B: Marketplace install with permission review
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: App running; official market catalog available.
 - **Steps**: 1) Open Extensions → Marketplace. 2) Install `demo.workspace-notes`. 3) Read the risk-tiered permission dialog. 4) Accept high-risk permissions.
 - **Expected**: Permissions are grouped High / Medium / Low with plain-language explanations before any download; the review dialog mounts on the viewport overlay host above the expanded sidebar; the host refreshes marketplace metadata immediately before download so a stale UI cache cannot pair an old checksum with a current package; plugin installed from the marketplace package, checksum verified, permissions granted, panel/tools available; the installed tab and risk-grouped rows reflect the new plugin without a separate overview card row.
@@ -3334,6 +3377,9 @@ identify the platform validation still needed.
 - **Status**: Documented / host-core covered by unit tests + protocol methods
 
 #### E2E-024R: Install a center-published plugin from the official marketplace
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A `schemaVersion: 2` catalog served from the distribution repository, with one plugin carrying provenance and an approved review verdict, its package under `packages/`. A second fixture declares `artifactBaseUrl` for the mirror/enterprise case.
 - **Steps**: 1) Open a plugin's detail sheet. 2) Read the Source section. 3) Install the selected version through the official resolve path. 4) Repeat with a local resolve stub that returns no source, exercising the official catalog URL fallback and an `artifactBaseUrl` fixture.
@@ -3380,6 +3426,9 @@ identify the platform validation still needed.
 
 #### E2E-024C: Plugin package install and auto-update path
 
+> **Changed in this build:** local package install still applies; the
+> marketplace auto-update half is retired (ADR fork-removes-plugin-marketplace).
+
 - **Preconditions**: Marketplace catalog has a newer version or local `.piplug`.
 - **Steps**: 1) Install package from the header overflow menu. 2) Enable auto-update from the row overflow menu. 3) Reopen Extensions while the marketplace is slow or unavailable and confirm the Installed surface and Marketplace tab remain usable. 4) Confirm the installed list refreshes update metadata from the local catalog. 5) Run Check for updates, then Apply automatic updates.
 - **Expected**: The Extensions surface does not wait for a remote request during its silent cache-only check; the row moves to Updates available and the update banner reports the count; the highest semantic version is selected even when the catalog version array is not newest-first; the explicit check fetches the current catalog and uses the cached catalog offline; permissions the new version adds are tagged New in the review dialog; auto-update applies only when the permission diff is empty or pre-granted.
@@ -3388,6 +3437,9 @@ identify the platform validation still needed.
 - **Status**: Documented
 
 #### E2E-024Q: Marketplace update diagnosis and release-data gate
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A catalog fixture contains an installed `0.5.0` plugin, a
   `0.5.1` version, and either unsorted version entries or intentionally missing
@@ -3666,6 +3718,9 @@ window; opening a normal panel afterward must still work.
   `plugins-page-style.test.mjs`); visual scenario Draft
 
 #### E2E-024O: Marketplace hides development-only sample plugins
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: App running; the official catalog contains the
   development fixtures `demo.hello` or `demo.workspace-summary` and at least
@@ -4874,6 +4929,32 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Milestone**: M5
 - **Status**: Unit-covered (`user-select.test.mjs`, `thinking-ui.test.mjs`,
   `markdown-prose-style.test.mjs`); full visual scenario Draft
+
+#### E2E-MARKDOWN-remote-media-is-click-to-load: Rendering Markdown never contacts a remote media host
+
+- **Preconditions**: A completed assistant answer (or tool output, or a
+  workspace `.md` opened in Files) containing a Markdown image, a raw HTML
+  `<img>`, an `<audio>`, a `<video>` with a `poster`, and a `<video>` with a
+  `<source>` child, each pointing at an `https://` host whose access log is
+  observable; a local workspace image in the same message.
+- **Steps**: 1) Open the session and scroll the message into view. 2) Check
+  the host's access log. 3) Hover one chip, then click its Load action. 4)
+  Check the access log again. 5) Switch sessions and return.
+- **Expected**: Before any click the host receives no request: every remote
+  item is a chip naming its host, with the full URL in the tooltip, and no
+  poster is fetched. The local image renders inline as before. Clicking one
+  chip produces exactly one request (plus at most three redirects) from the
+  Main process, without cookies, and replaces only that chip with the image or
+  a player; the others stay chips. A plain `http:`, private-address, non-media
+  or oversized target shows "Couldn't load" with Try again. Returning to the
+  session keeps the loaded item without a new request.
+- **Specs linked**: `05-security/01-security.md`, `04-ux/08-component-spec.md`
+  §8.7, ADR 0327
+- **Acceptance**: C (chat stream), Quality
+- **Milestone**: M6+
+- **Status**: Unit-covered (`remote-media-markdown.test.mjs`,
+  `remote-media-fetch.test.mjs`, `mermaid-rendering.test.mjs`); packaged
+  scenario Draft
 
 #### E2E-061: User message plaintext layout survives wrapping and reload
 
@@ -8062,6 +8143,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   6. Settings UI updates status to `Ready` with discovered tools, shows localized success toast, and displays `OAuth` badge.
   7. When access token expires, `UserMcpRuntime` transparently uses refresh token to obtain a fresh access token without user prompt.
   8. Moving the server via `mcp.transfer` preserves and re-keys the OAuth token secret under the destination ID.
+  9. A server whose protected-resource metadata names a different `resource`, or whose authorization-server metadata names a different `issuer`, fails with an error event before any browser launch or client registration; a stored token is not sent after the server URL is changed to another resource.
 - **Specs linked**: `03-runtime/01-ipc-protocol.md`, ADR 0283, ADR 0142
 - **Acceptance**: E (tools & permissions), Security
 - **Milestone**: M5
@@ -9193,6 +9275,31 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `bundled_plugins_refresh_from_disk_but_keep_user_state`; the packaged journey
   is Draft (run only in a capable environment when this surface changes)
 
+#### E2E-SECURITY-launchable-file-is-revealed-not-opened
+
+- **Preconditions**: A project contains `run.command` (macOS), `run.bat`
+  (Windows), or `run.desktop` / an extensionless file with the execute bit
+  (Linux), plus `report.pdf`. The bundled File Manager view, the work-panel
+  Files tab, and the browser pane are available.
+- **Steps**:
+  1) From the File Manager view, choose "Open with default app" on the
+     launchable file. 2) Load an allowed `file:` preview of a launchable name
+     in the browser pane and choose "Open externally". 3) Repeat both on
+     `report.pdf`.
+- **Expected**: The launchable file never runs. The OS file manager opens with
+  it selected and the app shows "This file can run programs, so it was shown
+  in its folder instead of opened." The plugin audit entry records
+  `outcome: "revealed"`. `report.pdf` opens in its default application.
+- **Specs linked**: `05-security/01-security.md` §2a,
+  `03-runtime/01-ipc-protocol.md` (`fs/open`), `07-plugins/03-plugin-api.md`,
+  ADR launchable-files-reveal-instead-of-open, ADR 0109
+- **Acceptance**: Security, D (workspace), G (plugins)
+- **Status**: Unit coverage in `apps/desktop/test/safe-open-path.test.mjs`
+  (policy table and source contract), `apps/desktop/test/plugin-fs-scope.test.mjs`
+  (`fs.openDefault` reveals, never opens), and
+  `apps/desktop/test/browser-pane-navigation.test.mjs` (browser pane). The
+  native OS handoff is manual (needs a desktop session per platform).
+
 #### E2E-PLUGIN-file-view-collapse-persists
 
 - **Preconditions**: The bundled File Manager view is open on a project with
@@ -9277,6 +9384,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   is Draft (run only in a capable environment when this surface changes)
 
 #### E2E-PLUGIN-bundled-plugin-keeps-a-marketplace-update
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A build that ships a bundled plugin whose marketplace entry
   offers a newer version, and a data directory the user can install into.
@@ -9789,7 +9899,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | M2 (IME slash alias) | E2E-255 |
 | M5 (Skill residency) | E2E-254 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-SETTINGS-inline-capability-imports, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-259, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
+| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-SETTINGS-inline-capability-imports, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-259, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+ (Selected model order) | E2E-MODEL-selected-order-persists |
 | M6+ (MCP server timeout override) | E2E-261 |
@@ -9837,6 +9947,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Quality (loop context ownership) | E2E-RUNTIME-loop-context-ownership |
 | G — Plugin host lifecycle (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
 | Quality (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
+| C — Conversation & stream (remote media click-to-load) | E2E-MARKDOWN-remote-media-is-click-to-load |
+| Quality (remote media click-to-load) | E2E-MARKDOWN-remote-media-is-click-to-load |
+| M6+ (remote media click-to-load) | E2E-MARKDOWN-remote-media-is-click-to-load |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
@@ -13086,9 +13199,12 @@ are withdrawn with ADR 0165.
   (`apps/desktop/test/transcript-file-chips.test.mjs` for the wiring and
   `apps/desktop/test/tool-row-file-refs.test.mjs` for the work-panel entry each
   shape of resolution produces). The isolated Electron renderer journey in
-  `scripts/e2e-file-ref-line-scroll.mjs` verifies a Markdown link enables the
-  File Manager on demand and a positioned reference still opens in the host
-  viewer; the full packaged UI journey remains Draft.
+  `scripts/e2e-file-ref-line-scroll.mjs` verifies a Markdown link opens a
+  user-installed File Manager view without enabling or reloading any plugin,
+  and a positioned reference still opens in the host viewer; the full packaged
+  UI journey remains Draft. No file manager is bundled (ADR
+  fork-removes-plugin-marketplace); without one, a project file opens in the
+  host file tab with no error toast.
 
 #### E2E-CHAT-mp4-attachment-opens-in-system-player
 
@@ -13769,7 +13885,31 @@ are withdrawn with ADR 0165.
 - **Status**: Setting selection/persistence covered by
   `pnpm test:e2e:settings-scroll`; dismissal and download cancellation covered
   by `updater-controller.test.mjs`. Packaged Windows installer journey remains
-  runner validation.
+  runner validation. Not applicable while `APP_UPDATES_ENABLED` is `false`
+  (see E2E-UPDATE-compiled-out-build-never-contacts-feed).
+
+#### E2E-UPDATE-compiled-out-build-never-contacts-feed
+
+- **Preconditions**: A packaged build produced with `APP_UPDATES_ENABLED =
+  false` (`apps/desktop/electron/main/update-build-flag.ts`) and
+  `build.publish: null`. Outbound traffic from the app is observable (proxy or
+  packet capture).
+- **Steps**: 1) Inspect the packaged resources and confirm there is no
+  `app-update.yml`. 2) Launch the app and keep it open past the former 15 s
+  first-check delay. 3) Open Settings → Info. 4) Click the sidebar build chip.
+  5) On macOS, open the application menu.
+- **Expected**: No request reaches any update feed or GitHub Releases host.
+  Settings → Info shows "Updates are disabled in this build." with no check,
+  retry, or View Release action and no Automatic/Manual preference. The build
+  chip shows the version and does nothing on click. The macOS application menu
+  has no "Check for Updates…" item. No update banner appears.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `05-security/01-security.md` §7, ADR 0022 (build switch amendment)
+- **Acceptance**: Quality (release safety)
+- **Milestone**: M6+
+- **Status**: Controller, menu, and renderer source contracts covered by
+  `updater-controller.test.mjs` and `auto-update.test.mjs`; the packaged
+  network observation remains runner validation.
 
 #### E2E-213: The first Composer model menu paint keeps configured aliases
 
@@ -13928,6 +14068,30 @@ are withdrawn with ADR 0165.
   draft-only update, inline file/image chip preservation, one-step undo, and no
   transcript row. Attachment sending is covered by the separate Composer send
   E2E.
+  While renderer extensions are disabled in this build
+  (`docs/adr/disable-plugin-renderer-extensions.md`), the UI Slots Lab path of
+  that suite does not apply.
+
+#### E2E-PLUGIN-renderer-extension-disabled-in-build
+
+- **Preconditions**: This build has `RENDERER_EXTENSIONS_ENABLED = false`. A
+  development plugin declares `manifest.renderer`, `renderer.extension` and at
+  least one other contribution (for example a command or agent tool).
+- **Steps**: 1) Load the plugin from its folder and read the permission
+  review. 2) Accept the review. 3) Open an Agent session and look for the
+  plugin's slots. 4) Open the plugin's row details on the Plugins page.
+- **Expected**: The review lists `renderer.extension` with "Renderer
+  extensions are disabled in this build" instead of its usual explanation.
+  The plugin loads and its other contributions work. No slot mounts, the
+  renderer never requests a `plugin-renderer://` URL, and `plugin.call` is
+  refused with `PLUGIN_UNLOADED`. The row details show the same notice.
+- **Specs linked**: `07-plugins/13-plugin-permissions-matrix.md`,
+  `docs/adr/disable-plugin-renderer-extensions.md`
+- **Acceptance**: Security
+- **Status**: Unit-covered (`plugin-renderer-call-runtime.test.mjs`,
+  `plugin-renderer-loader.test.mjs`,
+  `plugin-renderer-extension-disabled-ui.test.mjs`, `app-csp.test.mjs`); no
+  Electron runner yet.
 
 #### E2E-259: Installing the prompt-enhancement plugin migrates preferences once
 
@@ -14763,6 +14927,77 @@ browser milestones are scheduled.
   required. The credential seam itself is covered offline by
   `apps/desktop/test/remote-host-ssh-password.test.mjs`.
 
+#### E2E-REMOTE-HOST-expired-device-token-re-pairs-over-ssh
+
+- **Preconditions**: An isolated Desktop profile paired over SSH to a Linux
+  test Host running a matching `pi-host` release. A second, unpaired local
+  process can reach the Host's loopback RACP port. No production credential.
+- **Steps**: 1) With the Host stopped, rewrite the paired device's
+  `tokenIssuedAt` in `~/.pi-desktop/pi-host/credentials.json` to more than 180
+  days ago (or `lastSeenAt` to more than 30 days ago), then start the Host.
+  2) Start a long-running turn from another paired client, then relaunch the
+  Desktop or reconnect the Host from Settings. 3) Inspect `remote-hosts.json`,
+  `credentials.json`, the Host log, and the Desktop log. 4) Revoke the new
+  device and reconnect. 5) From the second process, send repeated upgrades with
+  a wrong bearer token, then reconnect the Desktop. 6) Start the upgraded Host on
+  a `credentials.json` written by the previous release (no `version` field) with
+  a device paired more than 30 days earlier.
+- **Expected**: Step 2 reconnects without a prompt: the Host refuses the old
+  token with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED`, the Desktop runs
+  `pi-host pairing-issue` over SSH and exchanges the token, the stored device
+  token changes, and the other client's turn keeps running (the Host is not
+  restarted or reinstalled). No log line contains a `pdt1.` or `ppt1.` value.
+  Step 4 is refused with `REMOTE_AUTH_FAILED` and is not re-paired; the Host
+  shows `action-required`. Step 5 answers `429` with `Retry-After` once the
+  failure budget is spent, and the Desktop connects after the backoff. Step 6
+  connects, and the file is rewritten as `version: 2` with the device's
+  lifetime starting at the upgrade.
+- **Specs linked**: `05-security/02-remote-control-security.md` §§3.4, 4.3,
+  and 13 (gate 16), `03-runtime/08-error-codes.md`, ADR
+  `racp-device-token-lifetime`
+- **Acceptance**: Security, Recovery
+- **Milestone**: Post-MVP (rollout R2)
+- **Status**: Draft; remote harness with a Linux SSH target required. The
+  lifetime, migration, throttle, admin-socket and Desktop re-pair seams are
+  covered offline by `packages/racp/src/auth-expiry.test.ts`,
+  `packages/racp/src/ws-binding.test.ts`, `apps/pi-host/src/config.test.ts`,
+  `apps/pi-host/src/pairing-issue.test.ts`, and
+  `apps/desktop/test/remote-device-repair.test.mjs`.
+
+
+#### E2E-REMOTE-HOST-ssh-host-key-confirmation
+
+- **Preconditions**: Settings → Remote Hosts is available. A Linux test machine
+  runs `sshd` and is absent from `~/.ssh/known_hosts` and from the app's
+  `<dataDir>/ssh_known_hosts`. A second machine is already listed in the user's
+  `~/.ssh/known_hosts`. The test operator can read the first machine's host key
+  fingerprint locally (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
+- **Steps**: 1) Install over SSH to the first machine (key or password mode).
+  2) Compare the shown fingerprint with the server's and press Cancel.
+  3) Install again and press "Trust and install". 4) Quit, relaunch and let the
+  host reconnect. 5) Install to the second machine. 6) Regenerate the first
+  machine's host key (or point its name at a different `sshd`) and reconnect
+  it; then try a fresh install to it. 7) Submit a bootstrap request whose host
+  is `-oProxyCommand=…` or contains a space through the IPC channel directly.
+- **Expected**: Step 1 shows a confirmation with host, port, key type and the
+  `SHA256:` fingerprint, focused on Cancel, before any remote command runs or a
+  password is sent (the server logs show no authentication attempt). Cancel
+  records nothing and leaves the form editable. Trust installs and pairs, and
+  the key appears only in `<dataDir>/ssh_known_hosts` (`0600`), never in
+  `~/.ssh/known_hosts`. The relaunch reconnects with no prompt. The second
+  machine installs with no prompt. In step 6 reconnect fails with a "host key
+  changed" message, the host shows "action required", the install is refused
+  the same way, and no option accepts the new key. Step 7 is refused with
+  `INVALID_ARGUMENT` before any `ssh` process starts. Every `ssh` argv carries
+  `StrictHostKeyChecking=yes` and `--` before the destination.
+- **Specs linked**: `05-security/02-remote-control-security.md` §3.4 (gate 22),
+  `02-architecture/05-remote-agent-control.md` §5.2, ADR 0328
+- **Acceptance**: Security, D (surfaces)
+- **Milestone**: Post-MVP (rollout R2b)
+- **Status**: Draft; remote harness with a Linux SSH target required. Covered
+  offline by `apps/desktop/test/remote-host-ssh-host-keys.test.mjs` (argv,
+  fingerprints, approve/decline/mismatch/changed, injection) and
+  `apps/desktop/test/remote-host-key-confirm-ui.test.mjs` (renderer flow).
 
 #### E2E-REMOTE-HOST-settings-compact-inventory
 
@@ -15936,6 +16171,54 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Draft; Rust and renderer unit regressions cover the data/query
   boundaries. Full rendered E2E requires an explicitly authorized run.
 
+#### E2E-MCP-project-server-requires-approval: A project's MCP server never runs before the user approves its exact content
+
+- **Preconditions**: Disposable data dir and HOME. Project A is registered and
+  contains `<project A>/.agents/servers/probe.json` (stdio, a command that
+  writes a marker file when started). No approval exists in
+  `<data>/agent-capabilities/mcp.json`.
+- **Steps**:
+  1. Open project A, open the composer command list, and start a session. The
+     marker file is never created and no `mcp_probe_*` tool is offered.
+  2. Open Settings > Agent > MCP with project A selected. The `probe` row shows
+     "Needs approval", the full command line and environment, and no enable
+     switch or Test connection.
+  3. Choose "Approve and enable". The row becomes enabled; a new session
+     connects the server (marker file appears).
+  4. Edit `probe.json` on disk to change an argument. Reload the page: the row
+     shows "Changed since approval", the server is disconnected for new
+     sessions, and approving again restores it.
+  5. Restart the app: the approval for the unchanged content persists.
+- **Status**: Draft. Host-core unit tests cover pending/approved/changed
+  state, persistence and stale-hash refusal; `apps/desktop/test/user-mcp.test.mjs`
+  proves the runtime never spawns an unapproved project record; the rendered
+  journey requires an explicitly authorized run.
+
+#### E2E-SKILL-project-skill-requires-approval: A project's skill never reaches the model before the user approves its exact text
+
+- **Preconditions**: Disposable data dir and HOME. Project A is registered and
+  contains `<project A>/.agents/skills/probe/SKILL.md` with a distinctive
+  description and body. No approval exists in
+  `<data>/agent-capabilities/skills.json`.
+- **Steps**:
+  1. Open project A. The composer command list offers no `/skill:probe`, and a
+     session's system prompt skill catalog does not list `probe`; a `Skill`
+     tool call with id `probe` is refused.
+  2. Open Settings > Agent > Skills with project A selected. The `probe` row
+     shows "Needs approval" and no enable switch. "Review text" shows the name,
+     description and body.
+  3. Choose "Approve and enable". The row becomes enabled; a new session lists
+     `probe` and the `Skill` tool returns its body.
+  4. Edit `SKILL.md` on disk. Reload the page: the row shows "Changed since
+     approval", new sessions and the composer no longer offer it, and
+     approving again restores it.
+  5. Create a project skill through the editor: it is enabled immediately.
+- **Status**: Draft. Host-core `user_skills` approval tests cover
+  pending/approved/changed state, stale-hash refusal and app-authored skills;
+  `apps/pi-host/src/skill-tool.test.ts` and
+  `apps/desktop/test/skill-project-approval.test.mjs` cover the headless tool
+  and the review UI; the rendered journey requires an explicitly authorized run.
+
 ### MCP market scenarios (`pnpm test:e2e:mcp-market`, headless protocol-level)
 
 | ID | Scenario | Verification |
@@ -16461,6 +16744,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
   unmarked record, and the dropped unknown marker. The end-to-end settings journey
 #### E2E-PLUGIN-official-channel-resolves-through-the-platform: An official-channel install uses platform mirrors when resolve answers promptly
 
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
+
 - **Preconditions**: A clean profile on the official channel, a plugin present in `plugins.aiuo.net/catalog.json`, and a request log for the platform and both mirror hosts (a local stub may stand in for each).
 - **Steps**: 1) Open Extensions → Marketplace and confirm the catalog loads. 2) Capture the catalog request and verify it used `plugins.aiuo.net`. 3) Install the plugin. 4) Capture the request the platform received. 5) Inspect which mirror served the package. 6) Install a second plugin, then install the same version of the first one again.
 - **Expected**: The marketplace UI has no source selector; exactly one `POST /api/v1/download/resolve` is sent per install or update, with a JSON body carrying `deviceId`, `pluginId`, and the version when one was picked; when resolve answers within three seconds, the package comes from the first entry in `downloads` that answers, and its bytes match the returned `sha256` and `sizeBytes` before anything is extracted; a mirror that is unreachable or fails is abandoned and the next one is used without user interaction; if resolve exceeds its deadline, the install switches to the catalog URL and verifies its catalog digest; reinstalling the same version issues a fresh resolve call rather than reusing the earlier answer, because the response is never cached; the installed plugin passes the ordinary permission review and its record names the official channel as its provider.
@@ -16500,6 +16786,9 @@ plugin-form fixtures in an isolated temporary directory at runtime.
 - **Status**: Draft
 
 #### E2E-PLUGIN-install-progress-shows-phases-and-mirror: An official-channel install reports its phases and the mirror it is using, then completes
+
+> **Retired in this build:** there is no remote plugin marketplace (ADR
+> fork-removes-plugin-marketplace). Kept for history; do not run.
 
 - **Preconditions**: A clean profile on the official channel, a plugin whose resolve answer lists at least two entries, a first mirror that fails or is slow so a second attempt is observable, and a renderer subscribed to `plugin.installProgress`.
 - **Steps**: 1) Start a manual install from the marketplace detail sheet. 2) Record the reports that arrive while it runs. 3) Hover the dialog after the install succeeds. 4) Look at the installed plugin once the install ends. 5) Install again with a large package and count the reports over a window of at least one second.
@@ -17293,12 +17582,12 @@ renderer's durable transcript reads. No real model or provider is contacted.
 #### E2E-262: Transcript path:line opens and scrolls the host file viewer
 
 - **Preconditions:** Isolated Electron/Chromium, an active workspace and session,
-  the bundled file-manager view available, and deterministic filesystem IPC
-  fixtures.
+  a user-installed file-manager view available, and deterministic filesystem
+  IPC fixtures.
 - **Steps:** Render a real transcript `path:line:column` reference followed by
   sentence punctuation; click its verified file chip and wait for the host file
   viewer to load.
-- **Expected:** Despite the bundled file-manager view being available, the
+- **Expected:** Despite the file-manager view being available, the
   positioned reference opens in the host's read-only file tab. The file request
   retains its line and column, and the viewer scrolls the requested line into
   the visible center area. The path and file contents remain the same as the
@@ -17432,9 +17721,12 @@ host-created files. The full app's file-preview viewer is covered separately.
   passes it ephemerally to the sidecar.
   `JevClassify` appears in the Agent's deferred catalog only with a key and
   never in Plan or Goal. Closing the dialog cancels an in-flight check the same
-  way a refused key does: nothing stored, nothing enabled. The fixture receives
-  the TypeSafe System One payload and bearer header; the tool returns bounded
-  structured answers and usage.
+  way a refused key does: nothing stored, nothing enabled. Each `JevClassify`
+  call first asks host-core `tools.execute` to authorize it; the fixture is not
+  contacted until that gate allows the call, and a denied call returns a tool
+  error with no request. Host-core's `ask` card names `api.typesafe.ai` and the
+  payload size. The fixture receives the TypeSafe System One payload and bearer
+  header; the tool returns bounded structured answers and usage.
 - **Specs:** [Tools and permissions](../03-runtime/03-tools-and-permissions.md),
   [provider/model system](../03-runtime/11-provider-model-system.md),
   [secrets storage](../03-runtime/14-secrets-storage.md),

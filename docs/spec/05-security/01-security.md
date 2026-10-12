@@ -32,10 +32,15 @@ Required (all **implemented**):
   defaults
 - Preload exposes a whitelist-checked `invoke`/`on` bridge only
   (`IPC_WHITELIST` enforced on both preload and main sides)
-- Transcript Markdown is sanitized (`rehype-sanitize`), but remote `http(s)`
-  images, audio, and video that a model writes into a reply are fetched on
-  render, without a click. This is a deliberate readability trade-off: a
-  reply can therefore reveal the user's IP to the host it names. Links never
+- Transcript Markdown is sanitized (`rehype-sanitize`), and rendering it never
+  contacts a remote host (ADR 0327). Remote images, audio, video, `<source>`
+  children and posters in assistant text, tool output, subagent transcripts,
+  workspace Markdown previews and plugin READMEs render as a click-to-load
+  chip naming the host. Only the clicked item is fetched, by Electron Main
+  over `pi-desktop/media/fetchRemote`: public HTTPS hosts only, each of at most
+  three redirects re-validated, no cookies or HTTP auth, a 20 s deadline, a
+  content type in the requested media family, and at most 10 MiB (image) or
+  25 MiB (audio/video). The renderer receives a `data:` URL. Links never
   navigate in-app and always route through the external-open path.
 
 ### Content Security Policy
@@ -48,18 +53,85 @@ Required (all **implemented**):
   at build time (`tightenCsp` plugin in `electron.vite.config.ts`);
   `connect-src 'self'` only. Provider network traffic happens in the Node
   sidecar, never in the renderer.
+- `img-src` and `media-src` admit `'self'`, `data:`, `blob:` and the app's own
+  plugin schemes, never `https:` or `http:` (ADR 0327). Remote Markdown media
+  reaches the renderer only as a bounded `data:` URL after a reader click.
 - Assistant Mermaid diagrams do not widen CSP or renderer privileges. Only a
   completed answer fence may dynamically load the bundled local renderer.
   Mermaid runs with `securityLevel: strict`, protected security/theme/limit
   configuration, HTML labels disabled, a 20,000-character source limit, and a
   500-edge limit. Its generated SVG then passes through DOMPurify's SVG profile;
   links, URL attributes, `foreignObject`, script, embedded media, and external
-  image elements are removed before the SVG reaches the DOM. Invalid or
-  oversized input fails closed to escaped source text.
+  image elements are removed before the SVG reaches the DOM. CSS inside the
+  SVG (`<style>` text and attribute values) keeps only `url(#id)` and
+  `url(data:…)`; `@import`, `image-set()`, CSS `src()` and every other
+  `url()` are removed, and CSS that hides a reference behind escapes or
+  comments is dropped (ADR 0327). Invalid or oversized input fails closed to
+  escaped source text.
+
+### Packaged binary hardening (ADR electron-fuses-and-packaged-code-paths)
+
+- electron-builder sets every Electron fuse explicitly
+  (`apps/desktop/package.json` → `build.electronFuses`):
+  - **On:** cookie encryption, embedded `app.asar` integrity validation
+    (macOS and Windows), and `onlyLoadAppFromAsar`.
+  - **Off:** `--inspect`/`SIGUSR1` for the main process.
+  - **Left on, with reasons:**
+    - `runAsNode`: the agent sidecar runs on the Electron binary (D008).
+    - `NODE_OPTIONS`: turning it off also drops `NODE_EXTRA_CA_CERTS`.
+    - `grantFileProtocolExtraPrivileges`: the renderer loads from `file://`
+      with module scripts.
+
+  `apps/desktop/test/electron-fuses.test.mjs` pins these values.
+- macOS hardened-runtime entitlements are exactly `allow-jit`,
+  `disable-library-validation`, and `device.audio-input`:
+  - `allow-unsigned-executable-memory` is not granted.
+  - `allow-dyld-environment-variables` is never granted.
+  - Library validation stays disabled only because the sidecar (on the main
+    executable) and plugin hosts load native addons from user-installed
+    packages.
+- Packaged builds resolve the host-core binary and the bundled plugin tree
+  only from `process.resourcesPath`. `PI_DESKTOP_HOST_BIN`, an inherited
+  `PI_DESKTOP_BUILTIN_PLUGINS_DIR`, and source-checkout fallbacks apply only
+  to unpackaged builds. Data-location overrides (`PI_DESKTOP_DATA_DIR`) are
+  unchanged.
+- Residual risk: a local process can still start the signed binary with
+  `ELECTRON_RUN_AS_NODE` or `NODE_OPTIONS`. Closing that requires moving the
+  sidecar off `RunAsNode` and replacing the `NODE_EXTRA_CA_CERTS` input.
+
+### 2a. Opening local files with the OS
+
+Every `shell.openPath` of a workspace- or plugin-chosen path — `fs/open`,
+plugin `fs.openDefault`, and the browser pane's "open externally" for a
+`file:` preview — first goes through `safe-open-path.ts`
+(`openPathOrReveal`, ADR launchable-files-reveal-instead-of-open). A path
+whose OS association could run code is **revealed** in the file manager
+(`shell.showItemInFolder`) instead of opened, and the user sees the localized
+`panel.files.launchableRevealed` notice. Launchable means:
+
+- the final extension, case-insensitively and after folding the trailing dots,
+  spaces, and NTFS `:stream` suffix Windows ignores, names an application,
+  bundle, script, installer, shortcut, or location file (`.app`, `.command`,
+  `.terminal`, `.workflow`, `.pkg`, `.dmg`, `.webloc`, `.inetloc`, `.exe`,
+  `.bat`, `.cmd`, `.ps1`, `.vbs`, `.msi`, `.lnk`, `.url`, `.reg`, `.desktop`,
+  `.appimage`, `.sh`, `.jar`, …; `.js` on Windows only). `x.pdf.command` is
+  launchable; `x.command.pdf` is not;
+- a directory with such an extension, or on macOS one whose
+  `Contents/Info.plist` names a `CFBundleExecutable`;
+- on POSIX, a file with any execute bit unless every name of it has a known
+  document extension;
+- a path that cannot be inspected.
+
+Both the literal and the symlink-resolved name are checked. App-owned
+directories opened on purpose (logs, project root, session scratch) are
+outside this policy.
 
 ### Future hardening (tracked, post-MVP)
 
-- Electron fuses (`runAsNode`, `nodeCliInspect` off) at package time
+- Sidecar launch without `ELECTRON_RUN_AS_NODE`, then `runAsNode` and
+  `NODE_OPTIONS` fuses off
+- Renderer served from a custom protocol, then
+  `grantFileProtocolExtraPrivileges` off
 - `webSecurity` assertions in an automated security e2e
 
 ## 3. Secrets
@@ -172,8 +244,10 @@ password or machine key. SigV4 uses scoped S3 credentials; bucket identity,
 request timing and object sizes remain visible. Credential export and import
 require opt-in. Raw exported secrets are absent from status, preview, conflict
 labels and logs. Provider/MCP secrets use the Host secret store; OAuth sessions
-and cookies are not portable. The local secret store uses encrypted files plus
-a colocated `.machine-key`, not an OS Keychain backend.
+and cookies are not portable. The local secret store uses encrypted files whose
+master key lives in the OS credential store (ADR
+secret-master-key-os-credential-store); a colocated owner-only `.machine-key`
+remains only as the explicit fallback when no credential store is reachable.
 
 Imported commands, endpoints, scripts, skills, plugins, and automations are
 staged behind a digest-bound local approval. Local paths and approvals are
@@ -186,6 +260,39 @@ previously unlocked devices. Immutable objects are retained indefinitely; a
 service or replay an old valid head to a fresh device with no trusted history.
 Per-file atomic replacement and import journaling do not constitute a
 whole-filesystem transaction.
+
+## 4.4 Project-provided capabilities
+
+A project directory is untrusted input: it arrives with whatever repository the
+user opened. Capability documents under `<project>/.agents/` must not execute
+code merely because the project was opened.
+
+- **MCP servers** (`<project>/.agents/servers/*.json`) never connect or spawn
+  until the user approves the exact execution-relevant content — transport,
+  command, args, env, url, headers — in Settings > Agent > MCP. host-core binds
+  the approval to a SHA-256 of those fields, stores it app-locally in
+  `<data>/agent-capabilities/mcp.json`, and reports the server disabled while
+  the hash differs; an edited file reads as "changed" and stops running until
+  re-approved. Approval requests echo the displayed hash, so a file changed
+  during review is refused. Electron Main's MCP runtime independently refuses
+  to connect an unapproved project record (ADR project-mcp-server-approval,
+  D659). Global servers in the user's home directory are unaffected.
+- **Skills** (`<project>/.agents/skills`) are prompt content: their name and
+  description enter the skill catalog and composer slash commands, and the
+  `Skill` tool returns their body. A project skill reaches none of these until
+  the user approves a SHA-256 of the exact skill document in Settings > Agent >
+  Skills, after reading its name, description and body. The approval lives in
+  `<data>/agent-capabilities/skills.json`; an edited document reads as
+  "changed" and leaves the catalog until re-approved, `skills.read` refuses a
+  document that changed between scan and read, and both the Desktop and the
+  headless Pi Host `Skill` tools refuse a skill that is not active for the
+  session's project (D661). Sibling resources of a directory skill are not part
+  of the approval; the runtime never injects them, and the model reaches them
+  only through the ordinary permission-checked file tools. Global skills are
+  unaffected.
+- **Native Pi resources** (`.pi/` settings and extensions, `.agents/skills`
+  read by the Pi SDK) load only for a cwd the user trusted in Pi's own trust
+  store; see §12.
 
 ## 5. Command execution
 
@@ -226,6 +333,15 @@ whole-filesystem transaction.
 
 ## 7. Application update security (D120)
 
+- **Build switch.** `APP_UPDATES_ENABLED` in
+  `apps/desktop/electron/main/update-build-flag.ts` is a compile-time switch.
+  When `false` (the default in this fork) the update controller resolves
+  `mode: "disabled"` with `disabledReason: "build"`: it attaches no
+  electron-updater listeners, schedules no checks, rejects `updates/check`,
+  `updates/download`, `updates/install`, and `updates/open-releases`, and the
+  UI offers no check or delivery preference. `build.publish` is `null` so
+  packages embed no `app-update.yml` and release builds emit no `latest*.yml`.
+  The rules below apply only to builds with the switch on.
 - Electron Main owns `electron-updater`; renderer IPC cannot provide or
   override the fixed HTTPS GitHub owner/repository or releases URL.
 - The updater forces `allowPrerelease = false` so discovery always uses
@@ -320,7 +436,11 @@ host-core. They do not change the loopback-only rule above.
 | Malicious web content in renderer | no Node, sandbox, navigation lock, CSP |
 | Prompt-injected destructive tool use | host-owned durable mode policy, permission confirmation, path boundary, secret isolation |
 | Dependency poisoning | lockfiles, few deps, native-module review |
+| Local malware swapping app code or executables | asar integrity + `onlyLoadAppFromAsar`, packaged builds ignore executable-path env overrides; `RunAsNode` still open (ADR electron-fuses-and-packaged-code-paths) |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
+| Agent- or repo-written launcher opened from the UI | `openPathOrReveal` reveals launchable files instead of opening them (§2a) |
+| Cloned repository ships a project MCP server | content-hash-bound approval before any spawn/connect; changed file needs re-approval; Main refuses unapproved project records (§4.4) |
+| Cloned repository ships a prompt-injecting project skill | content-hash-bound approval before catalog, slash-command or `Skill` tool exposure; changed document needs re-approval (§4.4) |
 | Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 
 ## 11. Security acceptance gates
@@ -342,6 +462,12 @@ host-core. They do not change the loopback-only rule above.
 10. Local MCP control is loopback-only, bearer-authenticated, opt-in, bounded,
     excludes secret writes and native pickers, and requires confirmation for
     session permission-mode changes
+11. A project MCP server with no approval, or whose execution-relevant content
+    changed since approval, is never spawned or connected (host-core unit tests
+    and `apps/desktop/test/user-mcp.test.mjs`)
+12. A project skill with no approval, or whose document changed since approval,
+    is absent from the skill catalog and refused by the `Skill` tool (host-core
+    `user_skills` approval tests and `apps/pi-host/src/skill-tool.test.ts`)
 
 ## 12. Native Pi session boundary (ADR 0254)
 
@@ -359,6 +485,11 @@ for a provably dead process on the same host when the target is unchanged or is 
 complete same-file append-only extension with the original byte prefix and a
 continuous parent chain. This lease is not treated as proof that Pi Web/CLI is absent because those
 clients do not yet share its protocol.
+
+Native continuation creates its settings manager with `projectTrusted` set to
+Pi's stored trust decision for the session cwd (never unconditionally `true`),
+so project `.pi/` and `.agents/skills` resources load only for a project the
+user trusted in Pi, even if they appear after the open-time trust check.
 
 Native continuation passes `noTools: "all"` to the SDK: no built-in or extension
 model tools are exposed, including filesystem/shell tools. `permissionMode:

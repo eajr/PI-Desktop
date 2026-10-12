@@ -68,6 +68,8 @@ import {
 } from "../lib/latex-math";
 import { useAppStore } from "../stores/app-store";
 import { useReferencedImageDataUrl } from "../lib/use-referenced-image-data-url";
+import { remoteMediaUrl } from "../lib/remote-media";
+import { RemoteMediaPlaceholder } from "./RemoteMediaPlaceholder";
 import { absoluteImagePath, remarkLocalImagePaths } from "../lib/markdown-image-paths";
 import { remarkNormalizeWrappedMarkdownLinkDestinations } from "../lib/markdown-link-destinations";
 import { useOpenChatFileRef } from "../hooks/use-preview-target";
@@ -697,8 +699,9 @@ function Anchor({
 /**
  * Local image references can't load over the renderer origin; the host
  * resolves them into a bounded data URL so they render inline. Missing,
- * escaped, or oversized files fall back to a chip. Remote images render
- * inline and click through to the browser tab.
+ * escaped, or oversized files fall back to a chip. Remote images never load
+ * on render: they show a click-to-load placeholder, and only the clicked image
+ * is fetched by Main (ADR 0327). A loaded one clicks through to the browser.
  */
 function MarkdownImage({
   node: _node,
@@ -714,7 +717,8 @@ function MarkdownImage({
   const fileTitle = usePreviewTitle("file");
   const urlTitle = usePreviewTitle("url");
   const source = typeof src === "string" ? src : "";
-  const isRemote = /^https?:/i.test(source);
+  const remoteUrl = remoteMediaUrl(source);
+  const isRemote = remoteUrl !== null;
   const decoded = safeDecodeUri(source);
   const rel = isRemote ? null : toWorkspaceRel(decoded, root, baseDir);
   const attachmentRef =
@@ -735,16 +739,25 @@ function MarkdownImage({
       ? (event: React.MouseEvent<HTMLElement>) =>
           openFileMenu(event, { path: localRef, baseDir })
       : undefined;
-  if (isRemote) {
+  if (remoteUrl) {
     return (
-      <img
-        {...rest}
-        src={source}
-        alt={alt ?? ""}
-        className="chat-image-remote"
-        title={urlTitle}
-        onClick={localToolsAllowed ? () => openHttpUrl(source) : undefined}
-      />
+      <RemoteMediaPlaceholder
+        url={remoteUrl}
+        kind="image"
+        label={alt || undefined}
+        positionProps={sourcePositionProps(rest)}
+      >
+        {(dataUrl) => (
+          <img
+            {...rest}
+            src={dataUrl}
+            alt={alt ?? ""}
+            className="chat-image-remote"
+            title={urlTitle}
+            onClick={localToolsAllowed ? () => openHttpUrl(remoteUrl) : undefined}
+          />
+        )}
+      </RemoteMediaPlaceholder>
     );
   }
   if (dataUrl) {
@@ -796,32 +809,90 @@ function Table({
   return data ? <MarkdownTable {...data}>{table}</MarkdownTable> : table;
 }
 
-/** Inline audio player for audio URLs in markdown. */
+/**
+ * The remote URL an `<audio>`/`<video>` element would fetch: its own `src`, or
+ * the first `<source>` child naming a remote host.
+ */
+function mediaRemoteUrl(src: unknown, node: unknown): string | null {
+  const direct = remoteMediaUrl(src);
+  if (direct) return direct;
+  const children = (node as { children?: unknown } | undefined)?.children;
+  if (!Array.isArray(children)) return null;
+  for (const child of children) {
+    const element = child as { type?: unknown; tagName?: unknown; properties?: { src?: unknown } };
+    if (element?.type !== "element" || element.tagName !== "source") continue;
+    const remote = remoteMediaUrl(element.properties?.src);
+    if (remote) return remote;
+  }
+  return null;
+}
+
+/**
+ * Inline audio player for audio URLs in markdown. A remote source stays a
+ * click-to-load placeholder (ADR 0327); the loaded player gets only the data
+ * URL Main returned, never the remote `<source>` children.
+ */
 function AudioBlock({
-  node: _node,
+  node,
   src,
+  children,
   ...rest
-}: ComponentProps<"audio"> & { node?: unknown }) {
-  const source = typeof src === "string" ? src : "";
+}: ComponentProps<"audio"> & SourcePositionProps & { node?: unknown }) {
+  const remoteUrl = mediaRemoteUrl(src, node);
+  if (remoteUrl) {
+    return (
+      <div className="chat-audio">
+        <RemoteMediaPlaceholder url={remoteUrl} kind="audio" positionProps={sourcePositionProps(rest)}>
+          {(dataUrl) => <audio {...rest} controls preload="none" src={dataUrl} />}
+        </RemoteMediaPlaceholder>
+      </div>
+    );
+  }
+  const source = typeof src === "string" ? src : undefined;
   return (
     <div className="chat-audio">
-      <audio controls preload="metadata" src={source} {...rest} />
+      <audio {...rest} controls preload="metadata" src={source}>
+        {children}
+      </audio>
     </div>
   );
 }
 
-/** Inline video player for video URLs in markdown. */
+/** Inline video player for video URLs in markdown; remote sources as for audio. */
 function VideoBlock({
+  node,
+  src,
+  children,
+  ...rest
+}: ComponentProps<"video"> & SourcePositionProps & { node?: unknown }) {
+  const remoteUrl = mediaRemoteUrl(src, node);
+  if (remoteUrl) {
+    return (
+      <div className="chat-video">
+        <RemoteMediaPlaceholder url={remoteUrl} kind="video" positionProps={sourcePositionProps(rest)}>
+          {(dataUrl) => <video {...rest} controls preload="none" src={dataUrl} />}
+        </RemoteMediaPlaceholder>
+      </div>
+    );
+  }
+  const source = typeof src === "string" ? src : undefined;
+  return (
+    <div className="chat-video">
+      <video {...rest} controls preload="metadata" src={source}>
+        {children}
+      </video>
+    </div>
+  );
+}
+
+/** A `<source>` naming a remote host is dropped; its parent shows the gate. */
+function MediaSource({
   node: _node,
   src,
   ...rest
-}: ComponentProps<"video"> & { node?: unknown }) {
-  const source = typeof src === "string" ? src : "";
-  return (
-    <div className="chat-video">
-      <video controls preload="metadata" src={source} {...rest} />
-    </div>
-  );
+}: ComponentProps<"source"> & { node?: unknown }) {
+  if (remoteMediaUrl(src)) return null;
+  return <source {...rest} src={typeof src === "string" ? src : undefined} />;
 }
 
 const markdownComponents: Components = {
@@ -831,6 +902,7 @@ const markdownComponents: Components = {
   img: MarkdownImage,
   audio: AudioBlock,
   video: VideoBlock,
+  source: MediaSource,
   table: Table,
 };
 
@@ -854,7 +926,9 @@ const sanitizeSchema = {
     code: [["className", /^language-./, "math-inline", "math-display"]],
     img: [...(defaultSchema.attributes?.img || []), "src", "alt", "title", "className"],
     audio: ["src", "controls", "preload", "className"],
-    video: ["src", "controls", "preload", "className", "poster"],
+    // No `poster`: it is a second remote fetch the click-to-load gate cannot
+    // see (ADR 0327).
+    video: ["src", "controls", "preload", "className"],
     source: ["src", "type"],
   },
   tagNames: [

@@ -11,12 +11,13 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { RemoteHostSshAuth, RemoteHostSummary } from "@pi-desktop/shared";
+import type { RemoteHostBootstrapRequest, RemoteHostSshAuth, RemoteHostSummary } from "@pi-desktop/shared";
 import { api } from "../../lib/api";
-import { remoteHostErrorKey } from "../../lib/remote-host-errors";
+import { hostKeyPromptOf, remoteHostErrorKey, type RemoteHostKeyPrompt } from "../../lib/remote-host-errors";
 import { useAppStore } from "../../stores/app-store";
 import { Badge, Button, Field, Input, PasswordInput, SegmentedControl, cx } from "../ui";
 import { RemoteHostSessions } from "./RemoteHostSessions";
+import { RemoteHostKeyConfirm } from "./RemoteHostKeyConfirm";
 
 type AddMode = "ssh" | "pair";
 
@@ -71,6 +72,11 @@ export function RemoteHostsPage() {
   const [sshForm, setSshForm] = useState<SshForm>(EMPTY_SSH_FORM);
   const [installing, setInstalling] = useState(false);
   const [addMode, setAddMode] = useState<AddMode>("ssh");
+  // A pending host-key confirmation and the exact request it was raised for;
+  // trusting resends that request, so edits cannot slip in between.
+  const [hostKeyPrompt, setHostKeyPrompt] = useState<
+    { prompt: RemoteHostKeyPrompt; request: RemoteHostBootstrapRequest } | null
+  >(null);
 
   const refresh = useCallback(async () => {
     const generation = ++refreshGeneration.current;
@@ -161,6 +167,44 @@ export function RemoteHostsPage() {
     }));
   }, []);
 
+  const runSshBootstrap = useCallback(
+    async (request: RemoteHostBootstrapRequest) => {
+      setInstalling(true);
+      try {
+        const result = await api.bootstrapRemoteHost(request);
+        setHostKeyPrompt(null);
+        showToast(t("settings.remoteHosts.sshSucceeded", { label: result.host.label }), {
+          variant: "info",
+        });
+        // Drops the password with the rest of the draft.
+        setSshForm(EMPTY_SSH_FORM);
+        await refresh();
+      } catch (caught) {
+        // An unknown host key is a question for the user, not a failure: show
+        // its fingerprint and wait. Nothing is trusted until they confirm.
+        const prompt = hostKeyPromptOf(caught);
+        if (prompt) {
+          setHostKeyPrompt({ prompt, request });
+          return;
+        }
+        setHostKeyPrompt(null);
+        const message = t(remoteHostErrorKey(caught));
+        showToast(t("settings.remoteHosts.sshFailed", { message }), { variant: "error" });
+      } finally {
+        setInstalling(false);
+      }
+    },
+    [refresh, showToast, t],
+  );
+
+  const trustHostKey = useCallback(() => {
+    if (!hostKeyPrompt) return;
+    void runSshBootstrap({
+      ...hostKeyPrompt.request,
+      trustedHostKeys: hostKeyPrompt.prompt.keys.map((key) => key.fingerprint),
+    });
+  }, [hostKeyPrompt, runSshBootstrap]);
+
   const submitSsh = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -175,37 +219,24 @@ export function RemoteHostsPage() {
       const user = sshForm.user.trim();
       const port = sshForm.port.trim();
       const identityFile = sshForm.identityFile.trim();
-      setInstalling(true);
-      try {
-        // Empty optional fields are dropped rather than sent blank, so main
-        // falls back to the SSH config and the local user name. A password
-        // replaces the key, so no `-i` is sent alongside it.
-        const result = await api.bootstrapRemoteHost({
-          label,
-          host,
-          ...(user ? { user } : {}),
-          ...(port ? { port: Number(port) } : {}),
-          ...(!passwordMode && identityFile ? { identityFile } : {}),
-          ...(passwordMode && password ? { password } : {}),
-        });
-        showToast(t("settings.remoteHosts.sshSucceeded", { label: result.host.label }), {
-          variant: "info",
-        });
-        // Drops the password with the rest of the draft.
-        setSshForm(EMPTY_SSH_FORM);
-        await refresh();
-      } catch (caught) {
-        const message = t(remoteHostErrorKey(caught));
-        showToast(t("settings.remoteHosts.sshFailed", { message }), { variant: "error" });
-      } finally {
-        setInstalling(false);
-      }
+      // Empty optional fields are dropped rather than sent blank, so main
+      // falls back to the SSH config and the local user name. A password
+      // replaces the key, so no `-i` is sent alongside it.
+      await runSshBootstrap({
+        label,
+        host,
+        ...(user ? { user } : {}),
+        ...(port ? { port: Number(port) } : {}),
+        ...(!passwordMode && identityFile ? { identityFile } : {}),
+        ...(passwordMode && password ? { password } : {}),
+      });
     },
-    [sshForm, refresh, showToast, t],
+    [sshForm, runSshBootstrap],
   );
-  const busy = installing || pairing;
+  const sshLocked = installing || hostKeyPrompt !== null;
+  const busy = sshLocked || pairing;
   const sshSubmitDisabled =
-    installing ||
+    sshLocked ||
     !sshForm.host.trim() ||
     !sshForm.label.trim() ||
     (sshForm.auth === "password" && sshForm.password === "");
@@ -313,7 +344,7 @@ export function RemoteHostsPage() {
                   aria-label={t("settings.remoteHosts.fieldLabel")}
                   autoComplete="off"
                   spellCheck={false}
-                  disabled={installing}
+                  disabled={sshLocked}
                 />
               </Field>
               <Field label={t("settings.remoteHosts.sshHost")}>
@@ -327,7 +358,7 @@ export function RemoteHostsPage() {
                   autoComplete="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  disabled={installing}
+                  disabled={sshLocked}
                 />
               </Field>
             </div>
@@ -343,7 +374,7 @@ export function RemoteHostsPage() {
                   autoComplete="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  disabled={installing}
+                  disabled={sshLocked}
                 />
               </Field>
               <Field label={t("settings.remoteHosts.sshPort")}>
@@ -356,7 +387,7 @@ export function RemoteHostsPage() {
                   inputMode="numeric"
                   autoComplete="off"
                   spellCheck={false}
-                  disabled={installing}
+                  disabled={sshLocked}
                 />
               </Field>
             </div>
@@ -376,7 +407,7 @@ export function RemoteHostsPage() {
                   { value: "password", label: t("settings.remoteHosts.sshAuthPassword") },
                 ]}
                 label={t("settings.remoteHosts.sshAuthMode")}
-                disabled={installing}
+                disabled={sshLocked}
               />
             </div>
 
@@ -391,7 +422,7 @@ export function RemoteHostsPage() {
                   autoComplete="off"
                   autoCapitalize="off"
                   spellCheck={false}
-                  disabled={installing}
+                  disabled={sshLocked}
                 />
               </Field>
             ) : (
@@ -405,20 +436,29 @@ export function RemoteHostsPage() {
                   aria-label={t("settings.remoteHosts.sshPassword")}
                   autoComplete="off"
                   spellCheck={false}
-                  disabled={installing}
+                  disabled={sshLocked}
                   showLabel={t("settings.remoteHosts.sshShowPassword")}
                   hideLabel={t("settings.remoteHosts.sshHidePassword")}
                 />
               </Field>
             )}
 
-            <div className="settings-remote-host-form-actions">
-              <Button type="submit" variant="primary" disabled={sshSubmitDisabled}>
-                {installing
-                  ? t("settings.remoteHosts.sshRunning")
-                  : t("settings.remoteHosts.sshAction")}
-              </Button>
-            </div>
+            {hostKeyPrompt ? (
+              <RemoteHostKeyConfirm
+                prompt={hostKeyPrompt.prompt}
+                busy={installing}
+                onTrust={trustHostKey}
+                onCancel={() => setHostKeyPrompt(null)}
+              />
+            ) : (
+              <div className="settings-remote-host-form-actions">
+                <Button type="submit" variant="primary" disabled={sshSubmitDisabled}>
+                  {installing
+                    ? t("settings.remoteHosts.sshRunning")
+                    : t("settings.remoteHosts.sshAction")}
+                </Button>
+              </div>
+            )}
           </form>
 
           <form

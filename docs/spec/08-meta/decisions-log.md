@@ -50,6 +50,9 @@ This log freezes previously open questions into concrete decisions.
 | D654 | Keep the deterministic first-prompt session title in the core | **Amend D652 / ADR 0323: a session whose stored title is still a recognized placeholder derives a whitespace-collapsed 48-character fallback from the first prompt, written through the host RPC and IPC `session/deriveTitle`. Host-core applies it only while the title is still a placeholder with the `default` source, and the derived text keeps that source, so an installed title plugin may still replace it and only a manual rename opts out. No model call, no new permission, no schema or protocol version change; `updated_at`, transcript content, and message count stay unchanged. See `03-runtime/01-ipc-protocol.md`, `03-runtime/02-agent-runtime.md`, `03-runtime/06-host-rpc-protocol.md`, `03-runtime/04-data-storage.md`, `04-ux/08-component-spec.md`, and E2E-021a.** | Removing every automatic write left an untouched session showing a placeholder until a plugin ran, so offline readability depended on installing optional software. |
 | D655 | Cloud sync opens in packaged builds as Experimental | **Amend D649: remove the packaged-build visibility gate from Settings `sync` and restore its `Experimental` badge on the rail row and page title. Cloud sync and Remote Hosts are both available in packaged and development builds with Experimental badges. The S3 sync behavior, protocol, Host schema, and persisted data are unchanged. See `04-ux/06-settings-ia.md`, `03-runtime/22-config-sync.md`, and E2E-CONFIG-SYNC-s3-portable-configuration.** | The existing encrypted backup is useful to packaged-build users; the Experimental badge communicates its current maturity without keeping the feature hidden. |
 | D656 | Quarantine appends the host keeps refusing instead of stalling the outbox | **Amend ADR 0041 / D318 / D444 / D597: an append whose `session.appendMessage` or `session.recordUsage` call fails with an error the outbox cannot classify as a duplicate message id, a `PERMISSION_DENIED:` poison row, or a foreign-key orphan is retried on a bounded backoff (5s, doubling to a 60s cap) instead of ending the flush. The fifth consecutive failure on that head moves it into an application-owned dead-letter file, `session-message-outbox.dead-letter.json`, with its payload, session id, quarantine timestamp, and host error; only the newest 256 quarantined appends are kept, and the oldest is discarded with a warn. The flush then continues with the next entry, so one refused append can no longer hold the FIFO head, fill the 1024-entry cap, or fail every session's writes. Quarantined appends are never replayed automatically, and `session.delete` drops that session's quarantined appends too. No protocol version, storage schema, or queued-outbox format change.** | A `stream did not contain valid UTF-8` append stayed at the FIFO head for 14.8 hours while `session.persistence.outbox.is.full` fired 5990 times, so every session's appends failed until restart. Only three error classes had a drain, and every other error was treated as transient forever (#1560). |
+| D657 | Window bounds recovery never runs an external helper | **Supersede D053; amend D447. The main process no longer executes the `/tmp/pi-window-bounds` CoreGraphics helper (or any external process) to detect a Stage Manager shelf. Shelf detection in `bootstrap/window.ts` uses Electron bounds only (width < 500 or height < 400), which is what every build without that unshipped dev binary already did. The macOS watchdog cadence, `ensureStableBounds` triggers and the Codex footprint restore are unchanged.** | `/tmp` is world-writable, so any local user could plant that path and get code execution as the desktop user every 1.5s, including in packaged builds; nothing in the repository builds or ships the helper. |
+| D658 | RACP device tokens expire and re-pair over SSH | **Amend D448 / ADR 0285 / ADR remote-provider-import / security §3.4: a `pdt1.` device token is refused after 30 days unused or 180 days since issue (`RACP_DEVICE_TOKEN_IDLE_TTL_MS`, `RACP_DEVICE_TOKEN_MAX_LIFETIME_MS`); upgrade and connection close record use. An expired-but-valid token gets `401` with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED` (new non-retriable code); other refusals keep `REMOTE_AUTH_FAILED`. An SSH-managed desktop then runs `pi-host pairing-issue` over SSH (admin-socket `pairing.issue`, single-use, two-minute token), exchanges it with the Host id check, stores the new token, and retries once; no reinstall or restart, and revoked tokens are never re-paired. `credentials.json` becomes version 2 (`tokenIssuedAt`, persisted `lastSeenAt`); version 1 records start both windows at migration time. Failed upgrade authentications are throttled per address (10-failure bucket, one per 6 s, then `429` + `Retry-After` from 1 s doubling to 60 s), logged without token material. `applyCeilingToPairedDevices` stays off because the same default also governs the local desktop principal.** | A never-expiring `owner` credential stayed useful indefinitely once copied; SSH is the pairing root of trust, so renewal can be automatic without asking the user or restarting the Host. See ADR racp-device-token-lifetime. |
+| D660 | Confirm SSH host keys instead of trusting on first use | **Amend ADR 0292 / D453 through ADR 0328: every remote-host `ssh` child uses `StrictHostKeyChecking=yes` with `UserKnownHostsFile` listing the app-managed `<dataDir>/ssh_known_hosts` first and the user's default files after it. An unknown host fails with `SSH_HOST_KEY_UNKNOWN` carrying key type and SHA-256 fingerprint; Settings asks the user to confirm, and only a confirmed key is recorded in the app file. A changed key fails with `SSH_HOST_KEY_CHANGED` and is never accepted by the app. `RemoteHostBootstrapRequest.trustedHostKeys` and both error codes are additive; host/user argv values also reject whitespace and control characters, and the destination follows `--`. See `05-security/02-remote-control-security.md` §3.4 and E2E-REMOTE-HOST-ssh-host-key-confirmation.** | `accept-new` trusted a never-seen host silently, so an attacker at first connect could impersonate it and receive the SSH password and synced provider keys. |
 
 ## B. Secondary implementation defaults
 
@@ -169,7 +172,7 @@ Gold source: local Codex electron captures; latest row wins where rows conflict.
 | D050 | Empty composer plate height | *(superseded by D055, then D061)* Home empty composer min-height ~112px (compact); model chip shows model id (effort stays in menu) | Match Codex empty plate density; model chip chrome closer to electron model picker trigger |
 | D051 | Sidebar nav density | *(session-list IA superseded by D088; row density retained)* **Nav rows ~32px pitch, recents rows ~28–31px, section label `最近`/`Recents`** | Close light-home sidebar residual vs cx-home-clean |
 | D052 | Home vertical + night box polish | *(workspace-chip surface superseded by D095; remaining guidance retained)* **Upper pb ~62px (hero first-ink ~y305); light chips `#f3f3f3`; light composer elevation stronger; dark home composer solid `#212121`; toolbar controls 28px** | Close residual heat at hero y≈300 and composer band; night plate must not flatten into `#181818` |
-| D053 | Stage Manager CG detection | **CG bounds helper matches any window layer by pid; missing-CG needs streak≥3 before shelf recovery; avoid permanent alwaysOnTop** | alwaysOnTop floating layer broke layer-0 helpers and caused restore thrash |
+| D053 | Stage Manager CG detection | *(superseded by D657)* **CG bounds helper matches any window layer by pid; missing-CG needs streak≥3 before shelf recovery; avoid permanent alwaysOnTop** | alwaysOnTop floating layer broke layer-0 helpers and caused restore thrash |
 | D054 | Empty draft row + infinity cue | *(∞ cue superseded by D094; leading brand cue superseded by D160)* **Composer auto-resize must never collapse empty textarea height (<28px); keep a visible brand cue left of draft; solid disabled send (`#bdbdbd` light); denser placeholder ink; night plate solid `#212121`** | Empty `height:0` auto-resize hid placeholder and read as broken night/light box; gold draft row needs visible mark + ink density |
 | D055 | Empty plate draft Y | *(plate-height guidance superseded by D061; workspace-chip density superseded by D095)* Home empty shell min-height ~148px (bottom-aligned) so draft densest ink ≈y556 vs gold; chips compact 28px | 112px plate left draft ~30px low; grow plate upward without moving toolbar footing |
 | D056 | Empty-home workspace chips | *(superseded by D095)* **Hide project/Local/branch capsule on empty home always; show only in thread-docked composer** | cx-home-clean empty gold has no capsule band above the plate even with project title |
@@ -7641,3 +7644,93 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   restart, dead-letter cap, session delete) and
   E2E-SESSION-outbox-unclassifiable-failure-does-not-stall-the-queue. See ADR
   0041, `03-runtime/04-data-storage.md`, and `03-runtime/06-host-rpc-protocol.md`.
+
+## 2026-10-12 — RACP device tokens expire and re-pair over SSH (D658)
+
+- D658 amends D448, ADR 0285, ADR remote-provider-import, and security §3.4:
+  device tokens expire after 30 days unused or 180 days since issue. An
+  expired-but-valid token is refused with `REMOTE_DEVICE_TOKEN_EXPIRED` via
+  the `x-racp-error` upgrade header; other refusals stay `REMOTE_AUTH_FAILED`.
+- An SSH-managed desktop re-pairs once automatically through
+  `pi-host pairing-issue` (admin-socket `pairing.issue`) without restarting
+  the Host; a revoked token is never re-paired, and a failed re-pair leaves
+  the Host `action-required`.
+- `pi-host` `credentials.json` moves to version 2; version 1 device records
+  start their lifetime at migration time so no desktop is locked out on
+  upgrade. Failed upgrade authentications are throttled per remote address.
+- `applyCeilingToPairedDevices` stays off: the shared default also governs the
+  local desktop's own sessions.
+- Covered by `packages/racp/src/auth-expiry.test.ts`,
+  `packages/racp/src/ws-binding.test.ts`, `apps/pi-host/src/config.test.ts`,
+  `apps/pi-host/src/pairing-issue.test.ts`, and
+  `apps/desktop/test/remote-device-repair.test.mjs`. See ADR
+  racp-device-token-lifetime.
+
+## 2026-10-12 — Project MCP servers need content-bound approval (D659)
+
+- D659 amends D193, ADR 0056, and ADR 0112: a project-level MCP server
+  (`<project>/.agents/servers/*.json`) is runnable only after the user approves
+  a SHA-256 of its transport, command, args, env, url, and headers. Approvals
+  live app-locally in the `approvals` map of
+  `<data>/agent-capabilities/mcp.json`; a project server with no stored state
+  now reads as `pending` instead of enabled, an explicit off stays off, and a
+  changed file reads as `changed` until re-approved. Global servers are
+  unchanged.
+- `mcp.approve({ id, projectPath, configHash })` approves the hash the user was
+  shown and refuses a stale one; `mcp.setEnabled(true)` refuses an unapproved
+  project server. Content the user writes through the app is approved as
+  written. Electron Main's MCP runtime also refuses to connect unapproved
+  project records.
+- Native Pi continuation passes Pi's stored project trust decision as
+  `projectTrusted` instead of `true`.
+- Project skills keep default-on catalog listing; content-bound approval for
+  them is a tracked follow-up (security §4.4 residual risk). Superseded by
+  D661.
+- Covered by host-core `mcp_servers` tests, `apps/desktop/test/user-mcp.test.mjs`,
+  `apps/desktop/test/mcp-project-approval.test.mjs`, and
+  `packages/agent-runtime/src/native-pi-session.test.ts`. See
+  `docs/adr/project-mcp-server-approval.md` and
+  E2E-MCP-project-server-requires-approval.
+
+## 2026-10-12 — Confirm SSH host keys instead of trusting on first use (D660)
+
+- D660 amends ADR 0292 decision 1 and D453 through ADR 0328: SSH connections
+  to remote hosts use `StrictHostKeyChecking=yes` instead of `accept-new`. An
+  unknown host is refused with `SSH_HOST_KEY_UNKNOWN`, and Settings shows its
+  key type and SHA-256 fingerprint for confirmation; only a confirmed key is
+  recorded, in the app-managed `<dataDir>/ssh_known_hosts`. A changed key fails
+  with `SSH_HOST_KEY_CHANGED` and is never accepted by the app.
+- The user's own `~/.ssh/known_hosts` stays consulted (after the app file) and
+  is never written, so previously paired hosts reconnect unchanged. The key is
+  learned by an `ssh` probe with every authentication method disabled, so no
+  password or provider key reaches a host before its key is trusted.
+- `RemoteHostBootstrapRequest.trustedHostKeys` and the two error codes are
+  additive. Host and user argv values now also reject whitespace and control
+  characters, and the destination follows `--`.
+- Covered by `apps/desktop/test/remote-host-ssh-host-keys.test.mjs`,
+  `remote-host-key-confirm-ui.test.mjs`, and
+  E2E-REMOTE-HOST-ssh-host-key-confirmation. See ADR 0328 and
+  `05-security/02-remote-control-security.md` §3.4.
+
+## 2026-10-12 — Project skills need content-bound approval (D661)
+
+- D661 extends D659 to project skills (`<project>/.agents/skills`): a project
+  skill reaches the skill catalog, composer slash commands and the `Skill` tool
+  only after the user approves a SHA-256 of its raw skill document. Approvals
+  live in the `approvals` map of `<data>/agent-capabilities/skills.json`; a
+  project skill with no stored state reads as `pending`, an explicit off stays
+  off, and a changed document reads as `changed` until re-approved. Sibling
+  resources of a directory skill are not hashed because the runtime never
+  injects them. Global skills are unchanged.
+- `skills.approve({ id, projectPath, contentHash })` approves the hash the user
+  was shown and refuses a stale one; `skills.setEnabled(true)` refuses an
+  unapproved project skill; `skills.read` refuses a project document that
+  changed between scan and read. Skills the user creates or imports through the
+  app are approved as written. The headless Pi Host `Skill` tool now refuses a
+  skill that is not active for the session's project, as Desktop's already did.
+- Removes the project-skill residual risk recorded by D659 (security §4.4).
+- Covered by host-core `user_skills` approval tests,
+  `apps/pi-host/src/skill-tool.test.ts`, and
+  `apps/desktop/test/skill-project-approval.test.mjs`. See
+  `docs/adr/project-mcp-server-approval.md` and
+  E2E-SKILL-project-skill-requires-approval.

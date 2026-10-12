@@ -7,7 +7,7 @@
   `02-architecture/05-remote-agent-control.md` §5.2,
   `05-security/02-remote-control-security.md` §3.4,
   `06-delivery/07-remote-control-rollout.md` §2 R2b
-- Amendments: [ADR 0293](0293-ssh-password-authentication.md) permits secure SSH password handling; [ADR 0326](0326-verified-ssh-host-installation.md) supersedes the executable-upload prohibition, remote-only download prerequisite and daily bootstrap lifecycle below.
+- Amendments: [ADR 0293](0293-ssh-password-authentication.md) permits secure SSH password handling; [ADR 0326](0326-verified-ssh-host-installation.md) supersedes the executable-upload prohibition, remote-only download prerequisite and daily bootstrap lifecycle below; [ADR 0328](0328-ssh-host-key-confirmation.md) replaces `StrictHostKeyChecking=accept-new` in decision 1 with strict checking and an explicit fingerprint confirmation.
 
 This record describes the original bootstrap decision, not the current candidate
 installation contract. ADR 0326 permits a verified release upload only after
@@ -49,7 +49,9 @@ extended boot hook, and one new IPC channel.
    password or passphrase fails immediately with a typed error instead of hanging
    a modal behind an invisible prompt. The module always sets
    `StrictHostKeyChecking=accept-new`, `ConnectTimeout=15`, and
-   `ExitOnForwardFailure=yes`.
+   `ExitOnForwardFailure=yes`. *(Amended by ADR 0328: connections now use
+   `StrictHostKeyChecking=yes`, and a new host is trusted only after the user
+   confirms its SHA-256 fingerprint.)*
 
 2. **Pure release coordinates (`pi-host-release.ts`).** The artifact is resolved
    for the *remote* platform at the *desktop's* version, and the SHA-256 the

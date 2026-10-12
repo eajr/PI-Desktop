@@ -3,22 +3,17 @@
  *
  * Every source produces `McpCandidate` records; ids and shapes are normalized
  * enough for the UI to display them, but the actual host-core admission gates
- * still run at upsert time. Failures during read/parse become `sources[].error`
+ * still run at upsert time. Candidates carry raw `env` / `headers` values and
+ * must not cross IPC as-is; see `agent-mcp-scan-cache.ts` for the redacted
+ * renderer projection. Failures during read/parse become `sources[].error`
  * so the UI can show one row per source instead of dropping the entry.
  */
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { mcpImportId } from "@pi-desktop/shared";
+import { mcpImportId, type ExternalMcpSourceKind } from "@pi-desktop/shared";
 
-export type McpSourceKind =
-  | "claude-desktop"
-  | "claude-code"
-  | "cursor-global"
-  | "cursor-project"
-  | "codex"
-  | "opencode"
-  | "chatgpt-desktop";
+export type McpSourceKind = ExternalMcpSourceKind;
 
 export interface McpCandidate {
   source: McpSourceKind;

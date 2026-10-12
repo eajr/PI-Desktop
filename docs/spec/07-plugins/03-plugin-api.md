@@ -296,7 +296,11 @@ returns `text` (capped at 512 KiB), `image` (capped at 5 MiB, as a data URL),
 `fs.openDefault` opens one existing file with the operating system's default
 associated application. It uses the same `fs.read` root, symlink, protected-path,
 deny-list, and scope checks as `fs.readText`; directories are rejected. The host
-audits the operation. A path is root-relative by default, and an absolute path is
+audits the operation. A file whose association could run code (application,
+script, installer, shortcut, POSIX executable; `05-security/01-security.md`
+§2a) is revealed in the file manager instead of opened: the call still
+resolves, the audit entry records `data.outcome: "revealed"`, and the host
+shows the user a notice. A path is root-relative by default, and an absolute path is
 accepted only by this action and `fs.reveal` (no other mode takes one) when it lies
 inside a registered folder root of the open project — which then becomes the
 containment base for the request (ADR 0249 §5, ADR 0264). That is the shape a view

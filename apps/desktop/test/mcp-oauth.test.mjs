@@ -984,3 +984,127 @@ test("McpOAuthManager: onAuthorized receives the server record", async (t) => {
   assert.equal(authorized.serverId, record.id);
   assert.equal(authorized.record, record);
 });
+
+function metadataFetch({ resource, issuer = "https://as.test", authServers = ["https://as.test"] } = {}) {
+  return async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.hostname === "mcp.test" && url.pathname.startsWith("/.well-known/oauth-protected-resource")) {
+      const body = { authorization_servers: authServers };
+      if (resource !== undefined) body.resource = resource;
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (url.hostname === "as.test" && url.pathname === "/.well-known/oauth-authorization-server") {
+      const body = {
+        authorization_endpoint: "https://as.test/authorize",
+        token_endpoint: "https://as.test/token",
+      };
+      if (issuer !== null) body.issuer = issuer; // null = omit the field
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(null, { status: 404 });
+  };
+}
+
+function metadataManager(t, options) {
+  const manager = new McpOAuthManager({
+    call: fakeHost().call,
+    fetchImpl: metadataFetch(options),
+    openExternal: async () => {},
+  });
+  t.after(() => manager.disposeAll());
+  return manager;
+}
+
+test("McpOAuthManager: accepts a protected resource that canonically matches the server URL", async (t) => {
+  for (const [serverUrl, resource] of [
+    ["https://mcp.test/mcp", "https://mcp.test/mcp"],
+    ["https://mcp.test/mcp", "https://mcp.test/mcp/"],
+    ["https://mcp.test/mcp/", "https://mcp.test/mcp"],
+    ["https://MCP.test:443/mcp", "https://mcp.test/mcp"],
+    ["https://mcp.test/", "https://mcp.test"],
+    // Same origin, whole-segment path prefix (MCP SDK checkResourceAllowed).
+    ["https://mcp.test/mcp", "https://mcp.test"],
+    ["https://mcp.test/v1/mcp", "https://mcp.test/v1/"],
+  ]) {
+    const metadata = await metadataManager(t, { resource }).discoverMetadata(serverUrl);
+    assert.equal(metadata.resource, resource, `${serverUrl} vs ${resource}`);
+    assert.equal(metadata.tokenEndpoint, "https://as.test/token");
+  }
+});
+
+test("McpOAuthManager: falls back to the server URL when metadata omits resource", async (t) => {
+  const metadata = await metadataManager(t, { resource: undefined }).discoverMetadata("https://mcp.test/mcp");
+  assert.equal(metadata.resource, "https://mcp.test/mcp");
+});
+
+test("McpOAuthManager: rejects a protected resource that names another service", async (t) => {
+  for (const resource of [
+    "https://other.test/mcp",
+    "https://mcp.test.evil.test/mcp",
+    "http://mcp.test/mcp",
+    "https://mcp.test:8443/mcp",
+    "https://mcp.test/other",
+    "https://mcp.test/mc",
+    "https://mcp.test/mcp/admin",
+    "https://mcp.test/mcp?tenant=other",
+    "not a url",
+    42,
+  ]) {
+    await assert.rejects(
+      () => metadataManager(t, { resource }).discoverMetadata("https://mcp.test/mcp"),
+      /protected resource metadata names resource .* does not match the MCP server URL https:\/\/mcp\.test\/mcp/,
+      String(resource),
+    );
+  }
+});
+
+test("McpOAuthManager: a mismatched resource never reaches the authorization server", async (t) => {
+  let opened = null;
+  const host = fakeHost();
+  const { mockCreateServer } = createMockServerFactory();
+  const events = [];
+  const manager = new McpOAuthManager({
+    call: host.call,
+    fetchImpl: metadataFetch({ resource: "https://bank.test/api" }),
+    createServer: mockCreateServer,
+    emit: (event) => events.push(event),
+    openExternal: async (url) => {
+      opened = url;
+    },
+  });
+  t.after(() => manager.disposeAll());
+  await manager.start("victim", "https://mcp.test/mcp");
+  await waitUntil(() => events.some((e) => e.kind === "error"));
+  const error = events.find((e) => e.kind === "error");
+  assert.match(error.message, /does not match the MCP server URL/);
+  assert.equal(opened, null);
+  assert.equal(host.calls.length, 0);
+});
+
+test("McpOAuthManager: rejects authorization server metadata whose issuer differs", async (t) => {
+  for (const issuer of ["https://evil.test", "https://as.test/tenant", "http://as.test", null]) {
+    await assert.rejects(
+      () => metadataManager(t, { resource: "https://mcp.test/mcp", issuer }).discoverMetadata("https://mcp.test/mcp"),
+      /authorization server metadata issuer .* does not match authorization server https:\/\/as\.test/,
+      String(issuer),
+    );
+  }
+  const metadata = await metadataManager(t, { resource: "https://mcp.test/mcp", issuer: "https://as.test/" })
+    .discoverMetadata("https://mcp.test/mcp");
+  assert.equal(metadata.authorizationEndpoint, "https://as.test/authorize");
+});
+
+test("McpOAuthManager: a stored token is withheld from a server URL outside its resource", async (t) => {
+  const host = fakeHost();
+  host.secrets.set("secret:mcp:bound:oauth", JSON.stringify({
+    clientId: "c",
+    tokenEndpoint: "https://as.test/token",
+    accessToken: "bound-token",
+    resource: "https://mcp.test/mcp",
+  }));
+  const manager = new McpOAuthManager({ call: host.call, openExternal: async () => {} });
+  t.after(() => manager.disposeAll());
+  assert.equal(await manager.getValidAccessToken("bound", "https://mcp.test/mcp/"), "bound-token");
+  assert.equal(await manager.getValidAccessToken("bound", "https://other.test/mcp"), null);
+  assert.equal(await manager.getValidAccessToken("bound"), "bound-token");
+});

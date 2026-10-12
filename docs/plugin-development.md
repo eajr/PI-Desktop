@@ -658,11 +658,12 @@ plugin's own persisted session partition, and network limited to
 plugin restricted to certain projects does not offer its views in others.
 
 `examples/plugins/hello` ships a working view at `views/greetings.html`, and
-PI-Desktop's own file view is a bundled plugin built the same way —
-`apps/desktop/resources/plugins/pi.file-manager` is a complete, non-toy example
-of a view that reaches the workspace over the public bridge: `fs.openDefault`
-and `fs.reveal` for the two actions only the host can perform, and the plugin's
-own `onPanelInvoke` channels for everything it reads and writes itself.
+PI-Desktop's bundled browser is a plugin built the same way:
+`apps/desktop/resources/plugins/pi.browser` is a complete, non-toy example of a
+view that drives a host capability over the public bridge. A view that reaches
+the workspace uses `fs.openDefault` and `fs.reveal` for the two actions only the
+host can perform, and the plugin's own `onPanelInvoke` channels for everything
+it reads and writes itself.
 
 ### 6.9 MCP server
 
@@ -897,6 +898,12 @@ through the window's import map, so no bundled React is needed.
 app's own React, so `renderer.extension` is a high-risk permission: grant it
 only to code you trust.
 
+> **Disabled in this build.** Renderer extensions do not load
+> (`RENDERER_EXTENSIONS_ENABLED` in `packages/shared`), because a module in the
+> app's own document can reach the whole preload bridge. A plugin that
+> declares `manifest.renderer` still installs and runs its other
+> contributions. See `docs/adr/disable-plugin-renderer-extensions.md`.
+
 `examples/plugins/ui-slots-lab` mounts a sample on every slot.
 `packages/plugin-sdk/src/renderer.ts` carries the types and each slot's props,
 and the manifest side is [spec 07-plugins/02 §3.2](spec/07-plugins/02-plugin-manifest-schema.md).
@@ -1055,14 +1062,10 @@ Before sharing a package:
 8. Run `pi-plugin pack` and install the resulting package in a clean app state.
 9. Record the printed SHA-256 next to the release artifact.
 
-For the official marketplace, publish on the plugin center,
-[plugins.aiuo.net](https://plugins.aiuo.net): create the plugin, bind the repository it lives in,
-tag the version and submit it — from the console, or with the publishing skill over MCP. The
-center packs the files, audits the source, records the SHA-256 and publishes the version, then
-mirrors the catalog and packages to
-[AIUO-Net/pi-desktop-plugins](https://github.com/AIUO-Net/pi-desktop-plugins) for the GitHub
-backup channel. Plugin sources are never hosted in the distribution repository, and pull requests
-that add them are closed.
+This build of PI-Desktop has no remote marketplace (ADR
+[fork-removes-plugin-marketplace](adr/fork-removes-plugin-marketplace.md)).
+Users install your package from the `.piplug` file or folder you distribute, so
+publish the package and its SHA-256 wherever you host releases.
 
 Signatures are not the current trust primitive. Package SHA-256 and explicit
 permission review are the implemented baseline; follow the

@@ -254,3 +254,38 @@ test("in-page completion cannot republish an invalidated session", async () => {
   wc.emit("did-stop-loading");
   assert.deepEqual(published, []);
 });
+
+test("opening a launchable local file externally reveals it instead", async (t) => {
+  const { shell } = await import("electron");
+  const calls = [];
+  shell.openPath = async (path) => { calls.push(["open", path]); return ""; };
+  shell.showItemInFolder = (path) => { calls.push(["reveal", path]); };
+  t.after(() => { delete shell.openPath; delete shell.showItemInFolder; });
+  const root = mkdtempSync(join(tmpdir(), "pi-browser-launchable-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  async function paneShowing(name) {
+    const full = join(root, name);
+    writeFileSync(full, "fixture");
+    let revealedNotices = 0;
+    const pane = new BrowserPane(() => {}, undefined, () => { revealedNotices += 1; });
+    const request = pane.navigateAndWait(pathToFileURL(full).href, root);
+    const wc = WebContentsView.instances.at(-1).webContents;
+    wc.url = pathToFileURL(realpathSync(full)).href;
+    wc.pendingLoads.shift().resolve();
+    await request;
+    t.after(() => pane.dispose());
+    return { pane, full: realpathSync(full), notices: () => revealedNotices };
+  }
+
+  const script = await paneShowing("page.html.command");
+  await script.pane.openExternal();
+  assert.deepEqual(calls, [["reveal", script.full]]);
+  assert.equal(script.notices(), 1);
+
+  calls.length = 0;
+  const page = await paneShowing("page.html");
+  await page.pane.openExternal();
+  assert.deepEqual(calls, [["open", page.full]]);
+  assert.equal(page.notices(), 0);
+});

@@ -16,6 +16,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dirs = "6"
 globset = "0.4"
 hex = "0.4"
+keyring = "4.2"
 ignore = "0.4"
 regex = "1"
 ring = "0.17"
@@ -39,7 +40,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
-    "Win32_Globalization",
     "Win32_Storage_FileSystem",
     "Win32_System_JobObjects",
     "Win32_System_LibraryLoader",

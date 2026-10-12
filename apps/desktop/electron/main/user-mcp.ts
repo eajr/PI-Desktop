@@ -38,7 +38,7 @@ export type UserMcpClient = Pick<
 export type UserMcpClientConfig = ConstructorParameters<typeof McpServerClient>[0];
 
 export type UserMcpOAuthHandler = {
-  getValidAccessToken: (serverId: string) => Promise<string | null>;
+  getValidAccessToken: (serverId: string, serverUrl?: string) => Promise<string | null>;
   hasOAuth: (serverId: string) => Promise<boolean>;
 };
 
@@ -184,7 +184,9 @@ export class UserMcpRuntime {
    * status rather than thrown.
    */
   async toolsForProject(projectPath: string | null | undefined): Promise<UserMcpToolDescriptor[]> {
-    const active = this.records.filter((record) => isActiveInProject(record, projectPath));
+    const active = this.records.filter(
+      (record) => !awaitingApproval(record) && isActiveInProject(record, projectPath),
+    );
     const admitted = active.slice(0, MAX_ACTIVE_SERVERS);
     if (admitted.length < active.length) {
       this.options.log?.("warn", "user mcp servers skipped over the active cap", {
@@ -315,6 +317,15 @@ export class UserMcpRuntime {
         updatedAt: Date.now(),
       };
     }
+    if (awaitingApproval(record)) {
+      return {
+        serverId,
+        state: "failed",
+        toolCount: 0,
+        message: "project server must be approved before it can run",
+        updatedAt: Date.now(),
+      };
+    }
     // Force a fresh handshake so a fixed command is retried rather than
     // reporting the cached failure.
     const key = connectionKey(record, null);
@@ -364,10 +375,18 @@ export class UserMcpRuntime {
     projectPath: string | null | undefined = null,
     pin = false,
   ): Promise<{ tools: McpTool[]; entry?: Entry }> {
+    // host-core already reports an unapproved project server as disabled; this
+    // is the last gate before a process is spawned or a socket opened, so a
+    // stale record or a caller that skips the enabled check (Test connection)
+    // still cannot run repository-provided configuration nobody reviewed.
+    if (awaitingApproval(record)) {
+      this.options.log?.("warn", "user mcp project server awaits approval", { serverId: record.id });
+      return { tools: [] };
+    }
     let oauthToken: string | null = null;
     if (record.transport === "http" && this.options.oauth) {
       try {
-        oauthToken = await this.options.oauth.getValidAccessToken(record.id);
+        oauthToken = await this.options.oauth.getValidAccessToken(record.id, record.url);
       } catch {
         oauthToken = null;
       }
@@ -529,6 +548,15 @@ export class UserMcpRuntime {
     this.entries.delete(candidate.key);
     return true;
   }
+}
+
+/**
+ * A project-level record arrives with the repository, so it never runs until
+ * the user approved its exact content. Records without a level (plugin-owned or
+ * older hosts) and global records are not subject to project approval.
+ */
+export function awaitingApproval(record: McpServerRecord): boolean {
+  return record.level === "project" && record.approval !== "approved";
 }
 
 function workspacePath(projectPath: string | null | undefined): string {

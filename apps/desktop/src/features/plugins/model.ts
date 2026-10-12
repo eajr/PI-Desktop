@@ -1,23 +1,16 @@
-import type {
-  MarketPluginSummary,
-  PluginCapability,
-  PluginSummary,
-} from "@pi-desktop/shared";
-
-export type TabId = "installed" | "market";
+import { RENDERER_EXTENSIONS_ENABLED, type PluginCapability, type PluginSummary } from "@pi-desktop/shared";
 
 /**
- * Always-visible sections of the installed index. Broken plugins come first and
- * pending updates second, so the two states that need a decision are never
- * buried under the plugins that are simply working.
+ * Always-visible sections of the installed index. Broken plugins come first so
+ * the state that needs a decision is never buried under the plugins that are
+ * simply working.
  */
-export type GroupId = "attention" | "updates" | "active" | "disabled";
+export type GroupId = "attention" | "active" | "disabled";
 
-export const GROUP_ORDER: GroupId[] = ["attention", "updates", "active", "disabled"];
+export const GROUP_ORDER: GroupId[] = ["attention", "active", "disabled"];
 
 export const GROUP_LABEL_KEYS: Record<GroupId, string> = {
   attention: "plugins.groupAttention",
-  updates: "plugins.groupUpdates",
   active: "plugins.groupActive",
   disabled: "plugins.groupDisabled",
 };
@@ -144,6 +137,43 @@ export function permissionLabel(key: string, t: (k: string, o?: any) => string):
   return t(`plugins.permissions.${key}`, { defaultValue: key });
 }
 
+/** The grant behind `manifest.renderer`. */
+export const RENDERER_EXTENSION_PERMISSION = "renderer.extension";
+
+/** Shown wherever this build declines to load a plugin's renderer extension. */
+export const RENDERER_EXTENSIONS_DISABLED_KEY = "plugins.rendererExtensionsDisabled";
+
+/**
+ * Whether this build ignores a permission outright. Renderer extensions are
+ * off (`RENDERER_EXTENSIONS_ENABLED`), so a review must not present
+ * `renderer.extension` as something the user is turning on: it records the
+ * declaration and grants nothing.
+ */
+export function permissionDisabledInBuild(
+  permission: string,
+  enabled: boolean = RENDERER_EXTENSIONS_ENABLED,
+): boolean {
+  return !enabled && permission === RENDERER_EXTENSION_PERMISSION;
+}
+
+/** The explanation under a permission's label in reviews and detail sheets. */
+export function permissionHelp(permission: string, t: (k: string, o?: any) => string): string {
+  if (permissionDisabledInBuild(permission)) return t(RENDERER_EXTENSIONS_DISABLED_KEY);
+  return t(`plugins.permissionHelp.${permission}`, { defaultValue: permission });
+}
+
+/** An installed plugin whose renderer extension this build skips. */
+export function skipsRendererExtension(
+  plugin: Pick<PluginSummary, "permissions" | "capabilities">,
+  enabled: boolean = RENDERER_EXTENSIONS_ENABLED,
+): boolean {
+  if (enabled) return false;
+  return (
+    (plugin.capabilities ?? []).includes("rendererUi") ||
+    (plugin.permissions ?? []).includes(RENDERER_EXTENSION_PERMISSION)
+  );
+}
+
 /** Deduplicates permissions and orders them by descending risk, then by label. */
 export function orderPermissions(permissions: readonly string[] | undefined): string[] {
   return [...new Set(permissions ?? [])].sort(
@@ -153,88 +183,13 @@ export function orderPermissions(permissions: readonly string[] | undefined): st
   );
 }
 
-export function formatBytes(size?: number): string {
-  if (!size || size <= 0) return "—";
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-}
-
-export function formatDate(value: string | undefined, locale: string): string {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  try {
-    return new Intl.DateTimeFormat(locale || undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(parsed);
-  } catch {
-    return parsed.toLocaleDateString();
-  }
-}
-
-export function shortSha(value?: string): string {
-  if (!value) return "—";
-  return value.length > 12 ? `${value.slice(0, 12)}…` : value;
-}
-
-/**
- * A catalog version is installable only once its package is published and
- * while it is still offered. The host refuses the download otherwise, so every
- * install affordance reads this instead of offering a button that can only
- * fail.
- */
-export function versionInstallable(
-  version?: { url?: string; shasum?: string; yanked?: boolean } | null,
-): boolean {
-  return !!version?.url?.trim() && !!version?.shasum?.trim() && !version.yanked;
-}
-
-/**
- * Withdrawn is a different refusal from not-yet-published: the version existed
- * and was pulled, so the sheet explains it rather than telling the user to wait
- * for an upload that will never come.
- */
-export function versionWithdrawn(version?: { yanked?: boolean } | null): boolean {
-  return !!version?.yanked;
-}
-
-/**
- * Whether a marketplace entry may render the verified shield.
- *
- * Catalog v2 carries an explicit tier that only the plugin center can issue,
- * and the host already downgrades a claim it cannot attribute to the official
- * source. A v1 entry has no tier, so its maintainer-written boolean still
- * decides. Rendering `trust` first keeps the badge from being something a
- * publisher can grant themselves.
- */
-export function showsVerifiedBadge(entry?: { trust?: string; verified?: boolean } | null): boolean {
-  if (!entry) return false;
-  if (entry.trust) return entry.trust === "verified";
-  return !!entry.verified;
-}
-
-/** Single-glyph stand-in for a marketplace icon we deliberately do not fetch. */
-export function monogram(name: string): string {
-  const first = [...name.trim()][0];
-  return first ? first.toLocaleUpperCase() : "?";
-}
-
 export function matchesQuery(query: string, ...fields: Array<string | undefined>): boolean {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return true;
   return fields.some((field) => field?.toLocaleLowerCase().includes(needle));
 }
 
-/** Development-only sample plugins are fixtures, not client product offerings. */
-export function isClientVisibleMarketPlugin(plugin: Pick<MarketPluginSummary, "id">): boolean {
-  return !plugin.id.startsWith("demo.");
-}
-
 export function groupOf(plugin: PluginSummary): GroupId {
   if (plugin.status === "error" || plugin.status === "load_error") return "attention";
-  if (plugin.updateAvailable) return "updates";
   return plugin.enabled ? "active" : "disabled";
 }

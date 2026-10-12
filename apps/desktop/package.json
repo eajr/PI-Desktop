@@ -85,13 +85,7 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "vastsa",
-        "repo": "PI-Desktop"
-      }
-    ],
+    "publish": null,
     "extraMetadata": {
       "piDistribution": "installed"
     },
@@ -287,6 +281,17 @@
     ],
     "asar": {
       "smartUnpack": false
+    },
+    "electronFuses": {
+      "runAsNode": true,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": true,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": true,
+      "resetAdHocDarwinSignature": true
     }
   }
 }

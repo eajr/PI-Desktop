@@ -2261,6 +2261,68 @@ describe("DesktopAgentRuntime deferred tool catalog", () => {
     }
   });
 
+  it("gates JevClassify through host tools.execute before contacting TypeSafe", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("{}"));
+    vi.stubGlobal("fetch", fetchMock);
+    const host = {
+      call: vi.fn(async (method: string) =>
+        method === "tools.execute"
+          ? {
+              ok: false,
+              isError: true,
+              denied: true,
+              errorCode: "TOOL_DENIED",
+              content: { error: "permission denied", code: "TOOL_DENIED" },
+            }
+          : undefined,
+      ),
+      onNotification: vi.fn(() => () => {}),
+    };
+    const runtime = createRuntime({ jevApiKey: "fixture-key", host });
+    try {
+      const tool = (
+        runtime as unknown as {
+          toolCatalog: Map<
+            string,
+            {
+              execute: (
+                id: string,
+                input: unknown,
+              ) => Promise<{ isError?: boolean; details?: unknown }>;
+            }
+          >;
+        }
+      ).toolCatalog.get("JevClassify");
+      expect(tool).toBeDefined();
+      const result = await tool!.execute("jev-call", {
+        state: { message: "hello" },
+        questions: {
+          approved: {
+            type: "bool",
+            instructions: "Does the user approve?",
+            criteria: { true: "Approval", false: "No approval" },
+          },
+        },
+      });
+      const gate = host.call.mock.calls.find(
+        ([method]) => method === "tools.execute",
+      ) as unknown as [string, Record<string, unknown>] | undefined;
+      expect(gate?.[1]).toMatchObject({
+        sessionId: "session-1",
+        toolCallId: "jev-call",
+        toolName: "JevClassify",
+        mode: "agent",
+        args: { state: { message: "hello" } },
+      });
+      expect(result.isError).toBe(true);
+      expect(result.details).toMatchObject({ errorCode: "TOOL_DENIED", denied: true });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+      await runtime.dispose();
+    }
+  });
+
   it("starts Agent with core tools plus workspace search and discovery", async () => {
     const runtime = createRuntime({
       pluginTools: [

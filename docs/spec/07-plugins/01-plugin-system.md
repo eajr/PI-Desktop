@@ -512,6 +512,12 @@ Rules the control encodes:
   environment/header rows, validation, duplicate checks, and Test connection.
 - Enablement is app-local and project records shadow global records before the
   active runtime filters disabled rows.
+- A project server runs only after approval bound to its execution-relevant
+  content (D659). A pending or changed project row shows a "Needs approval" or
+  "Changed since approval" badge and a review block with the full command line,
+  environment, URL and headers, plus "Approve and enable"; its switch and Test
+  connection are hidden until approved. Servers the user creates in a project
+  through the app are approved as written.
 - A previously advertised user MCP tool remains routable after transport loss
   or a saved connection edit. The next call re-handshakes the current saved
   server and validates the tool against its fresh list before dispatch; no
@@ -569,6 +575,13 @@ Rules the control encodes:
   non-ASCII.
 - The description is the catalog summary and the body is fetched only when the
   model invokes `Skill` (D174, D194).
+- A project skill enters the catalog only after approval bound to the exact
+  skill document (D661). A pending or changed project row shows a "Needs
+  approval" or "Changed since approval" badge and a review block; "Review text"
+  loads the name, description and body, and "Approve and enable" approves the
+  hash returned with that text. Its switch is hidden until approved. Skills the
+  user creates or imports into a project through the app are approved as
+  written.
 
 ## 13. Developer experience
 

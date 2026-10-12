@@ -7,7 +7,6 @@ const read = (rel) => readFile(new URL(rel, import.meta.url), "utf8");
 
 const overlaySources = [
   "../src/components/ReleaseNotesDialog.tsx",
-  "../src/components/plugins/PluginInstallDialog.tsx",
   "../src/components/plugins/PluginSettingsSheet.tsx",
   "../src/components/settings/ProviderSetupDialog.tsx",
   "../src/components/settings/VendorAccountDialog.tsx",
@@ -16,7 +15,6 @@ const overlaySources = [
   "../src/components/settings/SubagentEditorSheet.tsx",
   "../src/components/extensions/McpEditorSheet.tsx",
   "../src/features/plugins/PluginDialogs.tsx",
-  "../src/features/plugins/PluginDetailSheet.tsx",
 ];
 
 test("route entrance does not leave a transform containing block", async () => {
@@ -58,10 +56,6 @@ test("settings overlays mount on a viewport-fixed host outside the app shell", a
     pluginsCss,
     /#pi-desktop-overlays\s*>\s*\.plugins-modal-backdrop\s*\{[^}]*pointer-events:\s*auto;/,
   );
-  assert.match(
-    pluginsCss,
-    /#pi-desktop-overlays\s*>\s*\.plugins-sheet-layer\s*\{[^}]*pointer-events:\s*auto;/,
-  );
 
   const ui = await read("../src/components/ui.tsx");
   assert.match(ui, /export function portalOverlay/);
@@ -77,7 +71,7 @@ test("settings overlays mount on a viewport-fixed host outside the app shell", a
   const pluginDialogs = await read("../src/features/plugins/PluginDialogs.tsx");
   assert.equal(
     pluginDialogs.match(/(?<!function )pluginModalPortal\(/g)?.length,
-    3,
+    2,
     "each route-owned plugin modal must mount through pluginModalPortal",
   );
   assert.match(
@@ -89,13 +83,6 @@ test("settings overlays mount on a viewport-fixed host outside the app shell", a
     pluginDialogs,
     /PluginModalBlockingHost[\s\S]*useBlockingOverlay\(/,
     "plugin modal host must register useBlockingOverlay",
-  );
-
-  const detailSheet = await read("../src/features/plugins/PluginDetailSheet.tsx");
-  assert.match(
-    detailSheet,
-    /useBlockingOverlay\(/,
-    "PluginDetailSheet must register useBlockingOverlay while open",
   );
 });
 

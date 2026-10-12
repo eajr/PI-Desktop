@@ -65,7 +65,7 @@ app.whenReady().then(async () => {
       check(theme + ' ' + request + ' Escape dismisses', await evaluate('!document.querySelector("[role=dialog]")'));
     }
   }
-  for (const kind of ['rename','instructions','memory','delete','install','plugin-settings','plugin-review','oauth']) {
+  for (const kind of ['rename','instructions','memory','delete','plugin-settings','plugin-review','oauth']) {
     win.setContentSize(1100, 800);
     await evaluate('window.dialogFixture.show(' + JSON.stringify(kind) + ')');
     const m = await measure();

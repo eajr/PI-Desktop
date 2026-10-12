@@ -54,8 +54,9 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 ## 3. 构建内容
 
 - Electron 应用程序具有强化的运行时 + 权利
-  (`build/entitlements.mac.plist`: JIT + 无符号可执行内存 +
-  库验证禁用 — 标准 Electron 设置），并在 Info.plist 中通过
+  (`build/entitlements.mac.plist`: JIT + 库验证禁用 — 供 sidecar 与插件宿主
+  加载用户安装包中的原生模块），并通过 `build.electronFuses` 设置 Electron
+  熔断器（ADR electron-fuses-and-packaged-code-paths），并在 Info.plist 中通过
   `apps/desktop/package.json` → `mac.extendInfo` 追加
   `NSLocalNetworkUsageDescription`，使 macOS 15+ 弹出本地网络授权，同时授予
   Chromium 主进程与 `ELECTRON_RUN_AS_NODE` 的 agent sidecar；否则主进程的
@@ -227,26 +228,7 @@ Linux 更新源带上它们所构建的架构：x64 为 `latest-linux.yml`，arm
 `latest-linux-arm64.yml`。这正是 `electron-updater` 在对应架构上请求的通道文件，
 因此某条通道若缺少自己的更新源，会在上传前就失败。
 
-### 4.4 CNB 镜像触发
-
-`softprops/action-gh-release` 发布或更新 GitHub Release 之后，
-`.github/workflows/mirror-to-cnb.yml` 会启动 `aixk/Pi-Desktop` 上的 CNB
-流水线。GitHub Release 仍是权威产物源；CNB 只是同一标签的副本，供从
-https://cnb.cool/aixk/Pi-Desktop 拉取的用户使用。
-
-该作业：
-
-- 仅在 `vastsa/PI-Desktop` 上运行
-- 在 `release` 的 `published` / `edited` 时触发，也可通过
-  `workflow_dispatch` 传入明确标签（例如 `v0.14.6`）
-- 发送事件 `api_trigger_mirror`，并把 `MIRROR_TAGS` 设为该标签
-- 使用仓库密钥 `CNB_MIRROR_TOKEN`（已配置）；密钥为空时失败退出
-- 用 `jq` 构造 JSON，避免手动运行时标签缺失导致空的 `MIRROR_TAGS`
-
-若 CNB 流水线幂等，对同一标签重跑是安全的。它不会重新构建桌面产物，
-也不会改写 electron-updater 更新源。
-
-### 4.5 GitHub Actions 中的 macOS 签名密钥
+### 4.4 GitHub Actions 中的 macOS 签名密钥
 
 在 GitHub → 仓库 `vastsa/PI-Desktop` → Settings → Secrets and variables →
 Actions 中创建下列密钥。不要把 p12、密码、Apple ID 或应用专用密码提交进仓库。
@@ -269,7 +251,7 @@ base64 -i developer-id-application.p12 | pbcopy
 Linux 使用 `base64 -w0 developer-id-application.p12`。绝不能进入 git 的文件：
 `*.p12`、`*.cer`、`*.p8`、`*.mobileprovision`。
 
-### 4.6 macOS 签名可观测性与超时
+### 4.5 macOS 签名可观测性与超时
 
 `electron-builder` 在开始签名前只打印一行 —— `signing
 file=release/mac-arm64/PI-Desktop.app platform=darwin type=distribution

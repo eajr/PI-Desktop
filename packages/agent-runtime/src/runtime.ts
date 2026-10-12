@@ -14,7 +14,12 @@ import { requestExtensionUi } from "./extensions/ui-request.js";
 import { readLocalRequestErrorDetails } from "./local-request-errors.js";
 import { imageGenerationDescription, imageGenerationParameters } from "./image-generation/tool.js";
 import { todoWriteDescription, todoWriteParameters } from "./todo-tool.js";
-import { createJevClassifierTool } from "./jev-classifier-tool.js";
+import {
+  createJevClassifierTool,
+  JEV_CLASSIFY_TOOL_NAME,
+  type JevAuthorization,
+  type JevAuthorize,
+} from "./jev-classifier-tool.js";
 import { scheduledToolParameters, scheduledToolDescriptions } from "./scheduled-tools.js";
 import { withPiFileOpToolNames } from "./pi-file-ops.js";
 import { remoteMutationIdentity } from "./remote-workspace.js";
@@ -3769,7 +3774,11 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
     const builtins = tools.map(exec);
     const jevTools: AgentTool[] =
       this.mode === "agent" && this.jevApiKey
-        ? [createJevClassifierTool(this.jevApiKey)]
+        ? [
+            createJevClassifierTool(this.jevApiKey, (input) =>
+              this.authorizeJevClassify(input),
+            ),
+          ]
         : [];
 
     // Plugins contribute Agent tools by default. Plan/Goal modes only
@@ -4077,6 +4086,55 @@ Do not invent objections or turn speculative risks into blockers. Stop when the 
         };
       },
     };
+  }
+
+  /**
+   * Third-party egress goes through the same host-core gate as built-in tools:
+   * host-core resolves the session's permission mode, shows an approval card
+   * naming the destination and payload size in `ask`, and answers only with an
+   * authorization. The sidecar sends nothing to TypeSafe before `ok: true`.
+   */
+  private async authorizeJevClassify({
+    toolCallId,
+    context,
+    signal,
+  }: Parameters<JevAuthorize>[0]): Promise<JevAuthorization> {
+    if (signal?.aborted) {
+      return { ok: false, errorCode: "TOOL_ABORTED", denied: false };
+    }
+    const abort = () => {
+      void this.host
+        .call("tools.abort", { sessionId: this.sessionId, toolCallId })
+        .catch(() => undefined);
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      const result = await this.host.call<{
+        ok?: boolean;
+        denied?: boolean;
+        errorCode?: string;
+      }>("tools.execute", {
+        sessionId: this.sessionId,
+        turnId: this.turnId,
+        toolCallId,
+        toolName: JEV_CLASSIFY_TOOL_NAME,
+        args: { state: context.state, questions: context.questions },
+        mode: this.mode,
+        ...(this.delegatePermissionScopes.has(toolCallId)
+          ? { permissionScope: this.delegatePermissionScopes.get(toolCallId) }
+          : {}),
+      });
+      if (result?.ok === true) return { ok: true };
+      return {
+        ok: false,
+        errorCode:
+          typeof result?.errorCode === "string" ? result.errorCode : "TOOL_DENIED",
+        denied: result?.denied === true,
+      };
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      this.delegatePermissionScopes.delete(toolCallId);
+    }
   }
 
   private buildEnterModeTool(kind: ProposalKind): AgentTool {

@@ -57,8 +57,6 @@ test("settings writes validate values, notify the plugin, and never use global s
 
 test("host plugin modals hide docked native plugin views via blocking-overlay", async () => {
   assert.match(sheet, /useBlockingOverlay/);
-  const installDialog = await read("../src/components/plugins/PluginInstallDialog.tsx");
-  assert.match(installDialog, /useBlockingOverlay/);
   const dialogs = await read("../src/features/plugins/PluginDialogs.tsx");
   assert.match(dialogs, /useBlockingOverlay/);
   assert.match(dialogs, /PluginModalBlockingHost/);
@@ -80,12 +78,7 @@ test("plugin action results report through the toast host, not an inline line", 
   assert.match(installedPanel, /className="plugins-row-error">\{plugin\.errorMessage\}/);
   assert.doesNotMatch(installedPanel, /reportedErrorsRef/);
 
-  // Pending updates are announced; applying them keeps its header-menu entry.
-  assert.match(pluginsPage, /const reportedUpdatesRef = useRef<number \| null>\(null\);/);
-  assert.match(
-    pluginsPage,
-    /showToast\(t\("plugins\.updatesReady", \{ count: stats\.updates \}\), \{ variant: "info" \}\)/,
-  );
-  assert.doesNotMatch(pluginsPage, /plugins-alert/);
-  assert.match(page, /\{ key: "applyAutoUpdates", run: applyAutoUpdates \}/);
+  // There are no marketplace updates to announce (ADR
+  // fork-removes-plugin-marketplace), and no inline alert line.
+  assert.doesNotMatch(pluginsPage, /plugins-alert|updatesReady|applyAutoUpdates/);
 });

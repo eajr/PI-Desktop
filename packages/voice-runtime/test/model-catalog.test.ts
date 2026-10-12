@@ -17,6 +17,13 @@ describe("getCatalog", () => {
       expect(model.hfFilename).toBeTruthy();
     }
   });
+
+  it("pins every model to a commit and a sha256", () => {
+    for (const model of getCatalog()) {
+      expect(model.hfRevision, model.id).toMatch(/^[0-9a-f]{40}$/);
+      expect(model.sha256, model.id).toMatch(/^[0-9a-f]{64}$/);
+    }
+  });
 });
 
 describe("findModel", () => {

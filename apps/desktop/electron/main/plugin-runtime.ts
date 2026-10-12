@@ -13,6 +13,12 @@ import { open as openFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pluginNetFetch, parseFetchRedirect, type PluginFetchTransport } from "./plugin-net-fetch";
+import {
+  createPluginFetchTransport,
+  createPluginNetLookup,
+  PluginNetAddressError,
+  type PluginNetResolve,
+} from "./plugin-net-guard";
 import type { LoadedSkillDocument } from "./skill-document";
 import { getModuleDirectory } from "./module-path";
 import {
@@ -82,6 +88,7 @@ import {
   type PluginComposerTransformMeta,
   type PluginWorkspaceInfo,
   BUILTIN_SPEECH_PROTOCOL_IDS,
+  RENDERER_EXTENSIONS_ENABLED,
 } from "@pi-desktop/shared";
 import {
   previewFile,
@@ -107,6 +114,7 @@ import {
 } from "./plugin-renderer-extension";
 import { DevPluginWatcher, type DevPluginWatcherDeps } from "./plugin-watcher";
 import { parseAllowedExternalUrl } from "./safe-open-external";
+import { launchableRevealedNotice, openPathOrReveal, type OpenPathOutcome } from "./safe-open-path";
 import type { PluginAppearance } from "../shared/plugin-panel-chrome";
 import type { McpControlController, McpControlInvokeInput } from "./mcp-control";
 import {
@@ -312,6 +320,12 @@ export type PluginHostServices = {
    * visible workspace -- for a panel call or an unknown session.
    */
   getWorkspacePathForSession?: (sessionId: string) => string | null;
+  /**
+   * Whether plugin renderer extensions may load. Defaults to the build switch
+   * `RENDERER_EXTENSIONS_ENABLED` (off in this build); only tests that
+   * exercise the dormant machinery pass `true`.
+   */
+  rendererExtensionsEnabled?: boolean;
   /** The set of `contributes.agentExtensions` modules changed (load/unload). */
   agentExtensionsChanged?: () => void;
   getLocale?: () => string;
@@ -369,8 +383,15 @@ export type PluginHostServices = {
   readClipboardHistory: () => Promise<ClipboardHistoryEntry[]>;
   openPanel: (request: PluginPanelRequest) => Promise<void>;
   closePanel: (pluginId: string) => Promise<void>;
-  /** Single-hop transport; the runtime owns redirect and timeout policy. */
+  /**
+   * Single-hop transport; the runtime owns redirect and timeout policy. When
+   * absent, every hop is resolved, checked and pinned (`plugin-net-guard.ts`).
+   */
   fetch?: PluginFetchTransport;
+  /** Chromium's proxy decision for a URL (`Session.resolveProxy`). */
+  resolveNetRoute?: (url: string) => Promise<string>;
+  /** DNS for plugin egress checks; injectable so tests never resolve. */
+  resolveNetAddresses?: PluginNetResolve;
   /** The reviewed desktop operation controller shared with MCP. */
   desktopControl?: McpControlController;
   /**
@@ -1612,11 +1633,18 @@ export class PluginRuntime {
    * package, and nothing else (`docs/plugin-plan/ui/`).
    */
   resolveRendererSource(pluginId: string, generation: number, requestPath: string): string | null {
+    if (!this.rendererExtensionsEnabled()) return null;
     return resolveRendererSourcePath(this.loaded.get(pluginId), generation, requestPath);
+  }
+
+  /** The build switch, unless a test opted the dormant machinery back in. */
+  private rendererExtensionsEnabled(): boolean {
+    return this.services.rendererExtensionsEnabled ?? RENDERER_EXTENSIONS_ENABLED;
   }
 
   /** What the renderer host loads for this plugin, while it may load anything. */
   rendererDescriptor(pluginId: string): PluginRendererDescriptor | undefined {
+    if (!this.rendererExtensionsEnabled()) return undefined;
     return rendererDescriptorFor(this.loaded.get(pluginId));
   }
 
@@ -1626,9 +1654,11 @@ export class PluginRuntime {
    */
   async callRenderer(pluginId: string, method: string, args: unknown): Promise<unknown> {
     const loaded = this.loaded.get(pluginId);
+    // With renderer extensions off no descriptor exists, so a caller is
+    // refused exactly like one whose load has ended.
     return this.rendererCalls.call(
       pluginId,
-      loaded?.child ? loaded : undefined,
+      loaded?.child && this.rendererExtensionsEnabled() ? loaded : undefined,
       method,
       args,
       (plugin, payload, timeoutMs) =>
@@ -2730,6 +2760,10 @@ export class PluginRuntime {
             protocols: descriptor.protocols,
             timeoutMs:
               typeof descriptor.timeoutMs === "number" ? descriptor.timeoutMs : undefined,
+            lookup: createPluginNetLookup({
+              grant: this.netEgressGrant(loaded),
+              resolve: this.services.resolveNetAddresses,
+            }),
           });
           this.services.audit?.({
             pluginId,
@@ -5578,8 +5612,17 @@ export class PluginRuntime {
             });
             throw apiError("INVALID_ARGUMENT", "only files can be opened with the default app");
           }
+          // A launchable file (app, script, installer, shortcut, executable)
+          // is revealed instead: opening it would run code (safe-open-path).
+          let result: OpenPathOutcome;
           try {
-            await this.services.openPath(full);
+            result = await openPathOrReveal(full, {
+              openPath: (path) => this.services.openPath(path),
+              revealPath: async (path) => {
+                if (!this.services.revealPath) throw new Error("revealPath service missing");
+                await this.services.revealPath(path);
+              },
+            });
           } catch (error) {
             this.services.audit?.({
               pluginId,
@@ -5591,12 +5634,18 @@ export class PluginRuntime {
             });
             throw apiError("OPEN_FAILED", error instanceof Error ? error.message : String(error));
           }
+          if (result.outcome === "revealed") {
+            this.services.showToast(launchableRevealedNotice(this.services.getLocale?.()), "warn");
+          }
           this.services.audit?.({
             pluginId,
             api: "fs.openDefault",
             ok: true,
             ts: Date.now(),
             path: rel,
+            data: result.outcome === "revealed"
+              ? { outcome: "revealed", reason: result.reason }
+              : { outcome: "opened" },
           });
         },
         reveal: async (pathFromRoot: string) => {
@@ -5960,7 +6009,12 @@ export class PluginRuntime {
             const { url, result } = await pluginNetFetch(
               { ...input, redirect },
               (url) => this.assertEgress(loaded, url, "net.fetch"),
-              this.services.fetch,
+              this.services.fetch ??
+                createPluginFetchTransport({
+                  grant: this.netEgressGrant(loaded),
+                  resolve: this.services.resolveNetAddresses,
+                  resolveRoute: this.services.resolveNetRoute,
+                }),
             );
             this.services.audit?.(netFetchAuditEntry(pluginId, url, result.status, result.headers));
             return result;
@@ -5968,6 +6022,10 @@ export class PluginRuntime {
             if (error instanceof Error && "code" in error && error.code === "REDIRECT_DISALLOWED") {
               this.services.audit?.({ pluginId, api: "net.fetch", ok: false,
                 errorCode: error.code, ts: Date.now() });
+            }
+            if (error instanceof PluginNetAddressError) {
+              this.services.audit?.({ pluginId, api: "net.fetch", ok: false,
+                errorCode: error.code, host: error.host, address: error.address, ts: Date.now() });
             }
             throw error;
           }

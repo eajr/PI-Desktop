@@ -14,9 +14,11 @@ import {
   FS_MODES,
   INLINE_PERMISSION_LIMIT,
   LEGACY_FS_PERMISSIONS,
+  RENDERER_EXTENSIONS_DISABLED_KEY,
   permissionLabel,
   permissionRisk,
   orderPermissions,
+  skipsRendererExtension,
 } from "./model";
 
 export function PermissionChips({
@@ -214,6 +216,8 @@ export function PluginRowDetails({
     LEGACY_FS_PERMISSIONS.includes(permission),
   );
 
+  const rendererSkipped = skipsRendererExtension(plugin);
+
   if (!hasCapabilities && !hasServices && !hasPermissions && !hasAgentExtension) return null;
 
   return (
@@ -261,6 +265,10 @@ export function PluginRowDetails({
             <span className="plugins-row-detail-label">{t("plugins.fileAccessTitle")}</span>
             <FsScopeChips policy={plugin.fs} />
           </div>
+        ) : null}
+        {rendererSkipped ? (
+          // The plugin's other contributions run; its chat UI slots do not.
+          <p className="plugins-row-detail-note">{t(RENDERER_EXTENSIONS_DISABLED_KEY)}</p>
         ) : null}
         {legacyFs.length ? (
           // The plugin still loads, with less reach than its author expected.

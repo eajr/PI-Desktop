@@ -236,10 +236,23 @@ export const ErrorCodes = {
   HOST_VERSION_MISMATCH: "HOST_VERSION_MISMATCH",
   /** The device credential was refused by the Host. */
   REMOTE_AUTH_FAILED: "REMOTE_AUTH_FAILED",
+  /**
+   * The device token was valid but has outlived its idle or absolute
+   * lifetime; an SSH-paired desktop re-pairs over SSH instead of stopping.
+   */
+  REMOTE_DEVICE_TOKEN_EXPIRED: "REMOTE_DEVICE_TOKEN_EXPIRED",
   /** The RACP connection could not be established. */
   REMOTE_CONNECTION_FAILED: "REMOTE_CONNECTION_FAILED",
   /** The transport's port forward could not be set up. */
   REMOTE_FORWARD_FAILED: "REMOTE_FORWARD_FAILED",
+  /**
+   * The SSH host presented a key no known_hosts file trusts yet. `details`
+   * carries `host`, optional `port`, and `keys` (type + SHA256 fingerprint)
+   * when the desktop could learn them, so the user can confirm (ADR 0328).
+   */
+  SSH_HOST_KEY_UNKNOWN: "SSH_HOST_KEY_UNKNOWN",
+  /** The SSH host key contradicts a trusted one; never accepted automatically. */
+  SSH_HOST_KEY_CHANGED: "SSH_HOST_KEY_CHANGED",
   /** A Host-side path does not exist. */
   REMOTE_PATH_NOT_FOUND: "REMOTE_PATH_NOT_FOUND",
   /** A Host-side path is outside what the principal may reach. */

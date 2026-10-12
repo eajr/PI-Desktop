@@ -255,9 +255,9 @@ the app exits.
 
 S3 configuration is stored at `configSyncS3/config` in the Host `kv` store.
 The vault key and S3 secret bundle use existing encrypted Host secret storage.
-That implementation uses encrypted files and a `.machine-key` in the same data
-directory, not an OS Keychain backend; copying the entire data directory is not
-a protected cloud backup.
+That implementation uses encrypted files whose master key lives in the OS
+credential store (owner-only `.machine-key` fallback when none is reachable);
+copying the entire data directory is not a protected cloud backup.
 
 Local state lives under `config-sync/s3/<state-id>/`. The encrypted shared/
 observed baseline, pending bundle, and recovery points use temp-file rename.

@@ -4,16 +4,20 @@
  * Behavioral: the platform rule is the whole decision — macOS keeps the
  * recovery watchdog, every other platform turns it off.
  *
- * Contract: `createWindow` clears the interval before it can read CG bounds or
+ * Contract: `createWindow` clears the interval before it can read bounds or
  * re-layer the window, so no platform other than macOS repeats a
  * `setAlwaysOnTop(false)` that a window manager answers by raising the window.
+ *
+ * Security (D657): window bounds recovery never executes an external helper.
+ * The former `/tmp/pi-window-bounds` CoreGraphics helper ran from a
+ * world-writable path on every watchdog tick, packaged builds included.
  */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { register } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { readMainModule } from "./helpers/source-contracts.mjs";
+import { readMainModule, readMainSource } from "./helpers/source-contracts.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 register(pathToFileURL(join(here, "helpers/ts-import-hooks.mjs")));
@@ -41,7 +45,7 @@ test("the bounds watchdog turns itself off outside macOS", () => {
   const guard = body.indexOf('if (process.platform !== "darwin")');
   assert.notEqual(guard, -1, "the watchdog must be gated on darwin");
   // The guard has to clear the interval, or it keeps ticking forever.
-  const guardBlock = body.slice(guard, body.indexOf("const cg = readCgBounds();", guard));
+  const guardBlock = body.slice(guard, body.indexOf("const electronBounds = window.getBounds();", guard));
   assert.match(guardBlock, /clearInterval\(boundsWatchdog\);/);
   assert.match(guardBlock, /return;/);
   // And it has to run before the watchdog can touch the window layer, which is
@@ -54,8 +58,8 @@ test("the bounds watchdog turns itself off outside macOS", () => {
     guard < body.indexOf("ensureStableBounds(true)"),
     "the platform guard must precede shelf recovery",
   );
-  // macOS keeps the Stage Manager path intact (D039, D053, D083).
-  assert.match(body, /readCgBounds\(\)/);
+  // macOS keeps the Stage Manager path intact (D039, D083).
+  assert.match(body, /electronBounds\.width < 500 \|\| electronBounds\.height < 400/);
   assert.match(body, /ensureStableBounds\(true\)/);
 });
 
@@ -71,4 +75,15 @@ test("no other platform path re-layers the window on a timer", () => {
       "a window-layer timer must be macOS-only",
     );
   }
+});
+
+test("window bounds recovery never executes an external helper (D657)", async () => {
+  // Any local user can create files under /tmp, so executing a fixed path
+  // there is code execution as the desktop user. No build mode may do it.
+  assert.doesNotMatch(windowSource, /\/tmp\/pi-window-bounds/, "window.ts must not reference the /tmp helper");
+  assert.doesNotMatch(windowSource, /node:child_process|\bexecFileSync\b|\bexecSync\b|\bspawnSync\b/,
+    "window.ts must not spawn processes");
+  assert.doesNotMatch(windowSource, /readCgBounds|cgHelper/, "the CG helper path is removed");
+  const mainSource = await readMainSource();
+  assert.doesNotMatch(mainSource, /pi-window-bounds/, "no main-process module runs the CG helper");
 });

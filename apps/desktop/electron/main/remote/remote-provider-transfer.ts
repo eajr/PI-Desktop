@@ -10,6 +10,7 @@ export async function syncRemoteProviders(
   input: RemoteHostSyncProvidersRequest,
   record: RemoteHostRecord,
   host: HostRpcPort,
+  options: { knownHostsFile?: string } = {},
 ): Promise<RemoteHostSyncProvidersResult> {
   const ssh = sshMetadataOf(record);
   if (!ssh || record.hostKey !== input.hostKey) {
@@ -25,5 +26,5 @@ export async function syncRemoteProviders(
     ...(settings.defaultProviderId && settings.defaultModelId
       ? { localDefault: { providerId: settings.defaultProviderId, modelId: settings.defaultModelId } } : {}),
   });
-  return importProvidersOverSsh({ ssh, sshSecret: record.sshSecret, payload, buildTransport: createSystemSshTransport });
+  return importProvidersOverSsh({ ssh, sshSecret: record.sshSecret, payload, buildTransport: (target) => createSystemSshTransport(target, { knownHostsFile: options.knownHostsFile }) });
 }

@@ -1,6 +1,8 @@
 # ADR 0109: Open Files entries with the OS-associated application
 
-- Status: Accepted
+- Status: Accepted (amended by
+  [launchable-files-reveal-instead-of-open](launchable-files-reveal-instead-of-open.md):
+  launchable files are revealed, not opened)
 - Date: 2026-08-20
 - Deciders: PI-Desktop maintainers
 - Related: [ADR 0105](0105-files-as-a-bundled-plugin.md) ·

@@ -10,7 +10,7 @@ import { readNpmPath, writeNpmPath } from "../npm-preferences";
 import { registerAgentIpc } from "./agent-ipc";
 import { registerAppIpc } from "./app-ipc";
 import { registerDiagnosticsIpc } from "./diagnostics-ipc";
-import { registerMarketIpc } from "./market-ipc";
+import { registerCommandPaletteIpc } from "./command-palette-ipc";
 import { registerMcpIpc } from "./mcp-ipc";
 import type { McpOAuthManager } from "../mcp-oauth";
 import { searchMcpMarket } from "../mcp-registry-catalog";
@@ -27,6 +27,7 @@ import { registerConfigSyncIpc } from "./config-sync-ipc";
 import { registerSkillsIpc } from "./skills-ipc";
 import { registerAgentImportIpc } from "./agent-import-ipc";
 import { registerRemoteHostIpc } from "./remote-host-ipc";
+import { registerRemoteMediaIpc } from "./remote-media-ipc";
 import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-catalog";
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
@@ -485,10 +486,10 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   }
 
   registerRemoteHostIpc({ registrar });
+  registerRemoteMediaIpc({ registrar, logger });
 
-  registerMarketIpc({
+  registerCommandPaletteIpc({
     registrar,
-    getHost,
     plugins,
     agentExtensions,
     optionalWorkspaceRoot,

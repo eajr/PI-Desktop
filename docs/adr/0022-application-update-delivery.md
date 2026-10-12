@@ -127,3 +127,28 @@ available on supported Windows packages only after the UI warns that NSIS may
 replace the extracted no-install copy. Unsupported installer formats remain
 Manual. This additive setting requires no database schema or host protocol
 version change.
+
+## Amendment (build switch: updater compiled out)
+
+Downstream builds that do not control the GitHub Releases feed must not
+discover, download, or install upstream packages. A compile-time constant,
+`APP_UPDATES_ENABLED` in `apps/desktop/electron/main/update-build-flag.ts`,
+gates the whole lane and defaults to `false` in this fork:
+
+- `AppUpdaterController` resolves `mode: "disabled"` regardless of platform,
+  packaging, or stored `updatePreference`, attaches no electron-updater
+  listeners, never arms `autoDownload` / `autoInstallOnAppQuit`, and never
+  schedules the startup or periodic check. Explicit check, download, install,
+  and open-releases calls are rejected.
+- `UpdateState` gains an optional, additive `disabledReason`
+  (`"development" | "build"`). The renderer shows "Updates are disabled in this
+  build" and hides the check action and the Automatic/Manual preference when
+  the reason is `build`; the macOS menu omits "Check for Updates…".
+- `build.publish` is `null` (not absent: electron-builder would otherwise infer
+  a GitHub provider from `GH_TOKEN` or repository metadata), so packages carry
+  no `app-update.yml` and builds emit no `latest*.yml`. The release workflow's
+  feed verification and macOS feed merge steps skip when no feed exists.
+
+The updater code, IPC channels, and stored preference remain so the lane can be
+re-enabled by flipping the constant and restoring a `publish` provider the
+builder controls. No host protocol or storage schema change.

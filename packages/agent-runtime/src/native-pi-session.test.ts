@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpath
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentSession, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
+import { AgentSession, ModelRuntime, ProjectTrustStore, SessionManager, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { createAssistantMessageEventStream, type AssistantMessage } from "@earendil-works/pi-ai";
 import { NativePiSessionService } from "./native-pi-session.js";
 import {
@@ -222,6 +222,27 @@ describe("NativePiSessionService", () => {
     const reopened = SessionManager.open(f.file);
     expect(reopened.getLeafId()).not.toBe("future");
     service.disposeAll();
+  });
+
+  it("loads project resources only for a cwd the user trusted in Pi", async () => {
+    const f = fixture();
+    const create = vi.spyOn(SettingsManager, "create");
+    const run = async () => {
+      const service = new NativePiSessionService({
+        agentDir: f.agentDir,
+        sessionRoot: f.sessionRoot,
+        modelRuntimeFactory: async () => fauxModelRuntime() as any,
+      });
+      const [summary] = await service.list();
+      await service.prompt(summary.id, "trust probe", () => undefined);
+      await expect.poll(() => service.status(summary.id).status.isRunning).toBe(false);
+      service.disposeAll();
+    };
+    await run();
+    expect(create).toHaveBeenLastCalledWith(f.project, f.agentDir, { projectTrusted: false });
+    new ProjectTrustStore(f.agentDir).set(f.project, true);
+    await run();
+    expect(create).toHaveBeenLastCalledWith(f.project, f.agentDir, { projectTrusted: true });
   });
 
   it("reclaims a stale dead-owner lease only when the file stayed append-only", () => {

@@ -2660,6 +2660,26 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - **状态**：单位覆盖（`user-select.test.mjs`、`thinking-ui.test.mjs`、
   `markdown-prose-style.test.mjs`）；全视觉场景草稿
 
+#### E2E-MARKDOWN-remote-media-is-click-to-load：渲染 Markdown 绝不联系远程媒体主机
+
+- **前置条件**：一条已完成的助手回答（或工具输出，或在 Files 中打开的工作区
+  `.md`），包含 Markdown 图片、原始 HTML `<img>`、`<audio>`、带 `poster` 的
+  `<video>`，以及带 `<source>` 子元素的 `<video>`，均指向一个可观察访问日志的
+  `https://` 主机；同一消息中还有一张本地工作区图片。
+- **步骤**：1）打开会话并滚动到该消息。2）检查主机访问日志。3）悬停一个占位符，
+  然后点击其加载操作。4）再次检查访问日志。5）切换会话后返回。
+- **预期**：点击之前主机收不到任何请求：每个远程项都是标明主机的占位符，提示中
+  显示完整 URL，poster 不会被获取。本地图片照常内联显示。点击一个占位符只会由
+  Main 进程发出一次请求（加至多三次重定向），不带 cookie，并且只把该占位符替换为
+  图片或播放器，其余仍为占位符。`http:`、私有地址、非媒体或过大的目标显示
+  “加载失败”及“重试”。返回会话后已加载项保持显示，不会再次请求。
+- **关联规范**：`05-security/01-security.md`、`04-ux/08-component-spec.md`
+  §8.7、ADR 0327
+- **验收**：C（对话流）、品质
+- **里程碑**：M6+
+- **状态**：单元覆盖（`remote-media-markdown.test.mjs`、
+  `remote-media-fetch.test.mjs`、`mermaid-rendering.test.mjs`）；打包场景为草稿
+
 #### E2E-061：用户消息纯文本布局在包装和重新加载中仍然存在
 
 - **先决条件**：已配置提供商；输入框可以接受多行输入
@@ -3943,24 +3963,6 @@ IPC 请求无法关闭。
 - **里程碑**：M6+
 - **状态**：工作流脚本/单元已覆盖；每次发布仍需在干净机器上验证（适用变更合入前需在具备条件的环境中运行 E2E）
 
-#### E2E-212：GitHub Release 启动 CNB 镜像流水线
-
-- **前提条件**：`vastsa/PI-Desktop` 已配置仓库密钥 `CNB_MIRROR_TOKEN`；
-  `aixk/Pi-Desktop` 上的 CNB 流水线监听 `api_trigger_mirror`；已有带上传
-  工件的 GitHub Release 标签（例如 `vX.Y.Z`）。
-- **步骤**：1) 发布或编辑该 GitHub Release，或对 `mirror-to-cnb.yml` 传入
-  同一标签手动运行。2) 检查 Actions 日志中的解析标签以及对
-  `api.cnb.cool` 的 POST。3) 确认 CNB 流水线以该标签作为 `MIRROR_TAGS` 启动。
-- **预期**：作业仅在 `vastsa/PI-Desktop` 上运行。没有 `vX.Y.Z` 标签的手动
-  运行会在调用 CNB 之前失败。缺少 `CNB_MIRROR_TOKEN` 时失败退出。JSON
-  请求体由 `jq` 构造（不是 YAML 字符串插值）。GitHub Release 工件和更新源
-  不变；CNB 只是同一标签的镜像。
-- **链接规格**：`06-delivery/06-release-runbook.md`
-- **验收**：质量（发布镜像）
-- **里程碑**：M6+
-- **状态**：源合同已覆盖（`ci-workflow.test.mjs`）；实际启动 CNB 仍为操作
-  验证（除非明确要求，否则不要在本地跑 E2E）
-
 #### E2E-092：打包的运行时是独立的，没有重复的依赖项
 
 - **先决条件**：本机 macOS arm64 和 Intel x64、Windows x64 及 Linux x64
@@ -5011,6 +5013,7 @@ eleven-tool-round desktop paths are verified by
   6. 设置界面状态更新为已连接及工具数量，弹出成功提示，并显示 OAuth 徽标。
   7. 访问令牌过期时，`UserMcpRuntime` 透明使用 refresh token 换取新令牌，无需用户重新交互。
   8. 通过 `mcp.transfer` 迁移服务器时，自动将 OAuth 令牌迁移至新 ID 下。
+  9. 受保护资源元数据声明不同 `resource`，或授权服务器元数据声明不同 `issuer` 时，在打开浏览器或注册客户端之前以错误事件失败；服务 URL 改为其他资源后不再发送已存令牌。
 - **链接规格**：`03-runtime/01-ipc-protocol.md`、ADR 0283、ADR 0142
 - **验收**：E（工具和权限）、安全性
 - **里程碑**：M5
@@ -5715,7 +5718,7 @@ eleven-tool-round desktop paths are verified by
 | M2（输入法斜杠别名） | E2E-255 |
 | M5（Skill 常驻） | E2E-254 |
 | M6 | E2E-104、E2E-105、E2E-106、E2E-107、E2E-108、E2E-109、E2E-110、E2E-111、E2E-112、E2E-113、E2E-114、E2E-115、E2E-116、E2E-117、 E2E-118、E2E-119、E2E-120、E2E-103 |
-| M6+ | E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-150、E2E-151、E2E-168、E2E-199、E2E-200、E2E-202、E2E-203、E2E-209、E2E-211、E2E-UPDATE-preference-and-once-only-reminder、E2E-212、E2E-213、E2E-214、E2E-215、E2E-216、E2E-217、E2E-257、E2E-SETTINGS-inline-capability-imports、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
+| M6+ | E2E-121、E2E-122、E2E-123、E2E-142、E2E-148、E2E-150、E2E-151、E2E-168、E2E-199、E2E-200、E2E-202、E2E-203、E2E-209、E2E-211、E2E-UPDATE-preference-and-once-only-reminder、E2E-213、E2E-214、E2E-215、E2E-216、E2E-217、E2E-257、E2E-SETTINGS-inline-capability-imports、E2E-166、E2E-SUBAGENT-resume-a-settled-delegation |
 | M6+（Session Orchestrator） | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+（已选模型顺序） | E2E-MODEL-selected-order-persists |
 | M6+（MCP 服务器超时覆盖） | E2E-261 |
@@ -5763,6 +5766,9 @@ eleven-tool-round desktop paths are verified by
 | 品质（崩溃上报） | E2E-PLUGIN-crash-report-names-the-exit-code |
 | F — 持久化（存储的模型绑定数组） | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
 | 品质（存储的模型绑定数组） | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
+| C — 对话与流式（远程媒体点击加载） | E2E-MARKDOWN-remote-media-is-click-to-load |
+| 品质（远程媒体点击加载） | E2E-MARKDOWN-remote-media-is-click-to-load |
+| M6+（远程媒体点击加载） | E2E-MARKDOWN-remote-media-is-click-to-load |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策

@@ -19,6 +19,7 @@ import type { PiHostConfig } from "./config.js";
 import { FileCredentialStore, loadOrCreateHostId } from "./credentials.js";
 import { createHostOperations } from "./host-operations.js";
 import { createLogger, type HostLogger } from "./logger.js";
+import { runSkillTool } from "./skill-tool.js";
 import { TerminalService, loadPty } from "./terminal.js";
 import { prepareAdminDirectory, startAdminSocket } from "./admin-socket.js";
 
@@ -164,15 +165,7 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
       const { loadInstructionChain } = await import("@pi-desktop/agent-runtime");
       return loadInstructionChain(projectPath, path);
     });
-    sidecar.setLocalTool("Skill", async ({ args, sessionId }) => {
-      const id = String((args as { id?: unknown })?.id ?? "").trim();
-      const host = getHost();
-      if (!id || !host) return { ok: false, isError: true, content: "Skill: `id` is required." };
-      const session = await host.call<{ session?: { projectPath?: string } | null }>("session.get", { id: sessionId, messageLimit: 1 }).catch(() => null);
-      const result = await host.call<{ skill: { id: string; name: string } | null; body: string | null }>("skills.read", { id, projectPath: session?.session?.projectPath ?? null }).catch(() => null);
-      if (!result?.skill || typeof result.body !== "string") return { ok: false, isError: true, content: `Skill: "${id}" is not available on this Host.` };
-      return { ok: true, content: `# Skill: ${result.skill.name} (${result.skill.id})\n\n${result.body}` };
-    });
+    sidecar.setLocalTool("Skill", ({ args, sessionId }) => runSkillTool(getHost(), args, sessionId));
     sidecar.setTrustedExtensionBridge({
       publishCommands: () => undefined,
       publishDiagnostics: () => undefined,
@@ -209,7 +202,10 @@ export async function startPiHost(config: PiHostConfig, options: { log?: HostLog
   });
 
   // Claim the owner-only channel before spawning the sole SQLite writer.
-  const admin = process.platform === "win32" ? undefined : await startAdminSocket({ dataDir: config.dataDir, getHost, log });
+  const admin = process.platform === "win32" ? undefined : await startAdminSocket({
+    dataDir: config.dataDir, getHost, log,
+    issuePairing: (lifetimeMs) => authenticator.issuePairingToken(lifetimeMs),
+  });
   try {
     await startHost();
     await startSidecar();

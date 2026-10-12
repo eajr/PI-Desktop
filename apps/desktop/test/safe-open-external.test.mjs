@@ -138,10 +138,13 @@ test("main, plugins, preview, and updater share the allowlist before openExterna
 
   assert.match(browserSource, /parseAllowedExternalUrl\(url\)/);
   assert.match(browserSource, /isAllowedHttpUrl\(url\)/);
-  assert.match(browserSource, /shell\.openPath\(fileURLToPath\(url\)\)/);
+  // Local files go through the launchable-file policy (safe-open-path).
+  assert.match(browserSource, /path = fileURLToPath\(url\)/);
+  assert.match(browserSource, /openPathOrReveal\(path, electronOpenPathDeps\)/);
+  assert.doesNotMatch(browserSource, /shell\.openPath\(/);
   assert.doesNotMatch(
     browserSource,
-    /openExternal\(\): void \{[\s\S]*void shell\.openExternal\(url\);/,
+    /openExternal\(\)[^{]*\{[\s\S]*void shell\.openExternal\(url\);/,
   );
 
   assert.match(updaterSource, /parseAllowedExternalUrl\(RELEASES_URL\)/);

@@ -1,5 +1,12 @@
 # 07. Plugin Marketplace
 
+> **Status: removed in this build.** PI-Desktop no longer contains a
+> marketplace client. It fetches no catalog, sends no resolve request or device
+> identifier, and downloads no packages over the network. Plugins install only
+> from a local package or folder, or ship bundled. See
+> [ADR fork-removes-plugin-marketplace](../../adr/fork-removes-plugin-marketplace.md).
+> The rest of this page is historical.
+
 ## 1. Positioning
 
 The plugin marketplace is a **distribution layer**, not a runtime core.

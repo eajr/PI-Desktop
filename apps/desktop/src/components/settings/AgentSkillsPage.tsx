@@ -44,6 +44,11 @@ import {
   IconTrash,
 } from "../icons";
 import { SkillMarketPanel } from "./SkillMarketPanel";
+import {
+  SkillApprovalReview,
+  skillAwaitingApproval,
+  type SkillReview,
+} from "./SkillApprovalReview";
 import { AgentSkillImportPanel } from "../../features/settings/imports/AgentSkillImportPanel";
 import { ImportToggleButton } from "../../features/settings/import-workbench";
 
@@ -106,6 +111,7 @@ export function AgentSkillsPage() {
   const [editor, setEditor] = useState<SkillEditorState | null>(null);
   const [view, setView] = useState<"skills" | "market">("skills");
   const [saving, setSaving] = useState(false);
+  const [reviews, setReviews] = useState<Record<string, SkillReview>>({});
   const { armed, setArmed } = useArmedDelete();
 
   const rowKey = (level: AgentCapabilityLevel, id: string) => `${level}:${id}`;
@@ -156,6 +162,63 @@ export function AgentSkillsPage() {
       patchRow(level, skill.id, { enabled: skill.enabled });
       showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
     } finally {
+      setBusyId(null);
+    }
+  };
+
+  const reviewKey = (id: string) => `${selectedProjectPath ?? ""}\n${id}`;
+
+  /**
+   * Load a pending project skill's document for review. The hash comes back
+   * from the same read as the text, so approval binds to what is shown.
+   */
+  const loadReview = async (skill: UserSkillRecord) => {
+    const key = rowKey("project", skill.id);
+    if (busyId || !selectedProjectPath) return;
+    setBusyId(key);
+    try {
+      const result = await api.readUserSkill(skill.id, levelQuery("project"));
+      const read = result.skill;
+      const body = result.body;
+      if (!read?.contentHash || typeof body !== "string") {
+        // Removed or no longer a project document: show the current list.
+        await load();
+        return;
+      }
+      const contentHash = read.contentHash;
+      setReviews((current) => ({
+        ...current,
+        [reviewKey(skill.id)]: {
+          name: read.name,
+          ...(read.description ? { description: read.description } : {}),
+          body,
+          contentHash,
+        },
+      }));
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const approve = async (skill: UserSkillRecord, contentHash: string) => {
+    const key = rowKey("project", skill.id);
+    if (busyId || !selectedProjectPath) return;
+    setBusyId(key);
+    try {
+      await api.approveUserSkill(skill.id, selectedProjectPath, contentHash);
+      showToast(t("settings.skillApproval.approved", { name: skill.name || skill.id }), {
+        variant: "success",
+      });
+    } catch (error) {
+      // A refusal usually means the file changed while it was on screen;
+      // the reload below shows the current state, and the review is re-read.
+      showToast(error instanceof Error ? error.message : String(error), { variant: "error" });
+    } finally {
+      const reviewed = reviewKey(skill.id);
+      setReviews(({ [reviewed]: _reviewed, ...rest }) => rest);
+      await load();
       setBusyId(null);
     }
   };
@@ -402,6 +465,7 @@ export function AgentSkillsPage() {
     const name = skill.name || skill.id;
     const busy = busyId === key;
     const isArmed = armed === key;
+    const awaitingApproval = skillAwaitingApproval(skill);
     const items: CapabilityMenuItem[] = [
       {
         key: "reveal",
@@ -467,9 +531,27 @@ export function AgentSkillsPage() {
             {skill.source === "imported" ? (
               <span className="agent-capability-badge">{t("settings.imported")}</span>
             ) : null}
+            {awaitingApproval ? (
+              <span className="agent-capability-badge is-status is-failed">
+                {skill.approval === "changed"
+                  ? t("settings.skillApproval.changed")
+                  : t("settings.skillApproval.pending")}
+              </span>
+            ) : null}
           </>
         }
         description={skill.description || t("settings.noCapabilityDescription")}
+        meta={
+          awaitingApproval ? (
+            <SkillApprovalReview
+              skill={skill}
+              review={reviews[reviewKey(skill.id)] ?? null}
+              busy={busy}
+              onLoad={() => void loadReview(skill)}
+              onApprove={(contentHash) => void approve(skill, contentHash)}
+            />
+          ) : undefined
+        }
         actions={
           <>
             <TooltipButton
@@ -492,12 +574,14 @@ export function AgentSkillsPage() {
                 if (!open) setArmed(null);
               }}
             />
-            <CapabilityToggle
-              checked={skill.enabled}
-              busy={busy}
-              label={t("settings.toggleCapability", { name })}
-              onChange={() => void toggle(skill, level)}
-            />
+            {awaitingApproval ? null : (
+              <CapabilityToggle
+                checked={skill.enabled}
+                busy={busy}
+                label={t("settings.toggleCapability", { name })}
+                onChange={() => void toggle(skill, level)}
+              />
+            )}
           </>
         }
       />

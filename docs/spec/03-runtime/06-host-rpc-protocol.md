@@ -687,14 +687,17 @@ against a live host, and replaying one after the final row would be wrong.
 ### Agent capabilities (skills, subagents, MCP servers)
 - `skills.list` / `skills.active` / `skills.read` / `skills.create` /
   `skills.update` / `skills.remove` / `skills.import` /
-  `skills.setEnabled` / `skills.setScope` / `skills.transfer` — user skill
-  documents (`SKILL_INVALID` on validation failure)
+  `skills.setEnabled` / `skills.approve` / `skills.setScope` /
+  `skills.transfer` — user skill documents (`SKILL_INVALID` on validation
+  failure); `skills.approve` binds a project skill's approval to its
+  `contentHash` (D661)
 - `agents.list` / `agents.active` / `agents.read` / `agents.create` /
   `agents.update` / `agents.remove` / `agents.setEnabled` /
   `agents.setScope` — user subagent documents (`SUBAGENT_INVALID`)
 - `mcp.list` / `mcp.active` / `mcp.upsert` / `mcp.remove` /
-  `mcp.setEnabled` / `mcp.setScope` / `mcp.transfer` — user MCP server
-  definitions (`MCP_INVALID`)
+  `mcp.setEnabled` / `mcp.approve` / `mcp.setScope` / `mcp.transfer` — user MCP
+  server definitions (`MCP_INVALID`); `mcp.approve` binds a project server's
+  approval to its `configHash` (D659)
 
 `skills.transfer` and `mcp.transfer` take `{ id, from, to }`, each end a
 `{ level, projectPath? }` target (`projectPath` is required for the project

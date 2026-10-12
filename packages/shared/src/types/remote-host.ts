@@ -137,6 +137,29 @@ export type RemoteHostBootstrapRequest = {
    * first line break — so such a value is rejected with `INVALID_ARGUMENT`.
    */
   password?: string;
+  /**
+   * SHA256 fingerprints (`SHA256:<base64>`) of host keys the user approved in
+   * the host-key confirmation for this host. Absent on a first attempt: an
+   * unknown host then fails with `SSH_HOST_KEY_UNKNOWN`, whose details list
+   * the presented keys. The desktop records a key only when every learned
+   * fingerprint is in this list (ADR 0328).
+   */
+  trustedHostKeys?: string[];
+};
+
+/** One SSH host key as shown in the host-key confirmation. */
+export type RemoteHostSshHostKey = {
+  /** OpenSSH key type, e.g. `ssh-ed25519`. */
+  type: string;
+  /** `SHA256:` fingerprint as `ssh-keygen -l` prints it. */
+  fingerprint: string;
+};
+
+/** `details` of an `SSH_HOST_KEY_UNKNOWN` / `SSH_HOST_KEY_CHANGED` error. */
+export type RemoteHostSshHostKeyDetails = {
+  host: string;
+  port?: number;
+  keys?: RemoteHostSshHostKey[];
 };
 
 export type RemoteHostBootstrapResult = {

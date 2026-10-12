@@ -55,3 +55,10 @@ Previous MCP implementations in PI-Desktop supported only static HTTP headers. U
 
 - Preserve issuer paths when discovering authorization metadata: try OAuth path insertion, OIDC path insertion, then OIDC path appending. Root issuers retain the two root discovery URLs. Keep the existing TLS checks and manual redirect policy.
 - Request scopes from the initial 401 Bearer challenge first, otherwise all valid `scopes_supported` entries from protected-resource metadata. Omit `scope` when neither supplies one; authorization-server scope catalogs do not describe the resource's requirements and must not supply defaults or extra scopes.
+
+## Amendment (2026-10-12) — resource and issuer validation
+
+- Protected-resource metadata `resource` must name the configured MCP server (RFC 9728 §3.3, §7.3). Both sides are canonicalized (lowercase scheme and host, default port and fragment dropped, trailing slash ignored). Accepted: an equal identifier, or a same-origin, query-free identifier that is a whole-segment path prefix of the server URL (the MCP SDK `checkResourceAllowed` rule, e.g. `https://host` for `https://host/mcp`). Anything else fails discovery with an error naming both values, before DCR or the browser. The accepted `resource` is what RFC 8707 sends. Metadata that omits `resource` still falls back to the server URL.
+- Authorization-server metadata must include an `issuer` equal (after the same canonicalization) to the authorization server it was fetched for (RFC 8414 §3.3); a mismatch or missing `issuer` fails discovery.
+- `getValidAccessToken(serverId, serverUrl)` withholds a stored token whose `resource` does not cover the server's current URL, so editing a server's URL cannot carry a token to a different host. The server then reports `authRequired` and the user re-authorizes. Token storage stays keyed by server ID.
+- Discovery redirects remain refused (`redirect: "manual"`, ADR 0142) and all metadata-supplied endpoints remain behind the TLS guard above.

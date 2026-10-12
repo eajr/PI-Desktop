@@ -41,18 +41,68 @@
   在构建时（`electron.vite.config.ts` 中的 `tightenCsp` 插件）；
   仅限 `connect-src 'self'`。提供商网络流量发生在 Node 中
   sidecar，从未在渲染器中。
+- `img-src` 和 `media-src` 只允许 `'self'`、`data:`、`blob:` 以及应用自身的
+  插件 scheme，绝不允许 `https:` 或 `http:`（ADR 0327）。渲染 Markdown 不会
+  联系任何远程主机：远程图片、音频、视频、`<source>` 子元素和 poster 显示为
+  标明主机的点击加载占位符。只有用户点击的那一项由 Electron Main 通过
+  `pi-desktop/media/fetchRemote` 获取：仅公网 HTTPS 主机，最多三次重定向且逐跳
+  重新校验，不带 cookie 或 HTTP 认证，20 秒期限，内容类型须属于所请求的媒体
+  类别，图片不超过 10 MiB、音视频不超过 25 MiB；渲染器只收到 `data:` URL。
 - 助理美人鱼图不会扩大 CSP 或渲染器权限。只有一个
   完成的答案栅栏可以动态加载捆绑的本地渲染器。
   美人鱼与 `securityLevel: strict` 一起运行，受保护的 security/theme/limit
   配置、禁用 HTML 标签、20,000 个字符的源限制以及
   500 边限制。其生成的 SVG 然后通过 DOMPurify 的 SVG 配置文件；
   链接、URL 属性、`foreignObject`、脚本、嵌入媒体和外部
-  图像元素在 SVG 到达 DOM 之前被删除。无效或
+  图像元素在 SVG 到达 DOM 之前被删除。SVG 内的 CSS（`<style>` 文本和属性值）
+  只保留 `url(#id)` 与 `url(data:…)`；`@import`、`image-set()`、CSS `src()`
+  及其他 `url()` 均被移除，借转义或注释隐藏引用的 CSS 整体丢弃（ADR 0327）。无效或
   过大的输入无法关闭转义源文本。
+
+### 打包二进制加固（ADR electron-fuses-and-packaged-code-paths）
+
+- electron-builder 显式设置全部 Electron 熔断器（`build.electronFuses`）：
+  - **开启：** Cookie 加密、内嵌 `app.asar` 完整性校验（macOS / Windows）、
+    `onlyLoadAppFromAsar`。
+  - **关闭：** 主进程 `--inspect`。
+  - **暂保持开启：**
+    - `runAsNode`：sidecar 依赖它（D008）。
+    - `NODE_OPTIONS`：关闭会同时丢弃 `NODE_EXTRA_CA_CERTS`。
+    - `grantFileProtocolExtraPrivileges`：渲染器经 `file://` 加载模块脚本。
+- macOS entitlements 仅保留 `allow-jit`、`disable-library-validation`、
+  `device.audio-input`，不再授予 `allow-unsigned-executable-memory`。
+- 打包版只从 `process.resourcesPath` 解析 host-core 与内置插件目录。
+  `PI_DESKTOP_HOST_BIN` 与继承的 `PI_DESKTOP_BUILTIN_PLUGINS_DIR` 仅在未打包时
+  生效。`PI_DESKTOP_DATA_DIR` 不变。
+- 残余风险：本地进程仍可借 `ELECTRON_RUN_AS_NODE` / `NODE_OPTIONS` 启动已签名
+  二进制。
+
+### 2a. 用操作系统打开本地文件
+
+对工作区或插件选择的路径执行的每次 `shell.openPath`（`fs/open`、插件
+`fs.openDefault`，以及浏览器面板对 `file:` 预览的"在外部打开"）都先经过
+`safe-open-path.ts`（`openPathOrReveal`，ADR launchable-files-reveal-instead-of-open）。
+系统关联可能运行代码的路径会在文件管理器中**显示**（`shell.showItemInFolder`）而不是打开，
+用户会看到本地化提示 `panel.files.launchableRevealed`。可启动的路径包括：
+
+- 最终扩展名（不区分大小写，并折叠 Windows 忽略的尾随点、空格和 NTFS `:stream`
+  后缀）指向应用、包、脚本、安装程序、快捷方式或位置文件（`.app`、`.command`、
+  `.terminal`、`.workflow`、`.pkg`、`.dmg`、`.webloc`、`.inetloc`、`.exe`、`.bat`、
+  `.cmd`、`.ps1`、`.vbs`、`.msi`、`.lnk`、`.url`、`.reg`、`.desktop`、`.appimage`、
+  `.sh`、`.jar` 等；`.js` 仅在 Windows 上）。`x.pdf.command` 可启动，`x.command.pdf` 不可；
+- 带上述扩展名的目录，或在 macOS 上 `Contents/Info.plist` 声明了 `CFBundleExecutable`
+  的目录；
+- 在 POSIX 上带任一执行位的文件，除非它的每个名称都是已知文档扩展名；
+- 无法检查的路径。
+
+字面名称和解析符号链接后的名称都会检查。应用有意打开的自有目录（日志、项目根目录、
+会话暂存目录）不在此策略范围内。
 
 ### 未来强化（跟踪、MVP 后）
 
-- 封装时 Electron 熔断器（`runAsNode`、`nodeCliInspect` 关闭）
+- sidecar 不再依赖 `ELECTRON_RUN_AS_NODE` 后，关闭 `runAsNode` 与
+  `NODE_OPTIONS` 熔断器
+- 渲染器改由自定义协议提供后，关闭 `grantFileProtocolExtraPrivileges`
 - 自动安全 e2e 中的 `webSecurity` 断言
 
 远程控制的安全边界是独立的 MVP 后规格：见
@@ -218,7 +268,11 @@ MCP 市场只接受无凭据的公网 HTTPS 源和目录端点。Main 在每一�
 | 渲染器中的恶意网页内容 | 无 Node、沙箱、导航锁、CSP |
 | 即时注入破坏性工具的使用 | 主机拥有的持久模式策略、权限确认、路径边界、秘密隔离 |
 | 依赖性中毒 | 锁定文件、几个 dep、本机模块审查 |
+| 本地恶意软件替换应用代码或可执行文件 | asar 完整性 + `onlyLoadAppFromAsar`，打包版忽略可执行路径环境变量；`RunAsNode` 仍开启（ADR electron-fuses-and-packaged-code-paths） |
 | 恶意本地插件 | 声明的权限、无秘密访问、MVP 后跟踪的进程隔离 (ADR 0008) |
+| 由智能体或仓库写入、并从界面打开的启动器 | `openPathOrReveal` 对可启动文件改为在文件管理器中显示而不打开（§2a） |
+| 克隆的仓库自带项目 MCP 服务器 | 任何启动/连接前须基于内容哈希的批准；文件变更后须重新批准；Main 拒绝未批准的项目记录（英文版 §4.4） |
+| 克隆的仓库自带用于提示注入的项目技能 | 进入技能目录、斜杠命令或 `Skill` 工具前须基于内容哈希的批准；文档变更后须重新批准（英文版 §4.4） |
 | 技能市场 SSRF（用户源 URL） | 主进程公网 HTTPS 分类器 + DNS + 逐跳 redirect；渲染层 CSP 禁止该 fetch（ADR 0243） |
 
 ## 11. 安检门
@@ -239,3 +293,7 @@ approve/reject-only 和计划的 Plan 在 artifact/queue 工作之前被拒绝
    单独和 timeout/abort 杀死完整的进程树
 10. 本地 MCP 控制只允许回环、经过 bearer 认证、默认关闭且有界，不能暴露密钥写入
     或原生选择器，并且更改会话权限模式需要确认
+11. 未经批准、或批准后与执行相关的内容已变更的项目 MCP 服务器，绝不会被启动或连接
+    （host-core 单元测试与 `apps/desktop/test/user-mcp.test.mjs`）
+12. 未经批准、或批准后文档已变更的项目技能，不会出现在技能目录中，并被 `Skill` 工具拒绝
+    （host-core `user_skills` 批准测试与 `apps/pi-host/src/skill-tool.test.ts`）

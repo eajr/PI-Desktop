@@ -1,4 +1,4 @@
-import { dialog, globalShortcut, shell, type BrowserWindow } from "electron";
+import { dialog, globalShortcut, session, shell, type BrowserWindow } from "electron";
 import { join } from "node:path";
 import {
   IPC,
@@ -49,6 +49,8 @@ import { McpOAuthManager } from "../mcp-oauth";
 import { PluginPanelHost } from "../plugin-panel-host";
 import { PluginViewHost } from "../plugin-view-host";
 import { BrowserPane } from "../browser-view";
+import { electronOpenPathDeps } from "../safe-open-path-electron";
+import { launchableRevealedNotice, openPathOrReveal } from "../safe-open-path";
 import { BrowserHost, BROWSER_PLUGIN_ID } from "../browser-host";
 import { OAUTH_AUTH_KIND, type VendorOAuth } from "../oauth";
 import type { ClipboardHistory } from "../clipboard-history";
@@ -247,8 +249,12 @@ export function createPluginServices({
       await safeOpenExternal(url);
     },
     openPath: async (fullPath) => {
-      const error = await shell.openPath(stripWinLongPrefix(fullPath));
-      if (error) throw new Error(error);
+      // The runtime already reveals launchable files; re-check at the shell
+      // boundary so no caller of this service can launch one.
+      const result = await openPathOrReveal(stripWinLongPrefix(fullPath), electronOpenPathDeps);
+      if (result.outcome === "revealed") {
+        sendToRenderer(IPC.event.toast, { message: launchableRevealedNotice(getUpdaterLocale()) });
+      }
     },
     revealPath: async (fullPath) => {
       shell.showItemInFolder(stripWinLongPrefix(fullPath));
@@ -279,6 +285,10 @@ export function createPluginServices({
     // implementation follows redirects by hand and re-checks the manifest
     // egress allowlist before every hop. A plain `fetch` service would let an
     // allowlisted host 30x the request straight out to an undeclared one.
+    // The route lets that implementation pin a direct hop to the address it
+    // checked, while a proxied hop keeps using the user's proxy
+    // (docs/adr/plugin-net-resolved-address-guard.md).
+    resolveNetRoute: (url) => session.defaultSession.resolveProxy(url),
     audit: (entry) => {
       logger.app("plugin", "info", "plugin.api", entry);
     },
@@ -589,7 +599,9 @@ export function createPluginServices({
   });
   pluginPanels.addSenderResolver((senderId) => pluginViews.pluginIdForSender(senderId));
   const browserHost = new BrowserHost({
-    createPane: (onState, onOpenUrl) => new BrowserPane(onState, onOpenUrl),
+    createPane: (onState, onOpenUrl) =>
+      new BrowserPane(onState, onOpenUrl, () =>
+        sendToRenderer(IPC.event.toast, { message: launchableRevealedNotice(getUpdaterLocale()) })),
     onOpenUrl: (url, sessionId) => {
       void (async () => {
         const settings = await getHost()?.call<AppSettings>("settings.get");

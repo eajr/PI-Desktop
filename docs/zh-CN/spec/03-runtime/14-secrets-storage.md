@@ -34,6 +34,23 @@ Node pi sidecar 可能会通过主机 RPC 接收**临时内存中**的秘密，�
 
 MVP 必须实现两条路径的自动选择。
 
+### 已交付的主密钥保管方式
+
+已交付的实现仍以 AES-256-GCM 文件将密文保存在 `secrets/` 下，只把 32 字节主密钥移入
+操作系统凭据存储（ADR secret-master-key-os-credential-store）：
+
+| 项目 | 行为 |
+|---|---|
+| 凭据存储 | macOS 钥匙串、Windows 凭据管理器、Linux Secret Service（`keyring` crate） |
+| 服务 / 账户 | `net.aiuo.pi-desktop` / `secret-master-key:<uuid>`；账户记录在非机密文件 `secrets/.keychain-account` 中，因此每个数据根目录有自己的密钥，迁移后的副本仍保留它 |
+| 旧版迁移 | 现有 `.machine-key` 先写入凭据存储、回读，并用现有密文验证，之后才写入标记并删除文件；任何失败都保留文件 |
+| 回退 | 无可用凭据存储或设置 `PI_DESKTOP_SECRET_KEY_STORE=file` 时：使用仅属主可读写的 `.machine-key`，记录不含密钥材料的警告；下次在凭据存储可用时启动会迁移 |
+| 迁移后凭据存储不可用 | 存储以锁定状态打开：`has`/`delete` 可用，`get`/`set` 失败，不会重新生成密钥或覆盖任何内容 |
+| 凭据条目被删除 | 生成新密钥；现有密文在重新录入前无法解密 |
+| 文件权限（Unix） | 数据根目录和 `secrets/` 为 `0700`；密文、标记和回退密钥为 `0600`；密文通过临时文件 + rename 替换 |
+
+`secrets_meta.backend` 仍记录 `file_fallback`：它描述的是密文位置，而该位置没有变化。
+
 ## 4. 数据模型
 
 ```ts

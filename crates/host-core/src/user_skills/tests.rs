@@ -78,6 +78,8 @@ fn disabled_project_skill_shadows_global_skill() {
         source: "imported".into(),
         path: "/global/review.md".into(),
         size_bytes: 1,
+        content_hash: None,
+        approval: None,
         created_at: String::new(),
         updated_at: String::new(),
     };
@@ -250,6 +252,8 @@ fn record(id: &str, name: &str) -> UserSkillRecord {
         source: "imported".into(),
         path: String::new(),
         size_bytes: 0,
+        content_hash: None,
+        approval: None,
         created_at: String::new(),
         updated_at: String::new(),
     }

@@ -9,6 +9,7 @@ import {
   type CommandShellOption, isCommandShellOption,
   type WorkspaceFilesRequest,
 } from "@pi-desktop/shared";
+import { join } from "node:path";
 import { wsClientTransport } from "@pi-desktop/racp";
 import type { HostRpcPort } from "@pi-desktop/agent-host";
 import type { BackendRouter } from "../remote/backend-router.js";
@@ -16,11 +17,14 @@ import { makeRemoteSessionId, parseRemoteSessionId } from "../remote/backend-rou
 import { createRacpRemoteHostClient, exchangePairingToken, type RacpRemoteHostClient } from "../remote/racp-remote-host-client.js";
 import { createSshBootstrap, type SshBootstrapDeps } from "../remote/ssh-bootstrap.js";
 import { createSshTunnelManager, type SshTunnelManager } from "../remote/ssh-tunnel.js";
+import { APP_KNOWN_HOSTS_FILE } from "../remote/ssh-host-keys.js";
 import { createRemoteHostConnection, type RemoteHostConnection } from "../remote/remote-host-connection.js";
 import { createRemoteHostRegistry, type EncryptionPort, type RemoteHostRecord, type RemoteHostRegistry } from "../remote/remote-host-registry.js";
 import { sshMetadataOf, sshHostRecord, transportOf } from "../remote/remote-host-metadata.js";
 import { createRemoteSessionCatalog } from "../remote/remote-session-catalog.js";
 import { syncRemoteProviders } from "../remote/remote-provider-transfer.js";
+import { isDeviceTokenExpired, repairDeviceOverSsh } from "../remote/remote-device-repair.js";
+import { createSystemSshTransport } from "../remote/ssh-transport.js";
 import { workspaceExecutionError } from "../remote/remote-workspace-outcome.js";
 export { sshMetadataOf, sshHostRecord, transportOf } from "../remote/remote-host-metadata.js";
 export type { RemoteHostSummary };
@@ -42,6 +46,11 @@ export type BootRemoteHostsOptions = {
   log?: (level: "info" | "warn" | "error", message: string, data?: unknown) => void;
   tunnels?: SshTunnelManager;
   sshBootstrap?: Partial<SshBootstrapDeps>;
+  /**
+   * Re-pair an SSH host whose device token expired and return the new token.
+   * Defaults to minting a pairing token over SSH and exchanging it on `url`.
+   */
+  repairDevice?: (record: RemoteHostRecord, url: string) => Promise<string>;
 };
 export type RemoteLiveSessionSummary = Pick<RacpSession, "id" | "title" | "mode" | "permissionMode" | "status" | "activeTurnId" | "workspaceLabel"> & {
   source: "remote"; hostKey: string; hostLabel: string;
@@ -86,14 +95,18 @@ function unavailable(): Error {
 function requiresUserAction(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const fields = error as { errorCode?: string; code?: string };
-  return ["HOST_AUTH_FAILED", "REMOTE_AUTH_FAILED", "HOST_VERSION_MISMATCH", "CAPABILITY_UNAVAILABLE"]
+  return ["HOST_AUTH_FAILED", "REMOTE_AUTH_FAILED", "REMOTE_DEVICE_TOKEN_EXPIRED", "HOST_VERSION_MISMATCH",
+    "CAPABILITY_UNAVAILABLE", "SSH_HOST_KEY_UNKNOWN", "SSH_HOST_KEY_CHANGED"]
     .includes(fields.errorCode ?? fields.code ?? "");
 }
 
 export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHostsBoot {
   const log = options.log ?? (() => undefined);
   const registry = createRemoteHostRegistry({ dataDir: options.dataDir, encryption: options.encryption, log });
-  const tunnels = options.tunnels ?? createSshTunnelManager({ log });
+  // The app-managed known_hosts: only user-confirmed host keys land here, and
+  // every SSH connection consults it before the user's own files (ADR 0328).
+  const knownHostsFile = join(options.dataDir, APP_KNOWN_HOSTS_FILE);
+  const tunnels = options.tunnels ?? createSshTunnelManager({ log, knownHostsFile });
   const opened = new Map<string, OpenHost>();
   const actionRequired = new Set<string>();
   const openingHosts = new Set<OpenHost>();
@@ -162,7 +175,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
   const bootstrap = createSshBootstrap({
     version: options.clientInfo.version,
     exchangePairing: ({ url, pairingToken, label, expectedHostId }) => exchangePairingToken({ url, pairingToken, label, expectedHostId, clientInfo: options.clientInfo, requireWorkspace: true, log }),
-    log, ...options.sshBootstrap,
+    log, knownHostsFile, ...options.sshBootstrap,
   });
 
   function closeHost(host: OpenHost): Promise<void> {
@@ -189,7 +202,15 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
     if (record.metadata?.transport === "ssh" && !ssh) {
       throw Object.assign(new Error("invalid SSH host metadata"), { errorCode: "INVALID_ARGUMENT" });
     }
-    const url = ssh ? (await tunnels.open(record.hostKey, ssh, record.sshSecret)).url : record.url;
+    let url = record.url;
+    if (ssh) {
+      try { url = (await tunnels.open(record.hostKey, ssh, record.sshSecret)).url; }
+      catch (error) {
+        // A host-key refusal needs the user, not another automatic retry.
+        if (requiresUserAction(error)) actionRequired.add(record.hostKey);
+        throw error;
+      }
+    }
     if (closed) { await tunnels.close(record.hostKey); throw unavailable(); }
     const adapter = buildAdapter({ ...record, url });
     const connection = createRemoteHostConnection({
@@ -224,6 +245,45 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
       openingHosts.delete(live);
     }
   }
+  const repairDevice = options.repairDevice ?? (async (record: RemoteHostRecord, url: string) => {
+    const ssh = sshMetadataOf(record);
+    if (!ssh) throw Object.assign(new Error("re-pairing requires an SSH host"), { errorCode: "CAPABILITY_UNAVAILABLE" });
+    return repairDeviceOverSsh({
+      ssh, sshSecret: record.sshSecret, url, label: record.label,
+      buildTransport: (target) =>
+        createSystemSshTransport(target, { knownHostsFile, log: (level, message, data) => log(level, message, data) }),
+      exchangePairing: (input) => exchangePairingToken({ ...input, clientInfo: options.clientInfo, requireWorkspace: true, log }),
+    });
+  });
+  /**
+   * Open a host; when an SSH host refuses the device token as expired,
+   * re-pair over SSH once (SSH is the pairing root of trust) and retry.
+   */
+  async function openHostRepairing(record: RemoteHostRecord): Promise<OpenHost> {
+    try {
+      return await openHost(record);
+    } catch (error) {
+      const ssh = sshMetadataOf(record);
+      if (closed || !ssh || !isDeviceTokenExpired(error)) throw error;
+      log("info", `remote host ${record.hostKey} device token expired; re-pairing over SSH`);
+      let repaired: RemoteHostRecord;
+      try {
+        const { url } = await tunnels.open(record.hostKey, ssh, record.sshSecret);
+        assertOpen();
+        repaired = { ...record, deviceToken: await repairDevice(record, url) };
+        assertOpen();
+        await registry.upsert(repaired);
+      } catch (repairError) {
+        await tunnels.close(record.hostKey);
+        if (closed) throw repairError;
+        log("warn", `remote host ${record.hostKey} re-pairing failed`, {
+          errorCode: (repairError as { errorCode?: string })?.errorCode,
+        });
+        throw error;
+      }
+      return openHost(repaired);
+    }
+  }
   function summaryOf(record: RemoteHostRecord): RemoteHostSummary {
     const state = opened.get(record.hostKey)?.adapter.state();
     const status: RemoteHostConnectionStatus = state === "connected" || state === "connecting" || state === "reconnecting"
@@ -254,7 +314,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
       if (!connectedHost(key)) {
         await closeLive(key);
         assertOpen();
-        await openHost(record);
+        await openHostRepairing(record);
       }
       return summaryOf(record);
     });
@@ -277,7 +337,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
           if (closed) break;
           try {
             await serial(record.hostKey, async () => {
-              if (!opened.has(record.hostKey)) await openHost(record);
+              if (!opened.has(record.hostKey)) await openHostRepairing(record);
             });
             successes++;
           } catch (error) {
@@ -383,7 +443,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
         if (!record) throw unavailable();
         const host = options.getLocalHost?.();
         if (!host) throw unavailable();
-        return syncRemoteProviders(input, record, host);
+        return syncRemoteProviders(input, record, host, { knownHostsFile });
       });
     },
     addHost: (record) => serial(record.hostKey, () => addRecord(record)),
@@ -392,7 +452,7 @@ export function createRemoteHostsBoot(options: BootRemoteHostsOptions): RemoteHo
       if (!record) throw unavailable();
       await closeLive(key);
       await tunnels.close(key);
-      await openHost(record);
+      await openHostRepairing(record);
       return summaryOf(record);
     }),
     async bootstrapHost(request) {

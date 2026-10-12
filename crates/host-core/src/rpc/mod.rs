@@ -1,4 +1,6 @@
 mod config_sync_rpc;
+#[cfg(test)]
+mod egress_gate_tests;
 mod remote_tools;
 mod scheduled_rpc;
 mod scheduled_tools;
@@ -1423,67 +1425,6 @@ async fn emit_notification(tx: &mpsc::UnboundedSender<String>, method: &str, par
     send_notification(tx, method, params);
 }
 
-/// Reports install progress to the renderer, and reads the cancel flag.
-///
-/// Throttled on purpose: an install reports every chunk of bytes it sees, and
-/// an interface needs a few of those per second rather than thousands. A phase
-/// change and the terminal report always go through, so a dialog never misses
-/// the transition it is displaying.
-struct RpcInstallObserver {
-    tx: mpsc::UnboundedSender<String>,
-    cancel: crate::plugins::CancelToken,
-    last: Option<std::time::Instant>,
-    last_phase: Option<crate::plugins::InstallPhase>,
-}
-
-impl crate::plugins::InstallObserver for RpcInstallObserver {
-    fn progress(&mut self, event: crate::plugins::InstallProgress) {
-        const MIN_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
-        let phase_changed = self.last_phase != Some(event.phase);
-        let terminal = event.error.is_some();
-        let due = self
-            .last
-            .map(|at| at.elapsed() >= MIN_INTERVAL)
-            .unwrap_or(true);
-        if !phase_changed && !terminal && !due {
-            return;
-        }
-        self.last = Some(std::time::Instant::now());
-        self.last_phase = Some(event.phase);
-        let tried: Vec<Value> = event
-            .tried
-            .iter()
-            .map(|mirror| {
-                json!({
-                    "source": mirror.source,
-                    "url": mirror.url,
-                    "error": mirror.error,
-                })
-            })
-            .collect();
-        send_notification(
-            &self.tx,
-            "plugin.installProgress",
-            json!({
-                "pluginId": event.plugin_id,
-                "version": event.version,
-                "phase": event.phase.as_str(),
-                "source": event.source,
-                "attempt": event.attempt,
-                "attempts": event.attempts,
-                "receivedBytes": event.received_bytes,
-                "totalBytes": event.total_bytes,
-                "tried": tried,
-                "error": event.error,
-            }),
-        );
-    }
-
-    fn cancelled(&self) -> bool {
-        self.cancel.is_cancelled()
-    }
-}
-
 async fn wait_for_bash_cancellation(
     receiver: &mut Option<tokio::sync::watch::Receiver<bool>>,
 ) -> bool {
@@ -2299,12 +2240,6 @@ async fn handle_request(
             st.db
                 .set_setting("app", &settings)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            // Keep the marketplace channel in memory aligned with settings.
-            // Legacy source values are ignored, so this remains the official
-            // channel; the renderer owns remote refresh timing.
-            let (channel, custom_url) =
-                crate::plugins::market_channel_from_settings(Some(&settings));
-            st.plugins.set_market_channel(channel, custom_url);
             // A concrete app language pins the plugin display locale here, so a
             // shell that only writes settings still gets localized plugin rows.
             // `auto` is resolved by the shell and pushed through
@@ -3796,6 +3731,7 @@ async fn handle_request(
             // an approval wait as well as an already-spawned process.
             let cancellation_receiver = if remote_workspace.is_some()
                 || matches!(p.tool_name.as_str(), "Bash" | "GenerateImages")
+                || crate::permissions::egress::is_third_party_egress_tool(&p.tool_name)
             {
                 let mut st = state.lock().await;
                 match st.register_bash_cancellation(&p.session_id, &p.tool_call_id) {
@@ -3928,8 +3864,12 @@ async fn handle_request(
                             command_shell_id.clone(),
                         )
                     } else {
+                        let egress_reason =
+                            crate::permissions::egress::permission_reason(&p.tool_name);
                         let reason = if external_path_permission {
                             "Accesses a path outside the session workspace"
+                        } else if let Some(reason) = egress_reason.as_deref() {
+                            reason
                         } else {
                             match p.tool_name.as_str() {
                                 "Write" | "Edit" => "Modifies files in your workspace",
@@ -3948,7 +3888,11 @@ async fn handle_request(
                                 session_id: &p.session_id,
                                 tool_call_id: &p.tool_call_id,
                                 tool_name: &p.tool_name,
-                                args_preview: p.args.clone(),
+                                args_preview: crate::permissions::egress::permission_preview(
+                                    &p.tool_name,
+                                    &p.args,
+                                )
+                                .unwrap_or_else(|| p.args.clone()),
                                 reason,
                                 declared_risk: p.declared_risk.as_deref(),
                                 command_shell_id: command_shell_id.as_deref(),
@@ -4667,9 +4611,7 @@ async fn handle_request(
                     crate::plugins::InstallOptions {
                         source: "installed".into(),
                         enable,
-                        marketplace: None,
                         expected_shasum: None,
-                        auto_update: false,
                         granted_permissions: granted,
                     },
                 )
@@ -4701,9 +4643,7 @@ async fn handle_request(
                     crate::plugins::InstallOptions {
                         source: "installed".into(),
                         enable,
-                        marketplace: None,
                         expected_shasum,
-                        auto_update: false,
                         granted_permissions: granted,
                     },
                 )
@@ -4741,22 +4681,6 @@ async fn handle_request(
             let plugin = st
                 .plugins
                 .revoke_permissions(id, permissions)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({ "plugin": plugin }))
-        }
-        "plugins.setAutoUpdate" => {
-            let id = params
-                .get("id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
-            let enabled = params
-                .get("enabled")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let mut st = state.lock().await;
-            let plugin = st
-                .plugins
-                .set_auto_update(id, enabled)
                 .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
             Ok(json!({ "plugin": plugin }))
         }
@@ -4818,6 +4742,25 @@ async fn handle_request(
             let server = st
                 .mcp_servers
                 .set_enabled(&id, enabled, Some(level), project_path.as_deref())
+                .map_err(scope_err)?;
+            Ok(json!({ "server": server }))
+        }
+        "mcp.approve" => {
+            let id = require_id(&params)?;
+            let project_path = params
+                .get("projectPath")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| capability_err("projectPath required to approve a server"))?;
+            let config_hash = params
+                .get("configHash")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "configHash required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let server = st
+                .mcp_servers
+                .approve(&id, project_path, config_hash)
                 .map_err(scope_err)?;
             Ok(json!({ "server": server }))
         }
@@ -4945,6 +4888,25 @@ async fn handle_request(
                 .map_err(skill_err)?;
             Ok(json!({ "skill": skill }))
         }
+        "skills.approve" => {
+            let id = require_id(&params)?;
+            let project_path = params
+                .get("projectPath")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| rpc_err(1002, "projectPath required", "INVALID_PARAMS"))?;
+            let content_hash = params
+                .get("contentHash")
+                .and_then(Value::as_str)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| rpc_err(1002, "contentHash required", "INVALID_PARAMS"))?;
+            let mut st = state.lock().await;
+            let skill = st
+                .user_skills
+                .approve(&id, project_path, content_hash)
+                .map_err(skill_err)?;
+            Ok(json!({ "skill": skill }))
+        }
         "skills.setScope" => {
             let id = require_id(&params)?;
             let scope = parse_scope(&params)?;
@@ -5052,120 +5014,6 @@ async fn handle_request(
                 .map_err(|message| rpc_err(1002, message, "INVALID_PARAMS"))?;
             Ok(json!({ "ok": true }))
         }
-        "market.refresh" => {
-            let force = params
-                .get("force")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-            let st = state.lock().await;
-            let meta = st.plugins.refresh_market(force).map_err(plugin_err)?;
-            Ok(meta)
-        }
-        "market.search" => {
-            let query = params.get("query").and_then(|v| v.as_str());
-            let category = params.get("category").and_then(|v| v.as_str());
-            let st = state.lock().await;
-            let plugins = st
-                .plugins
-                .market_search(query, category)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({
-                "plugins": plugins,
-                "providerId": "official",
-                "sourceUrl": st.plugins.market_source_url(),
-            }))
-        }
-        "market.getDetail" => {
-            let id = params
-                .get("id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
-            let st = state.lock().await;
-            let plugin = st.plugins.market_get(id).map_err(plugin_err)?;
-            Ok(json!({ "plugin": plugin }))
-        }
-        "market.install" => {
-            let id = params
-                .get("id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
-            let version = params.get("version").and_then(|v| v.as_str());
-            let enable = params
-                .get("enable")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-            let auto_update = params
-                .get("autoUpdate")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let granted = params
-                .get("grantedPermissions")
-                .cloned()
-                .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok());
-            // An install outlives one request from the interface's point of
-            // view: it resolves where the package is, downloads it from one
-            // mirror after another, verifies it and registers it. Every one of
-            // those steps is worth showing, which is what the observer does,
-            // and the token is what the cancel channel flips.
-            let cancel = crate::plugins::CancelToken::default();
-            // Armed outside AppState: cancelInstall must flip this flag while
-            // install still holds the state lock for the download.
-            crate::plugins::progress::arm_active_cancel(&cancel);
-            let mut observer = RpcInstallObserver {
-                tx: tx.clone(),
-                cancel: cancel.clone(),
-                last: None,
-                last_phase: None,
-            };
-            let mut st = state.lock().await;
-            st.plugins.set_install_cancel(Some(cancel));
-            let outcome = st.plugins.install_from_market_observed(
-                id,
-                version,
-                enable,
-                auto_update,
-                granted,
-                &mut observer,
-            );
-            // Whatever happened, nothing is cancellable any more: a token left
-            // in place would answer the next cancel for an install that is
-            // already over.
-            st.plugins.set_install_cancel(None);
-            let result = outcome.map_err(plugin_err)?;
-            Ok(json!({ "result": result }))
-        }
-        "market.cancelInstall" => {
-            let id = params
-                .get("id")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| rpc_err(1002, "id required", "INVALID_PARAMS"))?;
-            // Do not take AppState: the install holds that lock while bytes
-            // arrive, and waiting on it would make cancel a no-op.
-            let cancelled = crate::plugins::progress::cancel_active_install();
-            Ok(json!({ "cancelled": cancelled, "id": id }))
-        }
-        "market.checkUpdates" => {
-            let refresh_remote = params
-                .get("refreshRemote")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-            let mut st = state.lock().await;
-            let updates = st
-                .plugins
-                .check_updates(refresh_remote)
-                .map_err(|e| rpc_err(1000, e.to_string(), "INTERNAL"))?;
-            Ok(json!({ "updates": updates, "plugins": st.plugins.list() }))
-        }
-        "market.applyUpdates" => {
-            let only_auto = params
-                .get("onlyAuto")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(true);
-            let mut st = state.lock().await;
-            let results = st.plugins.apply_updates(only_auto).map_err(plugin_err)?;
-            Ok(json!({ "results": results, "plugins": st.plugins.list() }))
-        }
-
         "app.getOnboarding" => {
             let st = state.lock().await;
             let settings = st

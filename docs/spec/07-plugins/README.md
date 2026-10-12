@@ -14,7 +14,7 @@ this directory define the normative contracts and implementation boundaries.
 | [04-plugin-security.md](04-plugin-security.md) | Plugin security |
 | [05-plugin-lifecycle.md](05-plugin-lifecycle.md) | Lifecycle |
 | [06-plugin-packaging.md](06-plugin-packaging.md) | Packaging & installation |
-| [07-plugin-marketplace.md](07-plugin-marketplace.md) | Plugin marketplace |
+| [07-plugin-marketplace.md](07-plugin-marketplace.md) | Plugin marketplace (removed in this build) |
 | [08-plugin-signing-updates.md](08-plugin-signing-updates.md) | Signing & updates |
 | [09-plugin-command-palette.md](09-plugin-command-palette.md) | Command palette |
 | [10-plugin-devex.md](10-plugin-devex.md) | Developer experience |

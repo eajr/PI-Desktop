@@ -22,6 +22,19 @@ export type FsImageDataUrlResult = {
   errorCode?: string;
 };
 
+/**
+ * Result of `fs/open`. A file whose default handler could launch code (an
+ * application, script, installer, shortcut, or POSIX executable) is never
+ * opened: it is revealed in the OS file manager instead and `outcome` is
+ * `"revealed"`. Older hosts return only `{ ok: true }`.
+ */
+export type FsOpenResult = {
+  ok: true;
+  outcome?: "opened" | "revealed";
+  /** Why the file was revealed instead of opened. */
+  reason?: "extension" | "bundle" | "executable-mode" | "unverifiable";
+};
+
 export type AgentInstructionFile = {
   scope: "global" | "project";
   path: string;

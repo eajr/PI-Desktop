@@ -1793,7 +1793,7 @@ Single message render — either user (plaintext) or assistant (markdown streami
   the URL in prose stays outside the link. Sentence punctuation immediately
   after a closing URL parenthesis stays outside as well; suffixes such as
   `(draft).html` remain part of the URL. Plain clicks — including markdown
-  links, autolinked URLs, inline-code URLs, and remote images — follow the
+  links, autolinked URLs, inline-code URLs, and loaded remote images — follow the
   persisted Link open destination setting (Work panel browser by default, or
   the system default browser). Right-clicking a link opens a body-level
   context menu with Open in default browser, Open in work panel, and Copy
@@ -2042,9 +2042,21 @@ Renderer: `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/shi
   or `\[…\]`). Raw HTML is
   parsed by `rehype-raw` and immediately constrained by the extended
   `rehype-sanitize` default schema; only the renderer-owned audio/video/source
-  additions and the `math-inline`/`math-display` classes on `code` (which keep
-  TeX `\[…\]` in display layout) are admitted. KaTeX's Vite-inlined WOFF2 fonts
-  are allowed by the renderer's `font-src 'self' data:` CSP directive.
+  additions (`src`, `controls`, `preload`, `className`; no `poster`) and the
+  `math-inline`/`math-display` classes on `code` (which keep TeX `\[…\]` in
+  display layout) are admitted. KaTeX's Vite-inlined WOFF2 fonts are allowed by
+  the renderer's `font-src 'self' data:` CSP directive.
+- **Remote media (ADR 0327)**: an image, audio or video whose `src` or
+  `<source>` child names another host — absolute, protocol-relative, or any
+  spelling the URL parser resolves off-origin — renders as an inline chip with
+  the media icon, the host, the alt text when present, and a localized
+  **Load image / Load audio / Load video** action; its tooltip says it was not
+  loaded automatically and shows the full URL. Clicking loads that one item
+  through Main and replaces the chip with the image or a `preload="none"`
+  player; the action reads **Loading…** meanwhile, and a refusal or failure
+  shows **Couldn't load** with **Try again**. A loaded item stays loaded for
+  the session (bounded cache), including when its message remounts. Local
+  images and attachments keep their existing inline/chip behavior.
 - **Copying a formula (D619)**: a selection that covers rendered math reaches
   the clipboard as the TeX it was written in — `$…$` inline, `$$…$$` on its own
   lines, each run widened past any run inside the formula the way a code span's
@@ -3887,7 +3899,9 @@ The scanner covers supported Claude Desktop, Claude Code, Cursor, Codex,
 OpenCode, and ChatGPT Desktop stores. Candidate rows show a label, safe
 metadata, source, and transport. URL metadata is reduced to its host so
 userinfo, paths, and query credentials never render; environment and header
-values are not shown. Imported servers follow the selected Global / Project
+values are not shown and never reach the renderer: the scan returns only their
+names, and the import sends back selections that main resolves against the scan
+it retained. Imported servers follow the selected Global / Project
 scope and project path. A disabled source server remains disabled after the
 host write succeeds.
 

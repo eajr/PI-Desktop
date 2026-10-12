@@ -305,8 +305,11 @@ codes surface through the same error object as any other call.
 | `HOST_BOOTSTRAP_FAILED` | no | provisioning the remote `pi-host` over SSH failed (download, checksum mismatch, or `install.sh`); `details.reason` names the stage |
 | `HOST_VERSION_MISMATCH` | no | the remote `pi-host` version does not match the desktop; the desktop refuses to drive an incompatible host |
 | `REMOTE_AUTH_FAILED` | no | the device or pairing token was rejected on the RACP-WS upgrade |
+| `REMOTE_DEVICE_TOKEN_EXPIRED` | no | the device token matched a paired device but is past its idle or absolute lifetime (upgrade header `x-racp-error`); an SSH-managed desktop re-pairs over SSH once before surfacing it |
 | `REMOTE_CONNECTION_FAILED` | yes | the RACP-WS transport could not connect (non-loopback URL, refused socket) |
 | `REMOTE_FORWARD_FAILED` | yes | the SSH loopback port forward could not be established |
+| `SSH_HOST_KEY_UNKNOWN` | no | the SSH host presented a key no consulted known_hosts file trusts; `details` carries `host`, optional `port`, and, when learned, `keys` (`type`, `SHA256:` fingerprint) for the user to confirm (ADR 0328) |
+| `SSH_HOST_KEY_CHANGED` | no | the SSH host key contradicts a trusted one; the desktop never accepts it and the user must resolve it outside the app (ADR 0328) |
 | `REMOTE_PATH_NOT_FOUND` | no | a remote project/workspace path does not exist on the host |
 | `REMOTE_PATH_FORBIDDEN` | no | a remote path is outside the host's permitted roots |
 | `PAIRING_FAILED` | no | `connection/pair` could not mint a device credential |
