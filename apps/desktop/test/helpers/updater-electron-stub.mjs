@@ -5,3 +5,8 @@ export const app = {
 };
 
 export const shell = { openExternal: async () => undefined };
+
+export const Menu = {
+  buildFromTemplate: (template) => template,
+  setApplicationMenu: () => undefined,
+};

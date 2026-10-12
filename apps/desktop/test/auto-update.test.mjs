@@ -224,6 +224,16 @@ test("renderer exposes the updates API, banner and settings row", () => {
   assert.match(appSource, /case "checkForUpdates"/);
 });
 
+test("renderer offers no update check or preference when compiled out", () => {
+  assert.match(typesSource, /disabledReason\?: UpdateDisabledReason/);
+  assert.match(settingsSource, /disabledReason === "build"/);
+  assert.match(settingsSource, /updates\.buildDisabled/);
+  assert.match(settingsSource, /buildDisabled \? null : \(/);
+  assert.match(enSource, /buildDisabled: "Updates are disabled in this build\."/);
+  assert.match(zhSource, /buildDisabled:/);
+  assert.match(menuSource, /updatesEnabled = APP_UPDATES_ENABLED/);
+});
+
 test("check-for-updates is reachable from the application menu", () => {
   assert.match(protocolSource, /"checkForUpdates",/);
   assert.match(menuSource, /checkForUpdates/);
@@ -253,12 +263,16 @@ test("check-for-updates is reachable from the application menu", () => {
   }
 });
 
-test("packaging publishes an electron-updater feed for GitHub Releases", () => {
+test("packaging embeds no update feed while the updater is compiled out", () => {
   const pkg = JSON.parse(pkgSource);
   assert.ok(pkg.dependencies["electron-updater"], "electron-updater dependency");
-  assert.equal(pkg.build.publish[0].provider, "github");
-  assert.equal(pkg.build.publish[0].owner, "vastsa");
-  assert.equal(pkg.build.publish[0].repo, "PI-Desktop");
+  // `null` (not absent): electron-builder otherwise infers a GitHub feed from
+  // GH_TOKEN / repository metadata and writes app-update.yml + latest*.yml.
+  assert.equal(
+    pkg.build.publish,
+    null,
+    "packaged builds must not embed app-update.yml pointing at an upstream feed",
+  );
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
   // electron-builder must never self-publish (implicit tag publishing would

@@ -13748,7 +13748,31 @@ are withdrawn with ADR 0165.
 - **Status**: Setting selection/persistence covered by
   `pnpm test:e2e:settings-scroll`; dismissal and download cancellation covered
   by `updater-controller.test.mjs`. Packaged Windows installer journey remains
-  runner validation.
+  runner validation. Not applicable while `APP_UPDATES_ENABLED` is `false`
+  (see E2E-UPDATE-compiled-out-build-never-contacts-feed).
+
+#### E2E-UPDATE-compiled-out-build-never-contacts-feed
+
+- **Preconditions**: A packaged build produced with `APP_UPDATES_ENABLED =
+  false` (`apps/desktop/electron/main/update-build-flag.ts`) and
+  `build.publish: null`. Outbound traffic from the app is observable (proxy or
+  packet capture).
+- **Steps**: 1) Inspect the packaged resources and confirm there is no
+  `app-update.yml`. 2) Launch the app and keep it open past the former 15 s
+  first-check delay. 3) Open Settings → Info. 4) Click the sidebar build chip.
+  5) On macOS, open the application menu.
+- **Expected**: No request reaches any update feed or GitHub Releases host.
+  Settings → Info shows "Updates are disabled in this build." with no check,
+  retry, or View Release action and no Automatic/Manual preference. The build
+  chip shows the version and does nothing on click. The macOS application menu
+  has no "Check for Updates…" item. No update banner appears.
+- **Specs linked**: `03-runtime/07-process-model.md`,
+  `05-security/01-security.md` §7, ADR 0022 (build switch amendment)
+- **Acceptance**: Quality (release safety)
+- **Milestone**: M6+
+- **Status**: Controller, menu, and renderer source contracts covered by
+  `updater-controller.test.mjs` and `auto-update.test.mjs`; the packaged
+  network observation remains runner validation.
 
 #### E2E-213: The first Composer model menu paint keeps configured aliases
 

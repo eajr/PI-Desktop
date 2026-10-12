@@ -597,9 +597,13 @@ export function Sidebar({
       : appVersion
         ? `v${appVersion}`
         : t("nav.buildUnknown");
+  // Builds with the updater compiled out never check; the chip is a label.
+  const updatesBuildDisabled = update?.disabledReason === "build";
   const buildTitle = updateReady
     ? t("updates.available", { version: update?.availableVersion ?? "" })
-    : t("nav.checkForUpdates");
+    : updatesBuildDisabled
+      ? t("updates.buildDisabled")
+      : t("nav.checkForUpdates");
 
   const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -2542,6 +2546,7 @@ export function Sidebar({
                 setSettingsTab("about");
                 return;
               }
+              if (updatesBuildDisabled) return;
               void (async () => {
                 try {
                   await api.updatesCheck();

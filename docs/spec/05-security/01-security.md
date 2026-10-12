@@ -226,6 +226,15 @@ whole-filesystem transaction.
 
 ## 7. Application update security (D120)
 
+- **Build switch.** `APP_UPDATES_ENABLED` in
+  `apps/desktop/electron/main/update-build-flag.ts` is a compile-time switch.
+  When `false` (the default in this fork) the update controller resolves
+  `mode: "disabled"` with `disabledReason: "build"`: it attaches no
+  electron-updater listeners, schedules no checks, rejects `updates/check`,
+  `updates/download`, `updates/install`, and `updates/open-releases`, and the
+  UI offers no check or delivery preference. `build.publish` is `null` so
+  packages embed no `app-update.yml` and release builds emit no `latest*.yml`.
+  The rules below apply only to builds with the switch on.
 - Electron Main owns `electron-updater`; renderer IPC cannot provide or
   override the fixed HTTPS GitHub owner/repository or releases URL.
 - The updater forces `allowPrerelease = false` so discovery always uses

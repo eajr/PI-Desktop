@@ -315,6 +315,12 @@ the next launch rather than changing the NSIS installer or writing into
   pure-JS helpers it calls without changing process or protocol ownership
 - renderer dependencies ship through Vite output rather than duplicate raw
   package trees; no interactive PTY native module is packaged
+- builds compiled with `APP_UPDATES_ENABLED = false`
+  (`electron/main/update-build-flag.ts`, the default in this fork) never start
+  update polling or contact a feed; `UpdateState` reports `mode: "disabled"`
+  with `disabledReason: "build"` and Settings → Info shows "Updates are
+  disabled in this build". The remainder of this bullet applies only when the
+  switch is on.
 - packaged builds use the Main-owned update controller and a persisted
   per-install `updatePreference`. Automatic mode keeps the existing in-app
   download/install flow on supported packages; Manual mode checks the fixed

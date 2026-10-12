@@ -125,6 +125,7 @@ export const es = {
     "error": "No se pudieron buscar actualizaciones: {{message}}",
     "dismiss": "Descartar",
     "devDisabled": "Las actualizaciones están deshabilitadas en las compilaciones de desarrollo.",
+    "buildDisabled": "Las actualizaciones están deshabilitadas en esta compilación.",
     "cardDesc": "Mantén PI-Desktop actualizado para recibir correcciones y funciones nuevas.",
     "backgroundLabel": "Descargando en segundo plano",
     "backgroundHint": "Cuando termine la descarga se te pedirá reiniciar; mientras tanto puedes seguir usando la aplicación.",

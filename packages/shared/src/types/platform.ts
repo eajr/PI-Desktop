@@ -42,9 +42,18 @@ export type UpdatePreference = "automatic" | "manual";
  * Effective update delivery on this install:
  *  - in-app: electron-updater downloads and installs
  *  - manual: detect versions and link to the releases page
- *  - disabled: development / unpackaged build
+ *  - disabled: development / unpackaged build, or a build compiled with the
+ *    updater switched off (see `UpdateDisabledReason`)
  */
 export type UpdateMode = "in-app" | "manual" | "disabled";
+
+/**
+ * Why `mode` is "disabled":
+ *  - development: unpackaged dev run (no update feed in resources)
+ *  - build: the updater is compiled out of this build; it never contacts any
+ *    update feed and the UI offers no check or delivery preference
+ */
+export type UpdateDisabledReason = "development" | "build";
 
 export type UpdateStatus =
   | "idle"
@@ -58,6 +67,8 @@ export type UpdateStatus =
 /** Snapshot pushed on the `updatesState` event and returned by updates IPC. */
 export type UpdateState = {
   mode: UpdateMode;
+  /** Present only when `mode` is "disabled". */
+  disabledReason?: UpdateDisabledReason;
   preference: UpdatePreference;
   defaultPreference: UpdatePreference;
   automaticSupported: boolean;

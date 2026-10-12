@@ -132,6 +132,7 @@ export const en = {
     error: "Couldn't check for updates: {{message}}",
     dismiss: "Dismiss",
     devDisabled: "Updates are disabled in development builds.",
+    buildDisabled: "Updates are disabled in this build.",
     cardDesc: "Keep PI-Desktop up to date for the latest fixes and features.",
     backgroundLabel: "Downloading in the background",
     backgroundHint: "You'll be prompted to restart once the download finishes; you can keep using the app meanwhile.",

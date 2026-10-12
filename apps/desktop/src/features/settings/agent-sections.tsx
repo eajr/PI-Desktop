@@ -120,6 +120,8 @@ export function UpdatesRow({
   }, [saveSettings, showToast, t]);
   const closeReleaseNotes = useCallback(() => setReleaseNotesOpen(false), []);
   const disabled = !update || update.mode === "disabled";
+  // The updater is compiled out: offer no check, link, or delivery preference.
+  const buildDisabled = update?.disabledReason === "build";
   const busy = update?.status === "checking" || update?.status === "downloading";
   const preferenceLocked =
     !update ||
@@ -128,7 +130,9 @@ export function UpdatesRow({
     update.status === "downloading";
 
   let action: ReactNode;
-  if (update?.status === "downloaded") {
+  if (buildDisabled) {
+    action = null;
+  } else if (update?.status === "downloaded") {
     action = (
       <Button
         variant="primary"
@@ -172,7 +176,11 @@ export function UpdatesRow({
   const progress = Math.max(0, Math.min(100, update?.progressPercent ?? 0));
 
   let statusBody: ReactNode = null;
-  if (disabled) {
+  if (buildDisabled) {
+    statusBody = (
+      <div className="about-update-status">{t("updates.buildDisabled")}</div>
+    );
+  } else if (disabled) {
     statusBody = (
       <div className="about-update-status">{t("updates.devDisabled")}</div>
     );
@@ -285,45 +293,47 @@ export function UpdatesRow({
           ) : null}
         </div>
       </section>
-      <SettingsCard>
-        <SettingsRow
-          title={t("updates.preferenceTitle")}
-          description={t("updates.preferenceDesc")}
-        >
-          <div className="flex flex-col items-end gap-1.5">
-            <SettingsMenuSelect
-              label={t("updates.preferenceTitle")}
-              value={selectedPreference}
-              options={[
-                {
-                  id: "automatic",
-                  label: t("updates.automatic"),
-                  disabled:
-                    update?.automaticSupported !== true || preferenceLocked,
-                },
-                {
-                  id: "manual",
-                  label: t("updates.manual"),
-                  disabled: preferenceLocked,
-                },
-              ]}
-              disabled={preferenceLocked}
-              busy={preferenceSaving || update?.status === "downloading"}
-              onChange={(value) => void savePreference(value)}
-            />
-            {update?.automaticSupported === false ? (
-              <div className="text-right text-xs-plus text-text-muted">
-                {t("updates.automaticUnsupported")}
-              </div>
-            ) : null}
-            {update?.automaticSupported && update.defaultPreference === "manual" ? (
-              <div className="text-right text-xs-plus text-text-muted">
-                {t("updates.automaticPortableWarning")}
-              </div>
-            ) : null}
-          </div>
-        </SettingsRow>
-      </SettingsCard>
+      {buildDisabled ? null : (
+        <SettingsCard>
+          <SettingsRow
+            title={t("updates.preferenceTitle")}
+            description={t("updates.preferenceDesc")}
+          >
+            <div className="flex flex-col items-end gap-1.5">
+              <SettingsMenuSelect
+                label={t("updates.preferenceTitle")}
+                value={selectedPreference}
+                options={[
+                  {
+                    id: "automatic",
+                    label: t("updates.automatic"),
+                    disabled:
+                      update?.automaticSupported !== true || preferenceLocked,
+                  },
+                  {
+                    id: "manual",
+                    label: t("updates.manual"),
+                    disabled: preferenceLocked,
+                  },
+                ]}
+                disabled={preferenceLocked}
+                busy={preferenceSaving || update?.status === "downloading"}
+                onChange={(value) => void savePreference(value)}
+              />
+              {update?.automaticSupported === false ? (
+                <div className="text-right text-xs-plus text-text-muted">
+                  {t("updates.automaticUnsupported")}
+                </div>
+              ) : null}
+              {update?.automaticSupported && update.defaultPreference === "manual" ? (
+                <div className="text-right text-xs-plus text-text-muted">
+                  {t("updates.automaticPortableWarning")}
+                </div>
+              ) : null}
+            </div>
+          </SettingsRow>
+        </SettingsCard>
+      )}
       {releaseNotesOpen ? (
           <Suspense
             fallback={
