@@ -373,5 +373,6 @@ Each ADR includes:
 | 0325 | [Smooth Windows main-window corner compositing](0325-windows-window-corner-compositing.md) | Proposed (implementation candidate; Windows E2E pending) |
 | 0326 | [Verified SSH Host installation and daily startup](0326-verified-ssh-host-installation.md) | Accepted for experimental implementation (amends ADR 0292; Linux SSH qualification and publication pending) |
 | plugin-fetch-redirect-policy | [Host-enforced plugin fetch redirect policy](plugin-fetch-redirect-policy.md) | Accepted (implementation candidate for #1475) |
+| disable-plugin-renderer-extensions | [Disable plugin renderer extensions until they are isolated](disable-plugin-renderer-extensions.md) | Accepted (fork security mitigation) |
 
 | local-agent-remote-workspace-tools | [Local Agent and model requests for remote workspaces](local-agent-remote-workspace-tools.md) | Accepted for implementation |

@@ -2193,6 +2193,7 @@ sklm: {
     "fsRootPicked": "una carpeta que elija",
     "fsOwnFiles": "archivos que creó",
     "fsAsksEachTime": "pregunta usted cada vez",
+    "rendererExtensionsDisabled": "Las extensiones de renderizado están desactivadas en esta compilación. Los elementos de interfaz del chat de este complemento no se cargarán; sus demás funciones siguen disponibles.",
     "legacyFsDowngraded": "Este complemento declara permisos de archivos anteriores a que existieran los ámbitos, por lo que su alcance se ha reducido. Actualícelo para restaurar la función completa.",
     "permissions": {
       "ui.panel": "Mostrar un panel de complementos",

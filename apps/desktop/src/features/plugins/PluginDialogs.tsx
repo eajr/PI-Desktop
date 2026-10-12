@@ -9,6 +9,7 @@ import {
   RISK_LABEL_KEYS,
   RISK_TIERS,
   TEMPLATE_IDS,
+  permissionHelp,
   permissionLabel,
   permissionRisk,
 } from "./model";
@@ -317,9 +318,7 @@ function PermissionGroups({
                       ) : null}
                     </strong>
                     <span>
-                      {t(`plugins.permissionHelp.${permission}`, {
-                        defaultValue: permission,
-                      })}
+                      {permissionHelp(permission, t)}
                     </span>
                   </span>
                 </li>

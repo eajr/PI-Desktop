@@ -2193,6 +2193,7 @@ sklm: {
     "fsRootPicked": "un dossier que vous choisissez",
     "fsOwnFiles": "fichiers qu'il a créé",
     "fsAsksEachTime": "demande vous à chaque fois",
+    "rendererExtensionsDisabled": "Les extensions de rendu sont désactivées dans cette version. Les éléments d'interface du chat de ce plugin ne seront pas chargés ; ses autres fonctions restent disponibles.",
     "legacyFsDowngraded": "Ce plugin déclare les autorisations de fichiers antérieures à l'existence des scopes, sa portée a donc été réduite. Mettez-le à jour pour restaurer toutes les fonctions.",
     "permissions": {
       "ui.panel": "Afficher un panneau de plug-in",

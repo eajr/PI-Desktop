@@ -17,6 +17,7 @@ const { RendererModuleLoader, rendererModuleUrl, rendererLoadSpecs } = await imp
   "../src/plugins/renderer-host/loader.ts"
 );
 const { SlotRegistry } = await import("../src/plugins/renderer-slots/registry.ts");
+const { RENDERER_EXTENSIONS_ENABLED } = await import("@pi-desktop/shared");
 const { createDispatchChannel } = await import("../src/plugins/renderer-host/dispatch.ts");
 const { PluginRendererError } = await import("../src/plugins/renderer-error.ts");
 const { PluginLayerStack } = await import("../src/plugins/renderer-layers/layer-stack.ts");
@@ -563,14 +564,26 @@ test("the plugin list asks for the running renderer plugins active in the open p
       renderer: descriptor,
     },
   ];
-  const ids = (projectPath) => rendererLoadSpecs(plugins, projectPath).map((entry) => entry.pluginId);
+  // The machinery stays tested with the build switch opted back in.
+  const ids = (projectPath) =>
+    rendererLoadSpecs(plugins, projectPath, true).map((entry) => entry.pluginId);
   assert.deepEqual(ids("/work/app"), ["demo.global", "demo.scoped"]);
   assert.deepEqual(ids("/Work/App/packages/ui"), ["demo.global", "demo.scoped"]);
   assert.deepEqual(ids("/work/other"), ["demo.global"]);
   assert.deepEqual(ids(null), ["demo.global"]);
-  assert.deepEqual(rendererLoadSpecs(plugins, "/work/app")[1], {
+  assert.deepEqual(rendererLoadSpecs(plugins, "/work/app", true)[1], {
     pluginId: "demo.scoped",
     version: "2.0.0",
     descriptor,
   });
+});
+
+test("this build loads no renderer extension, whatever the plugin list carries", () => {
+  const descriptor = spec().descriptor;
+  const plugins = [
+    { id: "demo.global", version: "1.0.0", enabled: true, renderer: descriptor },
+  ];
+  assert.equal(RENDERER_EXTENSIONS_ENABLED, false);
+  assert.deepEqual(rendererLoadSpecs(plugins, null), []);
+  assert.deepEqual(rendererLoadSpecs(plugins, "/work/app"), []);
 });

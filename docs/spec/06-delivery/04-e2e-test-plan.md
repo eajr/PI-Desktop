@@ -13928,6 +13928,30 @@ are withdrawn with ADR 0165.
   draft-only update, inline file/image chip preservation, one-step undo, and no
   transcript row. Attachment sending is covered by the separate Composer send
   E2E.
+  While renderer extensions are disabled in this build
+  (`docs/adr/disable-plugin-renderer-extensions.md`), the UI Slots Lab path of
+  that suite does not apply.
+
+#### E2E-PLUGIN-renderer-extension-disabled-in-build
+
+- **Preconditions**: This build has `RENDERER_EXTENSIONS_ENABLED = false`. A
+  development plugin declares `manifest.renderer`, `renderer.extension` and at
+  least one other contribution (for example a command or agent tool).
+- **Steps**: 1) Load the plugin from its folder and read the permission
+  review. 2) Accept the review. 3) Open an Agent session and look for the
+  plugin's slots. 4) Open the plugin's row details on the Plugins page.
+- **Expected**: The review lists `renderer.extension` with "Renderer
+  extensions are disabled in this build" instead of its usual explanation.
+  The plugin loads and its other contributions work. No slot mounts, the
+  renderer never requests a `plugin-renderer://` URL, and `plugin.call` is
+  refused with `PLUGIN_UNLOADED`. The row details show the same notice.
+- **Specs linked**: `07-plugins/13-plugin-permissions-matrix.md`,
+  `docs/adr/disable-plugin-renderer-extensions.md`
+- **Acceptance**: Security
+- **Status**: Unit-covered (`plugin-renderer-call-runtime.test.mjs`,
+  `plugin-renderer-loader.test.mjs`,
+  `plugin-renderer-extension-disabled-ui.test.mjs`, `app-csp.test.mjs`); no
+  Electron runner yet.
 
 #### E2E-259: Installing the prompt-enhancement plugin migrates preferences once
 

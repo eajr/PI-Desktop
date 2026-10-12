@@ -897,6 +897,12 @@ through the window's import map, so no bundled React is needed.
 app's own React, so `renderer.extension` is a high-risk permission: grant it
 only to code you trust.
 
+> **Disabled in this build.** Renderer extensions do not load
+> (`RENDERER_EXTENSIONS_ENABLED` in `packages/shared`), because a module in the
+> app's own document can reach the whole preload bridge. A plugin that
+> declares `manifest.renderer` still installs and runs its other
+> contributions. See `docs/adr/disable-plugin-renderer-extensions.md`.
+
 `examples/plugins/ui-slots-lab` mounts a sample on every slot.
 `packages/plugin-sdk/src/renderer.ts` carries the types and each slot's props,
 and the manifest side is [spec 07-plugins/02 §3.2](spec/07-plugins/02-plugin-manifest-schema.md).

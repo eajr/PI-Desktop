@@ -2159,6 +2159,7 @@ export const ptBR = {
     fsRootPicked: "uma pasta que você escolher",
     fsOwnFiles: "arquivos que o plugin criou",
     fsAsksEachTime: "solicita sua permissão a cada vez",
+    rendererExtensionsDisabled: "As extensões de renderização estão desativadas nesta compilação. Os elementos de interface do chat deste plugin não serão carregados; os demais recursos continuam funcionando.",
     legacyFsDowngraded: "As permissões de arquivos declaradas por este plugin são anteriores à existência de escopos, por isso seu alcance foi reduzido. Atualize o plugin para restaurar o funcionamento completo.",
     permissions: {
       "ui.panel": "Exibir painéis de interface",

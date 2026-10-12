@@ -2211,6 +2211,7 @@ importConfirm: "Imported extensions run inside the agent process with the same a
     fsRootPicked: "a folder you choose",
     fsOwnFiles: "files it created",
     fsAsksEachTime: "asks you each time",
+    rendererExtensionsDisabled: "Renderer extensions are disabled in this build. This plugin's chat UI slots will not load; its other features still work.",
     legacyFsDowngraded:
       "This plugin declares file permissions from before scopes existed, so its reach has been reduced. Update it to restore full function.",
     permissions: {

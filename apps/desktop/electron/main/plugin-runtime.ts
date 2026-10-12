@@ -82,6 +82,7 @@ import {
   type PluginComposerTransformMeta,
   type PluginWorkspaceInfo,
   BUILTIN_SPEECH_PROTOCOL_IDS,
+  RENDERER_EXTENSIONS_ENABLED,
 } from "@pi-desktop/shared";
 import {
   previewFile,
@@ -312,6 +313,12 @@ export type PluginHostServices = {
    * visible workspace -- for a panel call or an unknown session.
    */
   getWorkspacePathForSession?: (sessionId: string) => string | null;
+  /**
+   * Whether plugin renderer extensions may load. Defaults to the build switch
+   * `RENDERER_EXTENSIONS_ENABLED` (off in this build); only tests that
+   * exercise the dormant machinery pass `true`.
+   */
+  rendererExtensionsEnabled?: boolean;
   /** The set of `contributes.agentExtensions` modules changed (load/unload). */
   agentExtensionsChanged?: () => void;
   getLocale?: () => string;
@@ -1612,11 +1619,18 @@ export class PluginRuntime {
    * package, and nothing else (`docs/plugin-plan/ui/`).
    */
   resolveRendererSource(pluginId: string, generation: number, requestPath: string): string | null {
+    if (!this.rendererExtensionsEnabled()) return null;
     return resolveRendererSourcePath(this.loaded.get(pluginId), generation, requestPath);
+  }
+
+  /** The build switch, unless a test opted the dormant machinery back in. */
+  private rendererExtensionsEnabled(): boolean {
+    return this.services.rendererExtensionsEnabled ?? RENDERER_EXTENSIONS_ENABLED;
   }
 
   /** What the renderer host loads for this plugin, while it may load anything. */
   rendererDescriptor(pluginId: string): PluginRendererDescriptor | undefined {
+    if (!this.rendererExtensionsEnabled()) return undefined;
     return rendererDescriptorFor(this.loaded.get(pluginId));
   }
 
@@ -1626,9 +1640,11 @@ export class PluginRuntime {
    */
   async callRenderer(pluginId: string, method: string, args: unknown): Promise<unknown> {
     const loaded = this.loaded.get(pluginId);
+    // With renderer extensions off no descriptor exists, so a caller is
+    // refused exactly like one whose load has ended.
     return this.rendererCalls.call(
       pluginId,
-      loaded?.child ? loaded : undefined,
+      loaded?.child && this.rendererExtensionsEnabled() ? loaded : undefined,
       method,
       args,
       (plugin, payload, timeoutMs) =>
