@@ -57,9 +57,42 @@ Required (all **implemented**):
   image elements are removed before the SVG reaches the DOM. Invalid or
   oversized input fails closed to escaped source text.
 
+### Packaged binary hardening (ADR electron-fuses-and-packaged-code-paths)
+
+- electron-builder sets every Electron fuse explicitly
+  (`apps/desktop/package.json` → `build.electronFuses`):
+  - **On:** cookie encryption, embedded `app.asar` integrity validation
+    (macOS and Windows), and `onlyLoadAppFromAsar`.
+  - **Off:** `--inspect`/`SIGUSR1` for the main process.
+  - **Left on, with reasons:**
+    - `runAsNode`: the agent sidecar runs on the Electron binary (D008).
+    - `NODE_OPTIONS`: turning it off also drops `NODE_EXTRA_CA_CERTS`.
+    - `grantFileProtocolExtraPrivileges`: the renderer loads from `file://`
+      with module scripts.
+
+  `apps/desktop/test/electron-fuses.test.mjs` pins these values.
+- macOS hardened-runtime entitlements are exactly `allow-jit`,
+  `disable-library-validation`, and `device.audio-input`:
+  - `allow-unsigned-executable-memory` is not granted.
+  - `allow-dyld-environment-variables` is never granted.
+  - Library validation stays disabled only because the sidecar (on the main
+    executable) and plugin hosts load native addons from user-installed
+    packages.
+- Packaged builds resolve the host-core binary and the bundled plugin tree
+  only from `process.resourcesPath`. `PI_DESKTOP_HOST_BIN`, an inherited
+  `PI_DESKTOP_BUILTIN_PLUGINS_DIR`, and source-checkout fallbacks apply only
+  to unpackaged builds. Data-location overrides (`PI_DESKTOP_DATA_DIR`) are
+  unchanged.
+- Residual risk: a local process can still start the signed binary with
+  `ELECTRON_RUN_AS_NODE` or `NODE_OPTIONS`. Closing that requires moving the
+  sidecar off `RunAsNode` and replacing the `NODE_EXTRA_CA_CERTS` input.
+
 ### Future hardening (tracked, post-MVP)
 
-- Electron fuses (`runAsNode`, `nodeCliInspect` off) at package time
+- Sidecar launch without `ELECTRON_RUN_AS_NODE`, then `runAsNode` and
+  `NODE_OPTIONS` fuses off
+- Renderer served from a custom protocol, then
+  `grantFileProtocolExtraPrivileges` off
 - `webSecurity` assertions in an automated security e2e
 
 ## 3. Secrets
@@ -329,6 +362,7 @@ host-core. They do not change the loopback-only rule above.
 | Malicious web content in renderer | no Node, sandbox, navigation lock, CSP |
 | Prompt-injected destructive tool use | host-owned durable mode policy, permission confirmation, path boundary, secret isolation |
 | Dependency poisoning | lockfiles, few deps, native-module review |
+| Local malware swapping app code or executables | asar integrity + `onlyLoadAppFromAsar`, packaged builds ignore executable-path env overrides; `RunAsNode` still open (ADR electron-fuses-and-packaged-code-paths) |
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
 | Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 

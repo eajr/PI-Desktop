@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import * as electron from "electron";
 import {
   HostProcess as RuntimeHostProcess,
   type DiagnosedHostFailure,
@@ -13,6 +13,12 @@ import {
 import { DbSchemaTooNewError, parseSchemaTooNew } from "./host-boot-diagnostics";
 import { redactValue } from "./logger";
 import { getModuleDirectory } from "./module-path";
+import {
+  BUILTIN_PLUGINS_DIR_ENV,
+  builtinPluginsDirCandidates,
+  type CodePathContext,
+  hostBinaryCandidates,
+} from "./packaged-code-paths";
 
 export type {
   HostNotificationHandler,
@@ -20,26 +26,26 @@ export type {
   StderrHandler,
 } from "@pi-desktop/host-runtime";
 
+function codePathContext(): CodePathContext {
+  return {
+    // `app` is missing only outside Electron (the node --test harness loads
+    // this module); every Electron main process, packaged or not, has it.
+    isPackaged: electron.app?.isPackaged === true,
+    env: process.env,
+    resourcesPath: process.resourcesPath || "",
+    moduleDirectory: getModuleDirectory(import.meta.url),
+    platform: process.platform,
+  };
+}
+
+/**
+ * The host-core binary to spawn. A packaged build only runs the one inside its
+ * own `resources/bin`; `PI_DESKTOP_HOST_BIN` and the source-checkout fallbacks
+ * are development-only (see `packaged-code-paths`).
+ */
 export function resolveHostBinary(): string {
-  if (process.env.PI_DESKTOP_HOST_BIN && existsSync(process.env.PI_DESKTOP_HOST_BIN)) {
-    return process.env.PI_DESKTOP_HOST_BIN;
-  }
-  const exe = process.platform === "win32" ? ".exe" : "";
-  const candidates = [
-    // packaged resources
-    join(process.resourcesPath || "", `bin/pi-desktop-host-core${exe}`),
-    // monorepo dev/build
-    join(
-      getModuleDirectory(import.meta.url),
-      `../../../../target/debug/pi-desktop-host-core${exe}`,
-    ),
-    join(
-      getModuleDirectory(import.meta.url),
-      `../../../../target/release/pi-desktop-host-core${exe}`,
-    ),
-  ];
-  for (const c of candidates) {
-    if (c && existsSync(c)) return c;
+  for (const candidate of hostBinaryCandidates(codePathContext())) {
+    if (candidate && existsSync(candidate)) return candidate;
   }
   throw new Error(
     "host-core binary not found. Run `cargo build -p host-core` first.",
@@ -51,15 +57,11 @@ export function resolveHostBinary(): string {
  *
  * Mirrors `resolveBuiltinSkillPath`: electron-builder copies
  * `resources/plugins` to `<resources>/plugins`, and a source checkout reaches
- * the same tree relatively.
+ * the same tree relatively. Packaged builds look only inside their own
+ * resources.
  */
 function resolveBuiltinPluginsDir(): string | null {
-  const candidates = [
-    join(process.resourcesPath || "", "plugins"),
-    join(getModuleDirectory(import.meta.url), "../../resources/plugins"),
-    join(getModuleDirectory(import.meta.url), "../../../resources/plugins"),
-  ];
-  for (const candidate of candidates) {
+  for (const candidate of builtinPluginsDirCandidates(codePathContext())) {
     if (candidate && existsSync(candidate)) return candidate;
   }
   return null;
@@ -123,7 +125,9 @@ export class HostProcess extends RuntimeHostProcess {
       // host-core simply reconciles its registry against it (ADR 0105).
       env: {
         PI_DESKTOP_ELECTRON_PID: String(process.pid),
-        ...(builtinPlugins ? { PI_DESKTOP_BUILTIN_PLUGINS_DIR: builtinPlugins } : {}),
+        // Always set or clear it: an inherited value must never pick the
+        // tree host-core trusts as bundled (ADR 0241).
+        [BUILTIN_PLUGINS_DIR_ENV]: builtinPlugins ?? undefined,
       },
       onStderr: onStderr ?? fallbackStderrLogger,
       diagnoseFailure: diagnoseHostFailure,

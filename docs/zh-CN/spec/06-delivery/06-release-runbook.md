@@ -54,8 +54,9 @@ Windows 可执行文件和原生窗口图标中使用 `build/icon.ico`。渲染�
 ## 3. 构建内容
 
 - Electron 应用程序具有强化的运行时 + 权利
-  (`build/entitlements.mac.plist`: JIT + 无符号可执行内存 +
-  库验证禁用 — 标准 Electron 设置），并在 Info.plist 中通过
+  (`build/entitlements.mac.plist`: JIT + 库验证禁用 — 供 sidecar 与插件宿主
+  加载用户安装包中的原生模块），并通过 `build.electronFuses` 设置 Electron
+  熔断器（ADR electron-fuses-and-packaged-code-paths），并在 Info.plist 中通过
   `apps/desktop/package.json` → `mac.extendInfo` 追加
   `NSLocalNetworkUsageDescription`，使 macOS 15+ 弹出本地网络授权，同时授予
   Chromium 主进程与 `ELECTRON_RUN_AS_NODE` 的 agent sidecar；否则主进程的
