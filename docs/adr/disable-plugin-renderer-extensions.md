@@ -42,7 +42,9 @@ turns the feature off.
    JavaScript regex engine and no WebAssembly. `'unsafe-inline'` and `blob:`
    stay. The Vite dev server injects an inline React Refresh preamble, and
    `blob:` keeps the dormant import-map shims working once the feature comes
-   back. `style-src`, `img-src` and `connect-src` are not changed here.
+   back. `plugin-renderer:` is also removed from `style-src`, `img-src` and
+   `connect-src`, since the scheme serves nothing while the switch is off;
+   turning the feature back on must restore it with the isolated realm.
 4. Plugins that declare a renderer entry still install, keep their recorded
    `renderer.extension` grant (host-core requires every declared permission
    at install), and load all their other contributions. The grant does

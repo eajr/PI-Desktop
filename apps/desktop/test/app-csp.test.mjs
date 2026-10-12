@@ -35,3 +35,10 @@ test("script-src does not allow string evaluation", () => {
 test("script-src still allows the app's own modules", () => {
   assert.ok(directive("script-src").includes("'self'"));
 });
+
+test("no directive names the disabled plugin renderer scheme", () => {
+  for (const name of ["style-src", "img-src", "connect-src"]) {
+    const sources = directive(name);
+    assert.ok(!sources.includes("plugin-renderer:"), `${name}: ${sources.join(" ")}`);
+  }
+});
