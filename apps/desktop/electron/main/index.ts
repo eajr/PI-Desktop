@@ -51,7 +51,6 @@ import { hasSingleInstanceLock, isDevelopmentBuild } from "./installation";
 import { getStorageBootstrap } from "./storage/bootstrap";
 import { createPlanUiProbe } from "./plan-ui-probe";
 import { registerIpcHandlers } from "./ipc/register";
-import { createVoiceService } from "./voice-service";
 import { MicrophoneLeaseRegistry } from "./live-voice/microphone-lease";
 import { createLiveCallService } from "./live-voice/runtime";
 import { createLiveVoiceWidget } from "./live-voice/widget-window";
@@ -344,7 +343,6 @@ const {
   pluginViews,
   browserHost,
   announceTurnEnded,
-  speech,
 } = pluginServices;
 
 const providerCatalogRuntime = createProviderCatalogRuntime({
@@ -800,17 +798,7 @@ runtimeLifecycle = createRuntimeLifecycle({
 });
 const { bootHostStatus, bootBackends } = runtimeLifecycle;
 
-let voiceServiceReference: ReturnType<typeof createVoiceService> | null = null;
-const microphoneLeases = new MicrophoneLeaseRegistry(() => {
-  const phase = voiceServiceReference?.getState().phase;
-  return phase === "preparing" || phase === "starting" || phase === "listening" || phase === "transcribing" || phase === "cancelling";
-});
-const voiceService = createVoiceService(
-  dataDir + "/voice-models",
-  getMainWindow,
-  (token) => microphoneLeases.acquire("dictation", token),
-);
-voiceServiceReference = voiceService;
+const microphoneLeases = new MicrophoneLeaseRegistry();
 // The docked call widget: a desktop-level window that shows the call chrome
 // wherever the user put it and sends every action back to this window, which
 // stays the Live Voice owner (media, microphone lease, work scope).
@@ -871,7 +859,6 @@ function registerIpc() {
     persistenceOutbox,
     logger,
     plugins,
-    speech,
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
@@ -941,7 +928,6 @@ function registerIpc() {
     getPluginPanelTheme: () => mainState.pluginPanelTheme,
     isDeveloperMode: () => mainState.developerMode,
     sendToRenderer,
-    voiceService,
     liveCallService,
     liveVoiceWidget,
   });

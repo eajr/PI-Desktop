@@ -83,8 +83,7 @@ test("Composer keeps Live Voice and no longer mounts local Dictation controls", 
     "utf8",
   );
 
-  assert.match(composer, /useVoiceInput/);
-  assert.doesNotMatch(composer, /VoiceOverlay|voiceEnabled/);
+  assert.doesNotMatch(composer, /useVoiceInput|VoiceOverlay|voiceEnabled/);
   assert.match(toolbar, /<LiveVoiceControls\b/);
   assert.doesNotMatch(toolbar, /VoiceMicButton|voicePhase|onVoiceToggle|onVoiceCancel/);
 });

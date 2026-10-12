@@ -1,7 +1,7 @@
 # Live Voice v1 Progress
 
 - Implemented public settings/IPC DTOs, validation, error codes and the
-  `voice-runtime/live` pure PCM and wire-protocol entry.
+  `voice-runtime/live` (now `@pi-desktop/live-voice-protocol`, D662) pure PCM and wire-protocol entry.
 - Implemented Main authentication/provider resolution, Codex WebRTC
   negotiation, Gemini and Realtime WebSocket adapters, bounded PCM bridge,
   capture lease, owner checks, settings/provider invalidation and lifecycle

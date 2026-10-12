@@ -30,7 +30,7 @@ const settings = {
     { id: "fixture-selected", adapterId: "codex-live", providerId: "fixture-provider", voice: "cove" },
     { id: "fixture-other", adapterId: "codex-live", providerId: "fixture-other-provider", voice: "cove" },
   ] },
-  voice: { deviceId: null }, keybindings: {}, language: "en",
+  keybindings: {}, language: "en",
 };
 const status = {
   enabled: false, settingsRevision: 1, selectedBindingId: "fixture-selected", call: null,

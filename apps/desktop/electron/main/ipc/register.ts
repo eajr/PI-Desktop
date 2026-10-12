@@ -32,8 +32,6 @@ import { fetchSkillMarketDocument, searchSkillMarket } from "../skill-market-cat
 import { registerWindowIpc } from "./window-ipc";
 import { createComposerTemplateLoader, registerWorkspaceIpc } from "./workspace-ipc";
 import { registerComposerIpc } from "./composer-ipc";
-import { registerSpeechIpc } from "./speech-ipc";
-import { registerVoiceIpc } from "./voice-ipc";
 import { registerLiveVoiceIpc } from "./live-voice-ipc";
 import type { LiveCallService } from "../live-voice/call-service";
 import type { LiveVoiceWidget } from "../live-voice/widget-window";
@@ -102,7 +100,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     persistenceOutbox,
     logger,
     plugins,
-    speech,
     sessionCapabilityContext,
     enrichSession,
     acquireSessionOperation,
@@ -169,7 +166,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getPluginPanelTheme,
     isDeveloperMode,
     sendToRenderer,
-    voiceService,
     liveCallService,
     liveVoiceWidget,
   } = dependencies;
@@ -476,11 +472,6 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getPluginPanelTheme,
   });
 
-  registerSpeechIpc({ registrar, speech });
-
-  if (voiceService) {
-    registerVoiceIpc({ registrar, voiceService });
-  }
   if (liveCallService && liveVoiceWidget) {
     registerLiveVoiceIpc({ registrar, service: liveCallService, getMainWindow, widget: liveVoiceWidget });
   }

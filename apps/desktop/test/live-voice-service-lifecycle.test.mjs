@@ -36,7 +36,7 @@ async function prepare(service, workTarget) {
 test("twenty connect, failure, owner-loss and disable cycles release Main resources and pending controls", async (t) => {
   const { LiveCallService, MicrophoneLeaseRegistry } = await loadModules(t);
   const timers = trackTimers(t);
-  const leases = new MicrophoneLeaseRegistry(() => false);
+  const leases = new MicrophoneLeaseRegistry();
   const workScopes = new Set();
   const backgroundLeases = new Set();
   const activeAdapters = new Set();

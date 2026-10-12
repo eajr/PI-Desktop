@@ -107,9 +107,6 @@ does not turn temporary thread pressure into a host process exit.
 | `STREAM_FAILED` | yes | provider stream was terminated, closed prematurely, or otherwise ended before a complete response; up to ten same-turn retries may precede the terminal event |
 | `EMPTY_MODEL_RESPONSE` | yes | the model ended its turn with no tool call and no visible text twice: once as streamed, once after the automatic re-run; the first reply to a Host-ledger completion notice is exempt (spec 02-agent-runtime §5e, D446) |
 | `PROMPT_ENHANCEMENT_EMPTY` | no | the one-shot enhancement model returned no text |
-| `SPEECH_NOT_CONFIGURED` | no | host speech ASR or TTS is not bound in settings |
-| `SPEECH_PROTOCOL_UNSUPPORTED` | no | the speech protocol is unknown or does not support this role |
-| `SPEECH_INPUT_TOO_LARGE` | no | speech input exceeds 25 MB |
 | `SUBAGENT_IDLE_TIMEOUT` | no | withdrawn (D328): idle watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_DURATION_TIMEOUT` | no | withdrawn (D328): duration watchdogs are not armed; the code remains for stored results |
 | `SUBAGENT_CONTEXT_OVERFLOW` | no | a delegate's own model context exceeded its safe budget and neither automatic turn-boundary compaction nor the degraded retry that keeps only the task brief and the most recent messages brought it back below the limit; the failure names the actionable recovery instead of the provider's overflow text |
@@ -341,7 +338,7 @@ does not trigger automatic provider or billing fallback.
 | `LIVE_MEDIA_RELEASE_UNCONFIRMED` | no | renderer media release was not acknowledged; Main quarantines the microphone lease |
 | `LIVE_STALE_CALL` | no | the call, request, or capture epoch is no longer current |
 | `LIVE_INVALID_OWNER` | no | IPC or media-port ownership does not match the trusted main frame |
-| `LIVE_MICROPHONE_BUSY` | no | Dictation, another Live call, or an unconfirmed prior release owns the shared capture lease |
+| `LIVE_MICROPHONE_BUSY` | no | Another Live call, or an unconfirmed prior release owns the shared capture lease |
 | `LIVE_MICROPHONE_DENIED` | no | the user or operating system denied microphone permission |
 | `LIVE_MICROPHONE_UNAVAILABLE` | no | no usable microphone device is available |
 | `LIVE_MEDIA_UNSUPPORTED` | no | required browser media or AudioWorklet support is unavailable |

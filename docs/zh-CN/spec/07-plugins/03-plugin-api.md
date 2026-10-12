@@ -149,21 +149,6 @@ type PluginModule = {
 }
 ```
 
-### 语音（`speech.adapter.register`）
-```ts
-pi.speech.registerAdapter(adapter: {
-  protocol: string
-  label: string
-  roles: Array<"transcribe" | "synthesize">
-  handle: (input) => Promise<{ kind: "text"; text: string } | { kind: "audio"; mimeType: string; data: string } | { kind: "http"; call: SpeechHttpCall }>
-}): Promise<void>
-pi.speech.unregisterAdapter(protocol: string): Promise<void>
-```
-
-handle 留在插件进程。内置协议 id `openai_audio` 和 `openai_chat_audio` 保留。
-HTTP 计划由宿主用绑定 provider 的密钥代发，且必须落在该 origin。
-
-
 ### 用户界面
 ```ts
 pi.ui.openPanel(options?: { title?: string }): Promise<void>
@@ -1080,7 +1065,6 @@ window.pluginBridge.on(event, handler)
   `fs.writeText` / `fs.glob` / `fs.list` / `fs.remove` / `fs.requestDirectory`，
   范围由 `manifest.fs` 限定（ADR 0088）
 - `agent.registerTool` / `unregisterTool` / `agent.complete`
-- `speech.registerAdapter` / `unregisterAdapter`（`speech.adapter.register`）
 
 - `models.list`、`session.getLlmContext`
 - `onProviderOAuth` 和 `pi.providers.oauth.prompt` / `notify`（`provider.oauth`）

@@ -4,7 +4,7 @@
 
 ## 范围
 
-实时语音是可选、由应用管理的实时音频通路，与本地听写和 Host Speech 分开，默认关闭。v1 支持三种明确绑定：
+实时语音是可选、由应用管理的实时音频通路，默认关闭。本地听写和 Host Speech 已移除（D662，见 [20-speech.md](/zh-CN/spec/03-runtime/20-speech)），实时语音不依赖它们。v1 支持三种明确绑定：
 
 | Adapter | 凭证所有者 | 传输方式 |
 |---|---|---|
@@ -14,7 +14,7 @@
 
 
 独立作用域的 Live Work 通话也可以解决绑定会话唯一一个待回答的 AskTool 提问，但只能从该提问自己提供的选项标签中选择；权限与 Plan/Goal 审批仍然只在桌面 UI 中决定（见[实时语音工作会话接入](live-work-session.md)与 [ADR 0315](../../../adr/0315-live-voice-spoken-asktool-answers.md)）。
-公开设置为 `liveVoice: { enabled, selectedBindingId?, bindings }`。它只包含 Provider ID、模型/音色选择和协议 profile，不保存凭证。现有 `voice` 和 `speech` 设置保持原义。持久化 JSON 由 Host Core 所有；它会将 Live 设置与其他设置合并。
+公开设置为 `liveVoice: { enabled, selectedBindingId?, bindings }`。它只包含 Provider ID、模型/音色选择和协议 profile，不保存凭证。旧版本存储的 `voice` 和 `speech` 值保留原样且不再被读取。持久化 JSON 由 Host Core 所有；它会将 Live 设置与其他设置合并。
 
 没有工作绑定的纯语音 Live profile 不会创建 Agent turn、调用 AgentHost 或 MCP、访问工作区文件、执行模型生成的函数、保存录音或持久化字幕。字幕只保存在本次通话的有界 Renderer 内存缓冲区中。除非用户明确开启独立作用域的 Live Work 通话，否则 Provider delegation/function-call 请求会被拒绝或导致协议错误；Live Work 的执行与权限合同见[实时语音工作会话接入](live-work-session.md)。
 
@@ -24,7 +24,7 @@ Electron Main 管理唯一通话槽位、所选账号、凭证解析、Provider 
 
 OAuth token 和 API key 留在 Main。SDP、音频和字幕内容不写入日志。Main 的 WebSocket endpoint 在连接前校验，并使用桌面网络代理配置；不支持的代理路由会被拒绝。PCM 端口仅属于一个已准备的通话，帧大小和 credit 都有上限，且不携带凭证。
 
-Live 与 Dictation 共用 Main 进程的麦克风租约。本地 mute 会在 IPC 请求前门控采集；Main 也会独立拒绝静音或过期的采集 epoch。通话结束、Renderer 丢失、窗口隐藏/导航/崩溃、系统挂起/锁定、Provider 变更、功能关闭或应用退出时，都会停止媒体并关闭 adapter。如果无法确认 Renderer 已释放媒体，Main 会隔离麦克风租约，不会盲目复用。
+Live 通话持有 Main 进程的麦克风租约，同一时间只允许一个通话；采集使用系统默认输入设备。本地 mute 会在 IPC 请求前门控采集；Main 也会独立拒绝静音或过期的采集 epoch。通话结束、Renderer 丢失、窗口隐藏/导航/崩溃、系统挂起/锁定、Provider 变更、功能关闭或应用退出时，都会停止媒体并关闭 adapter。如果无法确认 Renderer 已释放媒体，Main 会隔离麦克风租约，不会盲目复用。
 
 ## 通话与媒体
 
@@ -42,12 +42,12 @@ Voice 在开发构建和打包构建中均向普通用户开放，不再要求�
 
 账号列表明确区分加载中、可重试的加载失败和无兼容账号。加载失败不会清除已保存的绑定。设置页提供现有模型配置入口，用于登录和管理账号。通话错误区分缺少认证、账号访问被拒、协议不支持、网络/限流及麦克风故障，不显示服务响应内容或凭证。通话条会在本地化文案旁同时显示对应的 `LIVE_*` 错误码本身，因此没有专属文案的失败也能从截图或工单中定位；该错误码背后的原始原因不进入任何视图，只写入脱敏后的 `provider` 日志。通话条本身是该应用的一个独立、无边框、始终置顶的桌面窗口，不拥有通话：它的每次按键都转发给持有麦克风、媒体和按通话隔离工作的主窗口，且只显示主窗口推送的权威状态与错误码。
 
-Voice 设置入口现在只展示实时语音：用户可绑定现有兼容 Provider、选择下次通话使用的绑定，以及设置模型、音色和 Realtime profile。通话进行中，当前绑定不可修改。关闭实时语音会结束通话。Provider 凭证继续由现有 Provider/secret 或 VendorOAuth 系统管理。旧的本地 Dictation 设置和 Composer 入口已隐藏；已有 `voice` 设置值及底层 Dictation 能力保持不变，不会因 UI 调整而删除或改写。旧设置中没有 `liveVoice` 时，会按关闭且无绑定处理。
+Voice 设置入口现在只展示实时语音：用户可绑定现有兼容 Provider、选择下次通话使用的绑定，以及设置模型、音色和 Realtime profile。通话进行中，当前绑定不可修改。关闭实时语音会结束通话。Provider 凭证继续由现有 Provider/secret 或 VendorOAuth 系统管理。旧设置中没有 `liveVoice` 时，会按关闭且无绑定处理。
 
-Live DTO 与 IPC 合同位于 `packages/shared`。纯 wire 解析和 PCM 数学逻辑只从 `@pi-desktop/voice-runtime/live` 导出，不进入旧的本地转写运行时。Electron Main 保持编排角色，不接管凭证或存储所有权。
+Live DTO 与 IPC 合同位于 `packages/shared`。纯 wire 解析和 PCM 数学逻辑位于 `packages/live-voice-protocol`（`@pi-desktop/live-voice-protocol`），不含原生或网络依赖。Electron Main 保持编排角色，不接管凭证或存储所有权。
 
 ## 验证与限制
 
-自动化覆盖 PCM 编码/重采样、Provider 消息解析、owner 检查、prepare/connect/mute/end、请求取消、活动绑定写保护、字幕上限、只拒绝 delegation 的行为，以及与 Dictation 的互斥。桌面 UI 测试和定向 Electron 进程测试在适用时覆盖用户路径。fixture 通过不能证明真实 Provider 访问权限或账号资格。
+自动化覆盖 PCM 编码/重采样、Provider 消息解析、owner 检查、prepare/connect/mute/end、请求取消、活动绑定写保护、字幕上限、只拒绝 delegation 的行为，以及单一持有者的麦克风租约。桌面 UI 测试和定向 Electron 进程测试在适用时覆盖用户路径。fixture 通过不能证明真实 Provider 访问权限或账号资格。
 
 Codex endpoint、模型和音色细节依据所引用的 Piwin 快照，不承诺公共 API 稳定性。Gemini 与 OpenAI Realtime 需要兼容模型、账号和 endpoint。真实账号调用、麦克风权限提示和硬件播放须与自动化 fixture 结果分开报告；它们可能产生 Provider 用量，并需要用户明确授权。

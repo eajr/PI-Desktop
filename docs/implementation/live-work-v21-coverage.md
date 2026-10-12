@@ -65,7 +65,7 @@ case has run for this acceptance row.
 | LV21-042 | NOT RUN | No Gemini Adapter → production Bridge → registered handler composition case. | Existing Gemini protocol fixture does not instantiate its concrete adapter. |
 | LV21-043 | NOT RUN | No Realtime GA Adapter → production Bridge composition case. | Existing GA parser/encoder coverage is not an adapter integration. |
 | LV21-044 | NOT RUN | No Realtime compat-v1 Adapter → production Bridge composition case. | Existing compat parser/encoder coverage is not an adapter integration. |
-| LV21-045 | PARTIAL | `packages/voice-runtime/src/live/protocol.test.ts` malformed/duplicate event cases | Protocol parsing has local tests; socket/WebRTC disconnect and reordering through concrete adapters are not. |
+| LV21-045 | PARTIAL | `packages/live-voice-protocol/src/protocol.test.ts` malformed/duplicate event cases | Protocol parsing has local tests; socket/WebRTC disconnect and reordering through concrete adapters are not. |
 | LV21-046 | PARTIAL | Existing `apps/desktop/test/live-voice-controller.test.mjs` control lifecycle tests; `agent-host-bridge-work-ack.test.mjs` strict response mapping | Duplicate/delayed Codex control ACK delivery is not tested end to end. |
 | LV21-047 | PARTIAL | `coordinator.test.ts` — “does not dispatch if the local provider receipt was not sent” | Coordinator has no-side-effect behavior; concrete adapter send failure is not instantiated. |
 | LV21-048 | NOT RUN | No 20-cycle repeated start/end/failure cleanup test was run. | Adapter, media lease, and pending-ACK leak audit remains open. |
@@ -74,12 +74,12 @@ case has run for this acceptance row.
 | LV21-051 | NOT RUN | No authorized MCP tool through the production Agent tool/permission gateway was exercised. | Local MCP HTTP disablement was not tested. |
 | LV21-052 | NOT RUN | No plugin tool removal/permission-denial integration was run. | Existing plugin permission gateway is unchanged. |
 | LV21-053 | NOT RUN | No voice “approve” candidate with forbidden Plan/Goal/AskTool operation spies was run. | Permission non-escalation remains an acceptance gap. |
-| LV21-054 | PARTIAL | `packages/voice-runtime/src/live/protocol.test.ts` strict declared-argument parsing; coordinator strict intent parsing test | Extra provider fields are rejected at protocol boundaries; four concrete adapters are not composed. |
+| LV21-054 | PARTIAL | `packages/live-voice-protocol/src/protocol.test.ts` strict declared-argument parsing; coordinator strict intent parsing test | Extra provider fields are rejected at protocol boundaries; four concrete adapters are not composed. |
 | LV21-055 | PARTIAL | `agent-host.test.ts` queue/admission tests; production composition call-close cleanup | Accepted work ownership survives Host lifecycle tests; hangup/new-call stale-result separation is not integrated. |
 | LV21-056 | NOT RUN | No independent Live and coding credential invalidation case was run. | Authentication remains outside this deterministic work test. |
 | LV21-057 | NOT RUN | No Gemini generation + PCM-drain concurrency test was run. | Concrete Gemini adapter remains untested here. |
 | LV21-058 | NOT RUN | No Realtime VAD and Host feedback mutual-exclusion composition was run. | Concrete response tracker path remains outside the new tests. |
-| LV21-059 | PARTIAL | `packages/voice-runtime/src/live/response-tracker.test.ts` interruption epoch tests | Late audio/completion behavior is covered separately from Live Work feedback. |
+| LV21-059 | PARTIAL | `packages/live-voice-protocol/src/response-tracker.test.ts` interruption epoch tests | Late audio/completion behavior is covered separately from Live Work feedback. |
 | LV21-060 | PARTIAL | `apps/desktop/test/live-work-operations.test.mjs` terminal projection; `LiveWorkOperations.tsx` failure-code display | UI component state rendering was not expanded to a full A/T state-transition interaction test. |
 | LV21-061 | PARTIAL | `packages/host-runtime/src/live-work/context.test.ts` opt-in/history boundaries; protocol tests | No cross-DTO/log sentinel test covers auth headers, SDP, and transcript together. |
 | LV21-062 | PARTIAL | Existing Live service mute/playback/announcement tests and Host work tests | Media mute, automatic announcements, and Host stop are verified at separate boundaries. |

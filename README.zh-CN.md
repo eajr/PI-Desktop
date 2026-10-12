@@ -167,7 +167,7 @@ PI-Desktop 的 Core 负责提供稳定底座。
 ```text
 Voice Agent
 ├── Floating Widget
-├── Speech Service
+├── Background Audio
 ├── Agent Tool
 └── Commands
 

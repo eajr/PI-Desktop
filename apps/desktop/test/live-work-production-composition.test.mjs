@@ -3,7 +3,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import { IPC } from "@pi-desktop/shared";
-import { codexDelegationFeedback, codexWorkFeedbackMessage, parseCodexMessage } from "@pi-desktop/voice-runtime/live";
+import { codexDelegationFeedback, codexWorkFeedbackMessage, parseCodexMessage } from "@pi-desktop/live-voice-protocol";
 import { createProductionWorkHarness, settleUntil, WORK_INSTRUCTION, WORK_RESULT, WORK_SESSION_ID } from "./helpers/live-work-production.mjs";
 
 const callId = "live-work-production-call";

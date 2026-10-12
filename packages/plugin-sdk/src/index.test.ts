@@ -674,13 +674,16 @@ describe("PLUGIN_PERMISSIONS", () => {
       "browser.cdp",
       "audio.capture.background",
       "audio.playback.background",
-      "speech.adapter.register",
       "keyboard.globalShortcut",
       "net.websocket",
     ]) {
       expect(PLUGIN_PERMISSIONS).toContain(permission);
     }
     expect(new Set(PLUGIN_PERMISSIONS).size).toBe(PLUGIN_PERMISSIONS.length);
+  });
+
+  it("no longer advertises the removed host speech permission", () => {
+    expect(PLUGIN_PERMISSIONS).not.toContain("speech.adapter.register");
   });
 
   it("no longer advertises the unscoped workspace-wide fs names", () => {

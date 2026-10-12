@@ -49,8 +49,16 @@ export const HIGH_RISK_PERMISSIONS = [
   "mcp.server.remote",
   "browser.cdp",
   "audio.capture.background",
-  "speech.adapter.register",
 ] as const;
+
+/**
+ * Permissions whose host capability was removed. The desktop still loads a
+ * plugin that declares one (it grants nothing), but the checker names the
+ * removal instead of reporting a mysterious unknown permission.
+ */
+const REMOVED_PERMISSIONS: Record<string, string> = {
+  "speech.adapter.register": "host speech (transcribe/synthesize) was removed; pi.speech calls fail with UNSUPPORTED",
+};
 
 /** Host API surface each permission unlocks, used for the unused-permission hint. */
 const PERMISSION_API_HINTS: Record<string, string[]> = {
@@ -77,7 +85,6 @@ const PERMISSION_API_HINTS: Record<string, string[]> = {
   "fs.write": ["fs.writeText"],
   "fs.delete": ["fs.remove"],
   "agent.tool.register": ["agent.registerTool"],
-  "speech.adapter.register": ["speech.registerAdapter"],
   "net.fetch": ["net.fetch"],
   "audio.capture.background": [
     "audio.getInputDevices",
@@ -321,6 +328,13 @@ export async function check(dirInput: string): Promise<CheckResult> {
               ? "only the files this plugin wrote"
               : "nothing until manifest.fs says where"
         }`,
+      });
+      continue;
+    }
+    if (permission in REMOVED_PERMISSIONS) {
+      errors.push({
+        code: "permission.removed",
+        message: `permission "${permission}" is no longer supported: ${REMOVED_PERMISSIONS[permission]}`,
       });
       continue;
     }

@@ -51,7 +51,6 @@ pub(crate) const PORTABLE_APPLICATION_FIELDS: &[&str] = &[
     "promptEnhancementThinkingLevel",
     "imageGeneration",
     "imageGenerationModels",
-    "speech",
 ];
 
 const PROJECT_IDENTITY_NAMESPACE: &str = "configSyncIdentities";
@@ -624,6 +623,9 @@ mod tests {
     fn adapter_registry_covers_every_portable_domain() {
         assert_eq!(DOMAIN_ADAPTERS.len(), ALL_DOMAINS.len());
         assert!(!PORTABLE_APPLICATION_FIELDS.contains(&"defaultPermissionMode"));
+        // Host speech was removed; a stored or incoming `speech` value is
+        // neither captured nor applied.
+        assert!(!PORTABLE_APPLICATION_FIELDS.contains(&"speech"));
         for domain in ALL_DOMAINS {
             let adapter = adapter_for(domain).expect("portable domain adapter");
             assert_eq!(adapter.schema_version, 1);

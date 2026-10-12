@@ -108,9 +108,6 @@ stdio 与 Tokio 的动态阻塞池隔离，因此后一种情况
 | `STREAM_FAILED` | 是的 | 提供程序流在完整响应之前终止、提前关闭或以其他方式结束；最多四次同回合重试可能会在终止事件之前发生 |
 | `EMPTY_MODEL_RESPONSE` | 是的 | 模型在没有工具调用且没有可见文本的情况下结束了两次：一次是流式传输，一次是在自动重新运行后；对 Host 账本完成通知的第一条回复除外（规范 02-agent-runtime §5e、D446） |
 | `PROMPT_ENHANCEMENT_EMPTY` | 不 | 一次性增强模型没有返回任何文本 |
-| `SPEECH_NOT_CONFIGURED` | 不 | 设置里没有绑定转写或朗读 |
-| `SPEECH_PROTOCOL_UNSUPPORTED` | 不 | 语音协议未知或不支持该角色 |
-| `SPEECH_INPUT_TOO_LARGE` | 不 | 语音输入超过 25 MB |
 | `SUBAGENT_IDLE_TIMEOUT` | 不 | 已撤回（D328）：空闲看门狗不再武装；代码仅为已存储结果保留 |
 | `SUBAGENT_DURATION_TIMEOUT` | 不 | 已撤回（D328）：时长看门狗不再武装；代码仅为已存储结果保留 |
 | `SUBAGENT_CONTEXT_OVERFLOW` | 不 | 委派自身的模型上下文超出其安全预算，自动的回合边界压缩与仅保留任务简报和最近消息的降级重试都没能把它带回限制以内；该失败给出可执行的恢复方式，而不是提供商的溢出文本 |
@@ -334,7 +331,7 @@ ADR 0285）。渲染进程除了一个标识徽章外看不到本地/远程之�
 | `LIVE_MEDIA_RELEASE_UNCONFIRMED` | 否 | 未收到 Renderer 的媒体释放确认；Main 隔离麦克风租约 |
 | `LIVE_STALE_CALL` | 否 | 通话、请求或采集 epoch 已不是当前值 |
 | `LIVE_INVALID_OWNER` | 否 | IPC 或媒体端口 owner 与受信主 frame 不匹配 |
-| `LIVE_MICROPHONE_BUSY` | 否 | Dictation、另一通 Live 通话或尚未确认的释放占用共享采集租约 |
+| `LIVE_MICROPHONE_BUSY` | 否 | 另一通 Live 通话或尚未确认的释放占用共享采集租约 |
 | `LIVE_MICROPHONE_DENIED` | 否 | 用户或操作系统拒绝麦克风权限 |
 | `LIVE_MICROPHONE_UNAVAILABLE` | 否 | 没有可用的麦克风设备 |
 | `LIVE_MEDIA_UNSUPPORTED` | 否 | 浏览器媒体或 AudioWorklet 支持不可用 |

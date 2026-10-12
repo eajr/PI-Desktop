@@ -59,9 +59,7 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        // Bundle JS workspace packages into Main. Native voice modules must
-        // resolve from packaged node_modules because their loaders locate
-        // platform libraries relative to their own package directories.
+        // Bundle JS workspace packages into Main.
         // jiti is loaded lazily by the sidecar's trusted-extension loader
         // (D387); Electron main never calls it, and its transpiled dist
         // breaks the main bundle's esbuild transform.
@@ -69,8 +67,6 @@ export default defineConfig({
           "electron-updater",
           "jiti",
           "jiti/static",
-          "@picovoice/pvrecorder-node",
-          "transcribe-cpp",
         ],
         input: {
           index: resolve(__dirname, "electron/main/entry.ts"),

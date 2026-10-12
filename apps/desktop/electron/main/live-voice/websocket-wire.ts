@@ -1,4 +1,4 @@
-import { MAX_LIVE_JSON_BYTES } from "@pi-desktop/voice-runtime/live";
+import { MAX_LIVE_JSON_BYTES } from "@pi-desktop/live-voice-protocol";
 import { WebSocket } from "ws";
 
 const MAX_BUFFERED_JSON_BYTES = 128 * 1024;

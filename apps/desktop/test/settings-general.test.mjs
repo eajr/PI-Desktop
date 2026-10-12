@@ -187,7 +187,8 @@ test("Basics and AI tabs expose their respective app and AI controls", () => {
   assert.doesNotMatch(settingsSearchSource, /settings\.speech/);
   assert.doesNotMatch(stylesSource, /\.settings-speech/);
   assert.doesNotMatch(enLocaleSource, /speechTitle:|speechVoicePlaceholder:/);
-  assert.match(protocolSource, /speechTranscribe: "pi-desktop\/speech\/transcribe"/);
+  // Host speech and local Dictation were removed; no channel survives.
+  assert.doesNotMatch(protocolSource, /pi-desktop\/speech\/|pi-desktop\/voice\/(?!live\/)/);
 });
 
 test("language persists as part of shared app settings", () => {

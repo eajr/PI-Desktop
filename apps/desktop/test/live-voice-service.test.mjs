@@ -389,16 +389,14 @@ test("cancel by requestId tombstones an in-flight prepare before it can acquire 
   assert.equal(state.releasedMic.length, 1);
 });
 
-test("the microphone lease prevents Live and Dictation from owning capture together", async (t) => {
+test("the microphone lease lets only one Live call own capture at a time", async (t) => {
   const { MicrophoneLeaseRegistry } = await loadModules(t);
-  let dictationActive = true;
-  const leases = new MicrophoneLeaseRegistry(() => dictationActive);
-  const releaseDictation = leases.acquire("dictation", "dictation-1");
-  assert.throws(() => leases.acquire("live", "live-1"), { errorCode: "LIVE_MICROPHONE_BUSY" });
-  releaseDictation();
-  dictationActive = false;
-  const releaseLive = leases.acquire("live", "live-1");
+  const leases = new MicrophoneLeaseRegistry();
+  const releaseFirst = leases.acquire("live", "live-1");
+  assert.throws(() => leases.acquire("live", "live-2"), { errorCode: "LIVE_MICROPHONE_BUSY" });
+  releaseFirst();
+  const releaseSecond = leases.acquire("live", "live-2");
   assert.equal(leases.isHeld(), true);
-  releaseLive();
+  releaseSecond();
   assert.equal(leases.isHeld(), false);
 });

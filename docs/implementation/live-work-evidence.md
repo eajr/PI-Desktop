@@ -256,7 +256,7 @@ only the named seam and assertions, not a complete provider-to-device journey.
 - No-work-scope voice-only behavior and explicit work-scope forwarding:
   `apps/desktop/test/live-voice-service.test.mjs`.
 - Declared tool parsing and provider-specific receipt encoding:
-  `packages/voice-runtime/src/live/protocol.test.ts`.
+  `packages/live-voice-protocol/src/protocol.test.ts`.
 - Receipt-before-classification, no dispatch after receipt delivery failure,
   Host queue routing, stale steer rejection, duplicate request handling,
   early terminal correlation, query-result without a second turn, and call
@@ -282,7 +282,7 @@ only the named seam and assertions, not a complete provider-to-device journey.
 - Provider generation plus local Codex playback gating and shared-turn
   feedback status: `apps/desktop/test/live-voice-service.test.mjs`.
 - Codex local output signal threshold and strict playback-activity IPC:
-  `packages/voice-runtime/src/live/playback-monitor.test.ts` and
+  `packages/live-voice-protocol/src/playback-monitor.test.ts` and
   `apps/desktop/test/live-voice-ipc-media.test.mjs`.
 - Four-profile parser/encoder → `LiveWorkCoordinator` → actual
   `AgentHost.startTurn` / terminal event → feedback encoder fixture:

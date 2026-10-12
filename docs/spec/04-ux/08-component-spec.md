@@ -340,8 +340,7 @@ combined model × reasoning selection (§11).
 
 - Every control is keyboard-reachable with Tab
 - Composer stop control has `aria-label="Stop generating"`
-- The Composer renders no transcription or speech control; the host speech
-  capability is reachable only from IPC and plugins (ADR 0291).
+- The Composer renders no transcription or speech control (D662).
 - The topbar does not render a separate running-state indicator; the Composer
   submit control and transcript working feedback remain the running-state cues.
 
@@ -3242,7 +3241,7 @@ reasoning-level control.
   oversized images use the existing canonical `@<path>` file-tool fallback.
   There are no visual previews in MVP.
 - No voice-to-draft input. The opt-in Live Voice path below is separate from
-  the Composer draft and does not restore the hidden Dictation entry.
+  the Composer draft; local Dictation was removed (D662).
 
 ### 11.7.1 Live Voice preparation, compact call bar, and details
 

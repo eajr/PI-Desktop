@@ -1,4 +1,4 @@
-import { decodePcm16, encodePcm16, StreamingPcmResampler } from "@pi-desktop/voice-runtime/live";
+import { decodePcm16, encodePcm16, StreamingPcmResampler } from "@pi-desktop/live-voice-protocol";
 import type { LivePlaybackCursor } from "@pi-desktop/shared";
 import { liveError } from "./live-voice-api";
 

@@ -325,7 +325,7 @@ Each ADR includes:
 | 0278 | [Canonical application ID `net.aiuo.pi-desktop`](0278-canonical-application-id.md) | Accepted (D443; amends D141 / D371 / ADR 0204; issue #524) |
 | 0279 | [Resumable subagent delegations](0279-resumable-subagent-delegations.md) | Accepted for implementation (amends ADR 0062; ADR 0089; issue #513) |
 | 0280 | [Plugin-owned UI localizes from the host locale](0280-plugin-owned-ui-localizes-from-host-locale.md) | Accepted (amends ADR 0267; ADR 0159) |
-| 0281 | [Host speech capability](0281-host-speech-capability.md) | Accepted for implementation (amends ADR 0257) |
+| 0281 | [Host speech capability](0281-host-speech-capability.md) | Superseded by fork-removes-voice-and-speech (amends ADR 0257) |
 | 0282 | [Retry and right-size the compaction summary before retained-tail recovery](0282-compaction-summary-retry-and-sizing.md) | Accepted (amends ADR 0049; issue #543) |
 | 0283 | [Remote MCP server OAuth 2.1 authentication](0283-remote-mcp-oauth.md) | Accepted |
 | 0284 | [Headless runtime boundary in `packages/host-runtime`](0284-headless-runtime-boundary.md) | Accepted for implementation (D447; ADR 0205 R2 prerequisite) |
@@ -335,7 +335,7 @@ Each ADR includes:
 | 0288 | [Package-local theme assets remain available](0288-package-local-theme-assets.md) | Accepted for implementation (amends ADR 0255) |
 | 0289 | [Signed macOS GitHub Releases and in-app update delivery](0289-signed-macos-github-releases.md) | Accepted (D450; amends ADR 0022 / 0145 / 0191 / 0204 / D078) |
 | 0290 | [Restore resizable sidebar width with collapse-below-threshold](0290-resizable-sidebar-collapse-threshold.md) | Accepted (D459; amends ADR 0141 / ADR 0238) |
-| 0291 | [Remove the speech settings UI](0291-remove-speech-settings-ui.md) | Accepted (amends ADR 0281) |
+| 0291 | [Remove the speech settings UI](0291-remove-speech-settings-ui.md) | Superseded by fork-removes-voice-and-speech (amends ADR 0281) |
 | 0292 | [SSH bootstrap for remote hosts](0292-ssh-remote-host-bootstrap.md) | Accepted for implementation (D453; ADR 0205 R2b, extends ADR 0286) |
 | 0293 | [SSH password authentication for the remote-host bootstrap](0293-ssh-password-authentication.md) | Accepted (D454; amends ADR 0292) |
 | 0294 | [Project archive is a list + inspector workbench](0294-project-archive-list-inspector.md) | Accepted (D455; amends D267 / D168) |
@@ -385,5 +385,6 @@ Each ADR includes:
 | plugin-net-resolved-address-guard | [Judge plugin egress on the address, not the spelling](plugin-net-resolved-address-guard.md) | Accepted (implementation candidate) |
 | disable-plugin-renderer-extensions | [Disable plugin renderer extensions until they are isolated](disable-plugin-renderer-extensions.md) | Accepted (fork security mitigation) |
 | fork-removes-plugin-marketplace | [Remove the remote plugin marketplace](fork-removes-plugin-marketplace.md) | Accepted (supersedes ADR 0276 and ADR 0241) |
+| fork-removes-voice-and-speech | [Remove local Dictation and host speech](fork-removes-voice-and-speech.md) | Accepted (D662; supersedes ADR 0281 and ADR 0291) |
 
 | local-agent-remote-workspace-tools | [Local Agent and model requests for remote workspaces](local-agent-remote-workspace-tools.md) | Accepted for implementation |

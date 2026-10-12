@@ -344,12 +344,17 @@ type PluginPermission =
  | "usage.read"
  | "audio.capture.background"
  | "audio.playback.background"
- | "speech.adapter.register"
  | "keyboard.globalShortcut"
  | "net.websocket";
 ```
 
 未知权限=验证失败。
+
+`speech.adapter.register` 已在 D662 移除
+（[ADR fork-removes-voice-and-speech](../../../adr/fork-removes-voice-and-speech.md)）。
+仍声明它的已安装清单照常加载，该权限不授予任何能力；
+`pi.speech.registerAdapter` / `unregisterAdapter` 在调用时返回 `UNSUPPORTED`。
+`pi-plugin check` 将其报告为 `permission.removed`。
 
 `fs.read.workspace`、`fs.write.workspace`、`fs.delete.workspace` 是文件范围机制
 之前的旧权限名。它们仍然能通过校验，主机会在加载时把它们改写成最小安全等价物

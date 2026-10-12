@@ -1,5 +1,9 @@
 # ADR 0291: Remove the speech settings UI
 
+> Superseded 2026-10-12 by [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md):
+> this build has no host speech capability, no `speech/*` IPC, and no
+> `speech.adapter.register` plugin permission. The text below is historical.
+
 - Status: Accepted
 - Date: 2026-09-19
 - Deciders: PI-Desktop core

@@ -20,7 +20,6 @@ export * from "./types/platform.js";
 export * from "./types/workpanel.js";
 export * from "./types/filesystem.js";
 export * from "./types/remote-media.js";
-export * from "./types/speech.js";
 export * from "./types/remote-host.js";
 export * from "./types/config-sync.js";
 export * from "./types/live-voice.js";

@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
-import { LIVE_WORK_TOOL_NAME } from "@pi-desktop/voice-runtime/live";
+import { LIVE_WORK_TOOL_NAME } from "@pi-desktop/live-voice-protocol";
 import { createProductionWorkHarness, WORK_SESSION_ID } from "./live-work-production.mjs";
 
 export class FixtureLiveSocket extends EventEmitter {

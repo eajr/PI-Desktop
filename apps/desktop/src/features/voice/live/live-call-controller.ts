@@ -3,14 +3,13 @@ import {
   codexDelegationFeedback,
   codexWorkFeedbackMessage,
   isPlaybackSignalActive,
-} from "@pi-desktop/voice-runtime/live";
+} from "@pi-desktop/live-voice-protocol";
 import type {
   LiveCallView,
   LiveControlEvent,
   LiveStatus,
   LiveTranscriptSegment,
 } from "@pi-desktop/shared";
-import { api } from "../../../lib/api";
 import { useAppStore } from "../../../stores/app-store";
 import { liveVoiceApi, liveError } from "./live-voice-api";
 import { LivePcmSession } from "./live-pcm-session";
@@ -75,28 +74,17 @@ export class LiveCallController {
   private readonly disposers: Array<() => void> = [];
   private readonly terminalCallIds = new Set<string>();
   private generation = 0;
-  private microphoneDeviceId: string | null = null;
 
   constructor() {
     this.disposers.push(
       liveVoiceApi.onView((view) => this.handleView(view)),
       liveVoiceApi.onControl((event) => this.handleControl(event)),
       liveVoiceApi.onTranscript((event) => this.handleTranscript(event.callId, event.segment)),
-      api.onSettingsChanged((patch) => {
-        const voice = patch.voice;
-        if (voice && typeof voice === "object" && "deviceId" in voice) {
-          const deviceId = (voice as { deviceId?: unknown }).deviceId;
-          this.microphoneDeviceId = typeof deviceId === "string" && deviceId ? deviceId : null;
-        }
-      }),
     );
     this.disposers.push(window.piDesktop?.onLiveVoicePort?.() ?? (() => undefined));
     window.addEventListener("message", this.handlePortMessage);
     window.addEventListener("pagehide", this.handlePageHide, { once: true });
     void this.refreshStatus();
-    void api.getSettings().then((settings) => {
-      this.microphoneDeviceId = settings.voice?.deviceId ?? null;
-    }).catch(() => undefined);
   }
 
   readonly getSnapshot = (): LiveVoiceSnapshot => this.snapshot;
@@ -154,7 +142,7 @@ export class LiveCallController {
           void liveVoiceApi.end({ callId: prepared.callId, reason: "user-cancelled-start" }).catch(() => undefined);
         }
       }).catch(() => undefined);
-      micRequest = requestMicrophone(this.microphoneDeviceId);
+      micRequest = requestMicrophone();
       resources.microphoneRequest = micRequest;
       void micRequest.then((stream) => {
         resources.microphoneRequestSettled = true;
@@ -793,11 +781,11 @@ export function getLiveCallController(): LiveCallController {
   return controller;
 }
 
-function requestMicrophone(deviceId: string | null): Promise<MediaStream> {
+// Live Voice captures from the system default input device.
+function requestMicrophone(): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) return Promise.reject(liveError("LIVE_MEDIA_UNSUPPORTED"));
   return navigator.mediaDevices.getUserMedia({
     audio: {
-      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
       channelCount: 1,
       echoCancellation: true,
       noiseSuppression: true,

@@ -216,15 +216,9 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@picovoice/pvrecorder-node':
-        specifier: 1.2.9
-        version: 1.2.9
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9(supports-color@7.2.0)
-      transcribe-cpp:
-        specifier: 0.2.2
-        version: 0.2.2
     devDependencies:
       '@earendil-works/pi-ai':
         specifier: 1.1.0
@@ -244,6 +238,9 @@ importers:
       '@pi-desktop/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@pi-desktop/live-voice-protocol':
+        specifier: workspace:*
+        version: link:../../packages/live-voice-protocol
       '@pi-desktop/plugin-devkit':
         specifier: workspace:*
         version: link:../../packages/plugin-devkit
@@ -256,9 +253,6 @@ importers:
       '@pi-desktop/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@pi-desktop/voice-runtime':
-        specifier: workspace:*
-        version: link:../../packages/voice-runtime
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.0))
@@ -487,6 +481,15 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.0))
 
+  packages/live-voice-protocol:
+    devDependencies:
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.1
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@7.2.0)(yaml@2.9.0)
+
   packages/plugin-devkit:
     dependencies:
       '@pi-desktop/plugin-sdk':
@@ -556,29 +559,6 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@24.13.3)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.0))
-
-  packages/voice-runtime:
-    dependencies:
-      opencc-js:
-        specifier: ^1.4.1
-        version: 1.4.2
-    devDependencies:
-      typescript:
-        specifier: ~5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^3.2.1
-        version: 3.2.7(@types/debug@4.1.13)(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(supports-color@7.2.0)(yaml@2.9.0)
-    optionalDependencies:
-      '@huggingface/hub':
-        specifier: 2.15.0
-        version: 2.15.0
-      '@picovoice/pvrecorder-node':
-        specifier: 1.2.9
-        version: 1.2.9
-      transcribe-cpp:
-        specifier: 0.2.2
-        version: 0.2.2
 
 packages:
 
@@ -1493,20 +1473,6 @@ packages:
       '@modelcontextprotocol/sdk':
         optional: true
 
-  '@huggingface/blake3-jit@0.0.2':
-    resolution: {integrity: sha512-Bq7B5qabyjrJfhBsl85Jd2QBtf+HzRD7h7A9GfN2lzrrsABhOa5evVPgzoCTxR7Ub0QFj7YDK1YkYRWBU25+2w==}
-
-  '@huggingface/hub@2.15.0':
-    resolution: {integrity: sha512-+sHWNz0YpqTvwuIYDxpyrhyk1o2j9lIJuPzbhUT0kxU8IHP9ZOzeajk/O6RRbZyvAM9h6m219FghDLi0Ayblww==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  '@huggingface/tasks@0.21.48':
-    resolution: {integrity: sha512-+ujPTb9irMxsiCYjL2Jpjs0+aCioJTTYA8Pp/I/+fm2LenzL3tDOs2/0ELj5phMAUDVoOozLviy4y/e7mBltxA==}
-
-  '@huggingface/xetchunk-wasm@0.1.0':
-    resolution: {integrity: sha512-wWpp2qwPgf9kv1KLJjcDUk/OrpDOsFoQ3Qpz0U5LGn20csoymBf8eneOv6wm/GzPBzlWac1OYiR0aa1vT6aM2Q==}
-
   '@iconify-json/simple-icons@1.2.93':
     resolution: {integrity: sha512-/XhANjfGYOuqvSR3TmUnkQkINvQ4GVjVuukvymRbxtVFBvIq/yiXJqCDycKcQPT401OYT9H2vIY6ihAlz1QIAw==}
 
@@ -1538,106 +1504,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@koromix/koffi-android-arm64@3.3.1':
-    resolution: {integrity: sha512-S3yMzUGca5UJRioY7wdBjeO+LuW9mQhrksL+Wd5ri1X7kWMB2IGLzrT1mn1xqx02Vicgvuy5GtkhHuxG5mkzYw==}
-    cpu: [arm64]
-    os: [android]
-
-  '@koromix/koffi-android-x64@3.3.1':
-    resolution: {integrity: sha512-QaKSyVi37j19CfN2tR3q8lQMosZ+mQIOQXcNQmWXfYDUs9x2CSCxzvMTeQyFyGdAqB58dBluEiy8V5ZMvARSHg==}
-    cpu: [x64]
-    os: [android]
-
-  '@koromix/koffi-darwin-arm64@3.3.1':
-    resolution: {integrity: sha512-xVLQMZzACn6TQJsGp/mBF71mfRyuhmxTBGcQLfJM59YArNN/9+1JV8FFCElmgspffijASZsLwbSEdPwZMNeDhQ==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@koromix/koffi-darwin-x64@3.3.1':
-    resolution: {integrity: sha512-+VGqqnBQvR+AbAbRyRDsxK0D6wwAivUURWsyVX8NhR5agf+0+sSAdNMsSy+9DyO7CmioTUVwV+Do+12uWnFrmA==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@koromix/koffi-freebsd-arm64@3.3.1':
-    resolution: {integrity: sha512-oPkfxEiLiZs1jV6qqw3DzZy3aigzOb9mGbRtK6ENNgoiZ2QdAw55cXUTOMNiAwgbkBwt7SsorFdUnYUuP5b0Gg==}
-    cpu: [arm64]
-    os: [freebsd]
-
-  '@koromix/koffi-freebsd-ia32@3.3.1':
-    resolution: {integrity: sha512-uLb93keIlk6TkECtb17z2d5nehEIJ2labIXF0ava3s+9w7VE7QZUw3O2IQVq4t95sIm5rMoE1Y+cFa0aN6444w==}
-    cpu: [ia32]
-    os: [freebsd]
-
-  '@koromix/koffi-freebsd-x64@3.3.1':
-    resolution: {integrity: sha512-+Iuh+m5Ln0fjubgw/6bzEkliBcFBIFWWL7IqzmktPy0Q0Bq+XCGtUf+5/KTlodYlTOLv/SE/YTbVkk3c02+E6w==}
-    cpu: [x64]
-    os: [freebsd]
-
-  '@koromix/koffi-linux-arm64@3.3.1':
-    resolution: {integrity: sha512-Itv2N+TvBFTSdEZdokM4ydjbBwr6GNKd51+UXoh/5HVXALBRnMQek2QhBnG7z6H9+/p2SB4rqBnvhuLQpv4B7g==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@koromix/koffi-linux-arm@3.3.1':
-    resolution: {integrity: sha512-rE6QypE/h4nDHPlzzVPok5W2gL5CopvBYI44lJXO2SauxVAeV86bbf+ucmF/toYENdjF0DBdY7GbloyixwQpPQ==}
-    cpu: [arm]
-    os: [linux]
-
-  '@koromix/koffi-linux-ia32@3.3.1':
-    resolution: {integrity: sha512-pb1NJ/Ih4MAPB1e2koQOKxGtLuPWKMT3QXxBrPptkkkDz/XpV6+bAA4ys7amXxpA0ybM2u/+VM0gGzdJRThkRg==}
-    cpu: [ia32]
-    os: [linux]
-
-  '@koromix/koffi-linux-loong64@3.3.1':
-    resolution: {integrity: sha512-RdS57JuF39tLXS/yYq4KlFnU7CMrn1+x/4v171bji+1aPYOXPxzYDAJVjapv/6tnrESrMTnfWIja3jfzieFmpQ==}
-    cpu: [loong64]
-    os: [linux]
-
-  '@koromix/koffi-linux-ppc64@3.3.1':
-    resolution: {integrity: sha512-nmOTpQQS5pWG73X01y7K70JQaL+5T/v04i0G4BtXDAxQq3WHmyeJCgmdHhz5W0JVtjHicitSZoothTspAopF9A==}
-    cpu: [ppc64]
-    os: [linux]
-
-  '@koromix/koffi-linux-riscv64@3.3.1':
-    resolution: {integrity: sha512-mk0Av5QmK0BPD3OHytOThVhEe4VCTrYv3+em6h75E1rNYiCfixzeh3d5+s5x2vCaby8zzxvNd39sO89Bp1juwg==}
-    cpu: [riscv64]
-    os: [linux]
-
-  '@koromix/koffi-linux-x64@3.3.1':
-    resolution: {integrity: sha512-uU5cJNe145TvITqrUWvBmZO4WLNObdZ2Gnm8eNk/OdrhRFG9LB44RUv07aQwPbdo1438j+Cr+tFNnpjTBadZFQ==}
-    cpu: [x64]
-    os: [linux]
-
-  '@koromix/koffi-openbsd-arm64@3.3.1':
-    resolution: {integrity: sha512-owXmXHI+5kkDyVjqGPfPgIHIzH1swsGY+YNbQ4ozkO23UKzJElAtmQPcmA1pQwiDCeyojHEelgd9+BV58uOIkA==}
-    cpu: [arm64]
-    os: [openbsd]
-
-  '@koromix/koffi-openbsd-ia32@3.3.1':
-    resolution: {integrity: sha512-fvIKWycDdc9XL3ATQT0uvt/j82EB3/JWzJU4yqUCJbMotTP8mvo/c1D1Jus4mO+fNGEYM33YuFDkJcQkHJd9Dg==}
-    cpu: [ia32]
-    os: [openbsd]
-
-  '@koromix/koffi-openbsd-x64@3.3.1':
-    resolution: {integrity: sha512-UYk2xNAK5wEyskLtrgTRt+2lwfBOvgaK8UJDz4B2qm57VvRrqb7ye1hzKFZrRVa8NWRPUk6W/zsqZyFHu4BoLA==}
-    cpu: [x64]
-    os: [openbsd]
-
-  '@koromix/koffi-win32-arm64@3.3.1':
-    resolution: {integrity: sha512-SZsmAWUKxBHdUR6Z5IJTslOOy0VEFHxoDHMZkn3k0P5TuP/aOZfQYoEa34UwnLI8t2Fmgyhmympth+39tR/XUw==}
-    cpu: [arm64]
-    os: [win32]
-
-  '@koromix/koffi-win32-ia32@3.3.1':
-    resolution: {integrity: sha512-pARisOvxCPkk6Wg1HkwRCnrkJIVS31kDweWLo+bQay/Dr1915s7skVydWpTKS30EcfOh4Jay7B4c0dgamTLBHg==}
-    cpu: [ia32]
-    os: [win32]
-
-  '@koromix/koffi-win32-x64@3.3.1':
-    resolution: {integrity: sha512-LYoO19cTIA7xjl+3s4VeGagCAO38VNXZ969DNszb1wTwJUjrHLrAbHFkk8fYkXineM3HJkFwElW0VLmZqXcfRg==}
-    cpu: [x64]
-    os: [win32]
 
   '@malept/cross-spawn-promise@2.0.0':
     resolution: {integrity: sha512-1DpKU0Z5ThltBwjNySMC14g0CkbyhCaz9FkhxqNsZI6uAPJXFS8cMXlBKo26FJ8ZuW6S9GCMcR9IO5k2X5/9Fg==}
@@ -1675,10 +1541,6 @@ packages:
   '@peculiar/webcrypto@1.7.1':
     resolution: {integrity: sha512-ODOov0sGMJMf3jPonOkgGqPknTsu+DdQ7kD++gz8aI+aFMOMHFbWAA2taqXXVTdP+OTOQR/znGvSpmkeI0WTYQ==}
     engines: {node: '>=14.18.0'}
-
-  '@picovoice/pvrecorder-node@1.2.9':
-    resolution: {integrity: sha512-e398ue4G8YihrnnyTpnVePvOiBEM5+R4D+ChoyyeC8J8KFBMuhGrZwrdmpIPqDqCjCA+YqO2mFaicHstVhEpcg==}
-    engines: {node: '>=18.0.0'}
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -2034,33 +1896,6 @@ packages:
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
       vite: '>=6.4.3 <7'
-
-  '@transcribe-cpp/darwin-arm64-metal@0.2.2':
-    resolution: {integrity: sha512-Ctv6bm0MiH/C0LLTn3B6GCXh0rdPH6V3Oh3B9UzHK9UL2BQRfd7h+uFDls4QUvbQfdiH+rougcRazW562QvinQ==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@transcribe-cpp/darwin-x64-cpu@0.2.2':
-    resolution: {integrity: sha512-6VghtWVGT2gPd9zzA3JFtdDtoqtcKlOiyYVU9rMpyf7N1Hj4X6e8x/z2+zbE62R38Cx1g+e+CjFTTzog5GCAQA==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@transcribe-cpp/linux-arm64-cpu-vulkan@0.2.2':
-    resolution: {integrity: sha512-qqRqPbkLXTGvGfgoxrnnlMtpDKH9SYTd9piKLl5muCY4ZnyubbA0VvWiArIuQFp8ITZNUXSaEmnBp5BczI3Tiw==}
-    cpu: [arm64]
-    os: [linux]
-    libc: [glibc]
-
-  '@transcribe-cpp/linux-x64-cpu-vulkan@0.2.2':
-    resolution: {integrity: sha512-k8t794Xh/DbUNiVutxTmclW9MNCR0FxpPhH57bHji0vevs+wAyo4h2HqDtswtPezflNspOmFvtzam+2mGieAUg==}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
-  '@transcribe-cpp/win32-x64-cpu-vulkan@0.2.2':
-    resolution: {integrity: sha512-EhSjJtfbqYaIjQiCXLh8wrwjL1k9HJxjCwA28p/nORm+txso7MpjFnFM55dCb+T2mdN1HSWCtWDR8+I/HJe2vQ==}
-    cpu: [x64]
-    os: [win32]
 
   '@types/babel__core@7.20.5':
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}
@@ -2621,10 +2456,6 @@ packages:
     resolution: {integrity: sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg==}
     engines: {node: '>=8'}
 
-  cli-progress@3.12.0:
-    resolution: {integrity: sha512-tRkV3HJ1ASwm19THiiLIXLO7Im7wlTuKnvkYaTkyoAPefqjNg7W7DHKUlGRxy9vxDvbyCYQkQozvptuMkGCg8A==}
-    engines: {node: '>=4'}
-
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
     engines: {node: '>=12'}
@@ -3169,9 +3000,6 @@ packages:
     resolution: {integrity: sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg==}
     engines: {node: '>=18'}
 
-  gearhash-jit@1.0.2:
-    resolution: {integrity: sha512-UhzJL4KXSdqAKepy/tZwmi2Rcy0YMmtiC4DQS4SURCuIWdh8ECZtnXK2ePRMLigfB61hRKdLK/Vgg2bSw73izQ==}
-
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
@@ -3489,9 +3317,6 @@ packages:
 
   khroma@2.1.0:
     resolution: {integrity: sha512-Ls993zuzfayK269Svk9hzpeGUKob/sIgZzyHYdjQoAdQetRKpOLj+k/QQQ/6Qi0Yz65mlROrfd+Ev+1+7dz9Kw==}
-
-  koffi@3.3.1:
-    resolution: {integrity: sha512-FZYfhBfYQr/cmHhZpaQ9rhbKpkjHhxaytn2A0mbPhiD5yV8QzF3SiQwR1w/34rCJ1fw+6qBQSj/ZoXRdC+Xc2Q==}
 
   layout-base@1.0.2:
     resolution: {integrity: sha512-8h2oVEZNktL4BH2JCOI90iD1yXwL6iNW7KcCKT2QZgQJR2vbqDsldCTPRU9NifTCqHZci57XvQQ15YTu+sTYPg==}
@@ -3935,9 +3760,6 @@ packages:
         optional: true
       zod:
         optional: true
-
-  opencc-js@1.4.2:
-    resolution: {integrity: sha512-EdcspgdROiCCZDM+jZR6Pa670xW+EW2QhctPBQ8gRjg6lrx4IHEl+2s+kt5izk/TkxVRgdWuFgaGkaEdIUfdaw==}
 
   p-cancelable@2.1.1:
     resolution: {integrity: sha512-BZOr3nRQHOntUjTrH8+Lh54smKHoHyur8We1V8DSMVrl5A2malOOwuJRnKRDjSnkoeBh4at6BwEnb5I7Jl31wg==}
@@ -4421,10 +4243,6 @@ packages:
   tmp@0.2.7:
     resolution: {integrity: sha512-e0votIpp4Uo2AJYSzVHV6xCcawuiez3DzqDAbrTc3YxBkplN6e+dM13ZeIcZnDg/QpSuU2zfZ3rzwY8ukEnaXw==}
     engines: {node: '>=14.14'}
-
-  transcribe-cpp@0.2.2:
-    resolution: {integrity: sha512-uzun32AIpT0NGe9WHkqCeg8aSLm1qYZ83alWuRfgpgd7RfIKGn0KBTmE/FHDFoX2mV8JMDBh8X5qCw2dt2kZ/w==}
-    engines: {node: '>=22'}
 
   trim-lines@3.0.1:
     resolution: {integrity: sha512-kRj8B+YHZCc9kQYdWfJB2/oUl9rA99qbowYYBtr4ui4mZyAQ2JpvVBd/6U2YloATfqBhBTSMhTpgBHtU0Mf3Rg==}
@@ -5783,26 +5601,6 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@huggingface/blake3-jit@0.0.2':
-    optional: true
-
-  '@huggingface/hub@2.15.0':
-    dependencies:
-      '@huggingface/tasks': 0.21.48
-      '@huggingface/xetchunk-wasm': 0.1.0
-    optionalDependencies:
-      cli-progress: 3.12.0
-    optional: true
-
-  '@huggingface/tasks@0.21.48':
-    optional: true
-
-  '@huggingface/xetchunk-wasm@0.1.0':
-    dependencies:
-      '@huggingface/blake3-jit': 0.0.2
-      gearhash-jit: 1.0.2
-    optional: true
-
   '@iconify-json/simple-icons@1.2.93':
     dependencies:
       '@iconify/types': 2.0.0
@@ -5839,66 +5637,6 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
-
-  '@koromix/koffi-android-arm64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-android-x64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-darwin-arm64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-darwin-x64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-freebsd-arm64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-freebsd-ia32@3.3.1':
-    optional: true
-
-  '@koromix/koffi-freebsd-x64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-arm64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-arm@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-ia32@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-loong64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-ppc64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-riscv64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-linux-x64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-openbsd-arm64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-openbsd-ia32@3.3.1':
-    optional: true
-
-  '@koromix/koffi-openbsd-x64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-win32-arm64@3.3.1':
-    optional: true
-
-  '@koromix/koffi-win32-ia32@3.3.1':
-    optional: true
-
-  '@koromix/koffi-win32-x64@3.3.1':
-    optional: true
 
   '@malept/cross-spawn-promise@2.0.0':
     dependencies:
@@ -5945,8 +5683,6 @@ snapshots:
       '@peculiar/utils': 2.0.3
       tslib: 2.8.1
       webcrypto-core: 1.9.2
-
-  '@picovoice/pvrecorder-node@1.2.9': {}
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -6235,21 +5971,6 @@ snapshots:
       '@tailwindcss/oxide': 4.3.3
       tailwindcss: 4.3.3
       vite: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.0)
-
-  '@transcribe-cpp/darwin-arm64-metal@0.2.2':
-    optional: true
-
-  '@transcribe-cpp/darwin-x64-cpu@0.2.2':
-    optional: true
-
-  '@transcribe-cpp/linux-arm64-cpu-vulkan@0.2.2':
-    optional: true
-
-  '@transcribe-cpp/linux-x64-cpu-vulkan@0.2.2':
-    optional: true
-
-  '@transcribe-cpp/win32-x64-cpu-vulkan@0.2.2':
-    optional: true
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -6922,11 +6643,6 @@ snapshots:
   ci-info@4.3.1: {}
 
   ci-info@4.4.0: {}
-
-  cli-progress@3.12.0:
-    dependencies:
-      string-width: 4.2.3
-    optional: true
 
   cliui@8.0.1:
     dependencies:
@@ -7608,9 +7324,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  gearhash-jit@1.0.2:
-    optional: true
-
   gensync@1.0.0-beta.2: {}
 
   get-caller-file@2.0.5: {}
@@ -8021,29 +7734,6 @@ snapshots:
       json-buffer: 3.0.1
 
   khroma@2.1.0: {}
-
-  koffi@3.3.1:
-    optionalDependencies:
-      '@koromix/koffi-android-arm64': 3.3.1
-      '@koromix/koffi-android-x64': 3.3.1
-      '@koromix/koffi-darwin-arm64': 3.3.1
-      '@koromix/koffi-darwin-x64': 3.3.1
-      '@koromix/koffi-freebsd-arm64': 3.3.1
-      '@koromix/koffi-freebsd-ia32': 3.3.1
-      '@koromix/koffi-freebsd-x64': 3.3.1
-      '@koromix/koffi-linux-arm': 3.3.1
-      '@koromix/koffi-linux-arm64': 3.3.1
-      '@koromix/koffi-linux-ia32': 3.3.1
-      '@koromix/koffi-linux-loong64': 3.3.1
-      '@koromix/koffi-linux-ppc64': 3.3.1
-      '@koromix/koffi-linux-riscv64': 3.3.1
-      '@koromix/koffi-linux-x64': 3.3.1
-      '@koromix/koffi-openbsd-arm64': 3.3.1
-      '@koromix/koffi-openbsd-ia32': 3.3.1
-      '@koromix/koffi-openbsd-x64': 3.3.1
-      '@koromix/koffi-win32-arm64': 3.3.1
-      '@koromix/koffi-win32-ia32': 3.3.1
-      '@koromix/koffi-win32-x64': 3.3.1
 
   layout-base@1.0.2: {}
 
@@ -8673,8 +8363,6 @@ snapshots:
       ws: 8.21.1
       zod: 4.4.3
 
-  opencc-js@1.4.2: {}
-
   p-cancelable@2.1.1: {}
 
   p-limit@3.1.0:
@@ -9216,16 +8904,6 @@ snapshots:
       tmp: 0.2.7
 
   tmp@0.2.7: {}
-
-  transcribe-cpp@0.2.2:
-    dependencies:
-      koffi: 3.3.1
-    optionalDependencies:
-      '@transcribe-cpp/darwin-arm64-metal': 0.2.2
-      '@transcribe-cpp/darwin-x64-cpu': 0.2.2
-      '@transcribe-cpp/linux-arm64-cpu-vulkan': 0.2.2
-      '@transcribe-cpp/linux-x64-cpu-vulkan': 0.2.2
-      '@transcribe-cpp/win32-x64-cpu-vulkan': 0.2.2
 
   trim-lines@3.0.1: {}
 

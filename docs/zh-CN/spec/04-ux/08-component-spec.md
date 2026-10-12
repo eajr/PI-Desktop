@@ -264,7 +264,7 @@ Composer 拥有 Agent/Plan/Goal 控件以及组合的模型 × 推理选择（§
 ### 2.5 辅助功能
 
 - 每个控件都可以通过 Tab 键盘访问
-- 输入框不渲染任何转写或朗读控件；宿主语音能力只能由 IPC 与插件调用（ADR 0291）。
+- 输入框不渲染任何转写或朗读控件（D662）。
 - 停止按钮有 `aria-label="Stop generating"`
 
 ### 2.6 MVP 约束
@@ -2190,7 +2190,7 @@ MainChat 底部的输入区域，用于撰写和发送提示。支持多行输�
   无论视觉能力如何（见 `03-runtime/svg-attachment-input.md`）（D361）。草稿仍是文本；芯片在发送前序列化为规范 `@<absolute-path>`，
   代理用文件工具跟随路径。
 - 没有语音转草稿输入。选择启用的 Live Voice 路径与 Composer 草稿相互独立，
-  不会重新显示隐藏的 Dictation 入口。
+  本地听写已移除（D662）。
 
 ### 11.7.1 Live Voice 准备、紧凑通话栏和详情
 

@@ -18,8 +18,8 @@
          need this on their own. -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
-    <!-- Isolated plugin panels may capture microphone after the user grants
-         `ui.microphone` (ADR 0257). Host speech v1 does not capture. -->
+    <!-- Live Voice and isolated plugin panels may capture microphone after
+         the user grants it (`ui.microphone`, ADR 0257). -->
     <key>com.apple.security.device.audio-input</key>
     <true/>
   </dict>

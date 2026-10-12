@@ -42,7 +42,7 @@
 - [17-asktool-questions.md](03-runtime/17-asktool-questions.md)
 - [18-line-anchored-edit-contract.md](03-runtime/18-line-anchored-edit-contract.md)
 - [19-remote-agent-control-protocol.md](03-runtime/19-remote-agent-control-protocol.md)
-- [20-speech.md](03-runtime/20-speech.md)
+- [20-speech.md](03-runtime/20-speech.md) (removed, D662)
 - [live-voice.md](03-runtime/live-voice.md)
 - [live-work-session.md](03-runtime/live-work-session.md)
 - [21-image-generation.md](03-runtime/21-image-generation.md)

@@ -8,6 +8,11 @@
   [provider-system-certificates](provider-system-certificates.md),
   [05-security/01-security](../spec/05-security/01-security.md)
 
+> Amended 2026-10-12 by
+> [ADR fork-removes-voice-and-speech](fork-removes-voice-and-speech.md): the
+> native voice modules were removed, so `app.asar.unpacked` no longer carries
+> them and `build.asarUnpack` is gone.
+
 ## Context
 
 A security review found that packaged PI-Desktop builds configured no Electron

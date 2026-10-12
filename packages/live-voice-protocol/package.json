@@ -1,5 +1,5 @@
 {
-  "name": "@pi-desktop/voice-runtime",
+  "name": "@pi-desktop/live-voice-protocol",
   "version": "0.18.0-beta.6",
   "private": true,
   "type": "module",
@@ -7,24 +7,12 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./dist/index.js"
-    },
-    "./live": {
-      "types": "./src/live/index.ts",
-      "import": "./dist/live/index.js"
     }
   },
   "scripts": {
     "build": "tsc --build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "opencc-js": "^1.4.1"
-  },
-  "optionalDependencies": {
-    "transcribe-cpp": "0.2.2",
-    "@picovoice/pvrecorder-node": "1.2.9",
-    "@huggingface/hub": "2.15.0"
   },
   "devDependencies": {
     "vitest": "^3.2.1",

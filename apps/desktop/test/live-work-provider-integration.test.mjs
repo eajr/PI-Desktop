@@ -13,7 +13,7 @@ import {
   parseRealtimeMessage,
   realtimeToolReceiptMessage,
   realtimeWorkFeedbackMessages,
-} from "@pi-desktop/voice-runtime/live";
+} from "@pi-desktop/live-voice-protocol";
 
 const SESSION_ID = "live-work-fixture-session";
 const CALL_ID = "live-work-fixture-call";

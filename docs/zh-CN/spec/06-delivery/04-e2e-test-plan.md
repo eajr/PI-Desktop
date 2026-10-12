@@ -9,26 +9,24 @@
 
 ---
 
-### E2E-LEGACY-DICTATION-idle-model-release
+### E2E-PLUGIN-removed-speech-permission-still-loads
 
-- **前提：** 通过 `VoiceService` 接口测试保留的本地 Dictation 服务，使用确定性的
-  Controller/ModelManager stub 和受控时钟。不访问物理麦克风，也不下载模型。
-- **步骤：** 启动并停止一次录音，将时间推进到 10 分钟空闲边界之前和边界时，检查
-  卸载调用。分别在边界前开始新录音、下一次启动被拒绝、进入 error 终态以及服务
-  dispose 时重复检查。
-- **预期：** 已结束的空闲模型只在边界到达时卸载一次，不会提前卸载。新录音会取消
-  计时器，其终态会启动新的等待窗口。新录音启动被拒绝时不会遗失卸载计划。回调时
-  处于活动阶段或服务已 dispose 都不会触发卸载。
-- **覆盖：** `apps/desktop/test/voice-service-idle-unload.test.mjs` 使用真实
-  `VoiceService` 生命周期，仅 mock 运行时边界和时钟。独立 Linux RSS 测量验证
-  `TranscribeModel.dispose()` 会向操作系统归还内存，且现有延迟加载路径可重新加载。
-- **规格：** [实时语音](../03-runtime/live-voice.md)。
+- **前提：** 隔离的插件宿主，加载一个仍在 manifest 中声明已移除权限
+  `speech.adapter.register`（D662）的本地插件。
+- **步骤：** 加载插件，然后在插件进程中调用 `pi.speech.registerAdapter` 和
+  `pi.speech.unregisterAdapter`。
+- **预期：** 插件正常加载。两次调用均以 `UNSUPPORTED` 失败，消息指明缺失的宿主
+  API；不注册任何内容。
+- **覆盖：** `apps/desktop/test/plugin-speech-removed.test.mjs`；`pi-plugin check`
+  报告 `permission.removed`（plugin-devkit 测试）。
+- **规格：** [ADR fork-removes-voice-and-speech](../../../adr/fork-removes-voice-and-speech.md)、
+  [插件清单](../07-plugins/02-plugin-manifest-schema.md)。
 
 ### E2E-LIVE-VOICE-public-settings-and-reconnect
 
 - **前提：** 生产 Renderer 构建、真实 Electron/Main/Host、隔离数据和测试项目、关闭开发者模式、本地 TLS Realtime fixture 及合成麦克风。仅在测试子进程中信任 fixture CA，不关闭 TLS、sender、沙盒或麦克风权限校验。
 - **步骤：** 在功能关闭时从 Composer 打开 Live，点击“打开设置”。通过设置搜索找到 Voice，绑定测试账号并启用；连接、取消静音、接收音频和字幕、静音并挂断。取消延迟启动，断开服务后显式重连；使用同一隔离配置重启，检查持久化设置并关闭功能。
-- **预期：** 普通用户可以到达入口；启用设置不会开始采集。真实构建中的 Renderer 通过精确主 frame 所有者校验。只使用所选账号，静音停止输入，每次结束释放媒体/socket，失败不会自动发起新通话。重启保留设置但不重连；旧 Dictation 设置不变，纯通话不创建 Agent 会话。
+- **预期：** 普通用户可以到达入口；启用设置不会开始采集。真实构建中的 Renderer 通过精确主 frame 所有者校验。只使用所选账号，静音停止输入，每次结束释放媒体/socket，失败不会自动发起新通话。重启保留设置但不重连；已存的旧 `voice` 设置不变，纯通话不创建 Agent 会话。
 - **覆盖：** `pnpm test:e2e:live-voice` 驱动真实构建及具体 Realtime GA adapter，连接本地 WSS；`live-voice-owner.test.mjs` 打包生产 owner 模块并验证其他文件/frame 被拒绝。合成音频不代表物理设备或真实 Provider 验收；命令和结果见 `docs/implementation/live-voice-public-readiness.md`。
 - **规格：** [实时语音](../03-runtime/live-voice.md)。
 
@@ -37,7 +35,7 @@
 - **前提：** 使用隔离的 Live Provider fixture、本地 AgentHost 会话和确定性意图分类器；候选请求须从现有 Live adapter 回调进入，不使用真实账号或付费端点。
 - **步骤：** 验证纯通话没有工作作用域时会拒绝任务候选；再以明确选择的本地会话和关闭的上下文共享启动工作通话。提交一个已声明工具请求并检查回执、Host admission 和 `voiceOrigin`。覆盖忙时独立排队、过期 steer、精确回合 stop、submit 返回前到达的终态事件，以及基于已记录结果的只读查询。请求项目／会话列表，确认只返回标签和本次 call 的 opaque 引用；通过面板动作打开已列会话、在已列项目中新建会话，并确认工作绑定仍固定。分别保持 Provider 生成、用户讲话和本地播放活跃，确认反馈须待三者空闲和静默窗口结束后才发送。覆盖 silent、静默时的显式查询、过期反馈降级；当提交处于等待用户决策状态时，确认紧凑栏保留等待提示、详情显示待决请求并提供打开该精确会话的操作，且其他会话的待决请求不会被归到绑定会话；当提交处于等待用户决策状态时，确认紧凑栏保留等待提示、详情显示待决请求并提供打开该精确会话的操作，且其他会话的待决请求不会被归到绑定会话。随后用语音回答该 AskTool 提问，确认会话卡片经由 Host 输入路径解决；再分别用提问从未提供的标签、只回答一部分、以及同时存在两个待答提问重试，确认每次都被拒绝、不产生写操作且不重试。结束通话时确认已受理工作仍保留。
 - **预期：** 工作始终绑定到通话开始时选定的会话；关闭上下文共享时不读取历史；现有 AgentHost 执行 prompt、steer、queue 和 stop；重复 Provider ID 不重复派发；结果查询只投影准确操作摘要且不会创建新回合。项目／会话选项不暴露原始路径或 ID，引用按 call 隔离并过期；打开只导航，创建必须先列出注册项目并由用户点击确认。自动反馈同时观察 Provider 生成状态和本地播放活动，任务执行与反馈投递状态分开。结束 Live 不取消已受理任务；Renderer 信号不代表用户已经听到结果。
-- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/voice-runtime/src/live/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`live-work-decision.test.mjs` 覆盖等待决策投影、会话作用域、有界纯文本渲染与打开绑定会话的面板操作，`voice-runtime/src/live/playback-monitor.test.ts` 覆盖本地音频信号检测；`packages/host-runtime/src/live-work/ask-answer.test.ts` 覆盖语音回答意图与路由（解决、拒绝、unknown 且绝不重发），`apps/desktop/test/spoken-answer.test.mjs` 覆盖只选既有选项的匹配、有界朗读内容与投递预算。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
+- **覆盖：** `apps/desktop/test/live-voice-service.test.mjs` 覆盖纯通话拒绝、显式工作作用域和 Provider／用户／本地播放的反馈门控及独立投递状态；`packages/host-runtime/src/live-work/coordinator.test.ts` 覆盖回执顺序、路由、过期 steer、去重、关闭通话、早到终态和选择流程；`packages/host-runtime/src/live-work/feedback-scheduler.test.ts` 覆盖防抖、播报间隔、silent、过期降级、去重与溢出；`packages/host-runtime/src/live-work/context.test.ts` 覆盖上下文投影与 opaque 引用；`packages/host-runtime/src/live-work/result-summary.test.ts` 覆盖精确回合摘要和诚实回退；`packages/agent-host/src/agent-host.test.ts` 覆盖无历史快照、队列和语音来源；`packages/live-voice-protocol/src/protocol.test.ts` 覆盖 Provider 工具及反馈编码；`apps/desktop/test/live-work-scope.test.mjs` 覆盖引用作用域／过期，`live-work-operations.test.mjs` 覆盖面板动作，`live-work-decision.test.mjs` 覆盖等待决策投影、会话作用域、有界纯文本渲染与打开绑定会话的面板操作，`live-voice-protocol/src/playback-monitor.test.ts` 覆盖本地音频信号检测；`packages/host-runtime/src/live-work/ask-answer.test.ts` 覆盖语音回答意图与路由（解决、拒绝、unknown 且绝不重发），`apps/desktop/test/spoken-answer.test.mjs` 覆盖只选既有选项的匹配、有界朗读内容与投递预算。该自动化覆盖仍不等于 W2-001—W2-096 全矩阵，也不代表真实 Provider／设备验收。
 - **状态：** 部分完成；其余场景和实机矩阵见 `docs/implementation/live-work-evidence.md`。
 
 ### E2E-LIVE-WORK-v2.1-reliability

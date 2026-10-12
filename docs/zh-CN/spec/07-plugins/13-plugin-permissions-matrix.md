@@ -57,7 +57,10 @@
 | `session.delete.own` | 高 | `pi.session.delete` | 安装时确认 | 只能回收或清除本插件导入的会话；有频率限制 |
 | `usage.read` | 中等 | `pi.usage.listTurns` | 安装时确认 | 已完成 turn 事实行的只读列举（每回合 token 计数与标识符，keyset 分页）；不含消息正文，无写路径 |
 | `agent.complete` | 高 | `pi.agent.complete` | 安装时确认 | 宿主代发一次性补全；消耗用户额度；`includeSessionContext` 还需要 `session.read` |
-| `speech.adapter.register` | 高 | `pi.speech.registerAdapter` / `unregisterAdapter` | 安装时确认 | 注册语音协议。handle 留在插件进程；HTTP 计划由宿主用绑定密钥代发且必须同 origin |
+
+`speech.adapter.register` 已在 D662 移除
+（[ADR fork-removes-voice-and-speech](../../../adr/fork-removes-voice-and-speech.md)）。
+仍声明它的 manifest 照常加载，该权限不授予任何能力。
 
 ## 2A. 权限是开关，manifest 承载范围
 
@@ -156,7 +159,6 @@ Agent，在 Plan 中不可见。主机返回 `PLUGIN_DISABLED_IN_PLAN`
 | `usage.read` | Read usage statistics | 读取用量统计 |
 | `agent.complete` | Run a one-shot completion with your models | 用你的模型发起一次补全 |
 | `composer.transform` | Transform text in the Composer | 转换输入框中的文本 |
-| `speech.adapter.register` | Register a speech adapter | 注册语音适配器 |
 | `audio.capture.background` | Use the microphone in the background | 后台使用麦克风 |
 | `audio.playback.background` | Play audio in the background | 后台播放声音 |
 | `keyboard.globalShortcut` | Register system-wide shortcuts | 注册系统级快捷键 |

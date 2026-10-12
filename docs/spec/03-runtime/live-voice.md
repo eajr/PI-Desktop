@@ -2,8 +2,9 @@
 
 ## Scope
 
-Live Voice is an optional, app-owned real-time audio path. It is separate
-from local Dictation and Host Speech, and is disabled by default. v1 supports
+Live Voice is an optional, app-owned real-time audio path, and is disabled by
+default. Local Dictation and Host Speech were removed (D662,
+[20-speech.md](20-speech.md)); Live Voice does not depend on either. v1 supports
 three explicit bindings:
 
 | Adapter | Credential owner | Transport |
@@ -14,8 +15,8 @@ three explicit bindings:
 
 The public settings value is `liveVoice: { enabled, selectedBindingId?,
 bindings }`. It contains provider IDs, model/voice choices and protocol
-profile only; it never stores credentials. Existing `voice` and `speech`
-settings retain their prior meaning. Host Core owns the persisted settings
+profile only; it never stores credentials. Stored `voice` and `speech` values
+from older builds are left in place and are not read. Host Core owns the persisted settings
 JSON and merges the Live value with unrelated settings.
 
 The voice-only Live profile does not create an Agent turn, call AgentHost or
@@ -55,7 +56,8 @@ fragment are refused.
 The PCM port exists for one prepared call, has bounded frame sizes and credits,
 and carries no credentials.
 
-Live and Dictation share a Main-process microphone lease. Local mute gates
+Live calls hold a Main-process microphone lease, one call at a time. Capture
+uses the system default input device. Local mute gates
 capture before the IPC request; Main independently rejects muted or stale
 capture epochs. Ending, renderer loss, window hide/navigation/crash, system
 suspend/lock, provider change, disable and app quit stop media and close the
@@ -175,22 +177,13 @@ picker; the next-call, model, voice and profile rows appear with the binding
 rather than as empty disabled controls. A currently active binding cannot be
 rewritten while its call is running. Turning Live Voice off ends the call.
 Provider credentials stay in the existing Provider/secret or VendorOAuth
-systems. Legacy local Dictation
-settings and its Composer entry are hidden; existing `voice` values and the
-underlying Dictation capability remain unchanged and are not deleted or rewritten
-by the UI. Old settings with no `liveVoice` value read as disabled with no
+systems. Old settings with no `liveVoice` value read as disabled with no
 bindings.
 
-When the hidden local Dictation capability loads an STT model, it releases the
-model after ten minutes in a terminal phase without a new recording. Starting a
-recording cancels a pending unload; a later recording lazily reloads the model
-from its on-disk cache. This changes idle memory use and the first-recording
-latency after a long idle period, but does not alter Dictation settings or the
-downloaded model files.
-
 Live DTOs and IPC contracts live in `packages/shared`. Pure wire parsing and
-PCM math are exported only from `@pi-desktop/voice-runtime/live`; they do not
-enter the old local transcription runtime. Electron Main remains an
+PCM math live in `packages/live-voice-protocol`
+(`@pi-desktop/live-voice-protocol`), which has no native or network
+dependency. Electron Main remains an
 orchestrator and does not transfer credential or storage ownership.
 
 ## Verification and limits
@@ -198,7 +191,7 @@ orchestrator and does not transfer credential or storage ownership.
 Automated coverage exercises PCM encoding/resampling, provider message
 parsing, owner checks, prepare/connect/mute/end, request cancellation,
 active-binding write protection, transcript bounds, reject-only delegation,
-and mutual exclusion with Dictation. Desktop UI tests and targeted Electron
+and the single-owner microphone lease. Desktop UI tests and targeted Electron
 process tests cover the user path when available. A green fixture suite does
 not certify real provider access or account entitlement.
 

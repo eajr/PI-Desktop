@@ -312,10 +312,9 @@ Settings is a **full-window page** that replaces the app sidebar + main chrome (
   Manual `/compact` remains available from the command palette for an idle
   session; the transcript shows where each compaction happened and the context
   usage inspector shows whether a checkpoint is installed.
-Speech bindings (`AppSettings.speech`) are **not a Settings surface** (ADR
-0291). The host keeps the speech capability and the `speech/*` IPC for plugins
-and for bindings that are already stored, but nothing here picks a
-transcription or speech provider, protocol, model, or voice, and search indexes
+There is no speech or dictation Settings surface. Host speech and local
+Dictation were removed (D662, ADR fork-removes-voice-and-speech); stored
+`speech` and `voice` values are left untouched and ignored, and search indexes
 no speech keys.
 
 Token usage is **not a Settings destination** (D335 / ADR 0173). Completed-turn
@@ -349,8 +348,8 @@ a usage tab.
   preparation, not to the Settings enable switch. Context sharing is a separate
   unchecked, transient next-call choice. Settings copy distinguishes the
   default voice-only call from explicitly authorized work requests.
-- Legacy Dictation and Host Speech settings remain hidden and their stored
-  values retain their meaning. No new persisted preference, IPC, provider
+- Local Dictation and Host Speech were removed (D662); their stored values
+  are ignored and left in place. No new persisted preference, IPC, provider
   fallback, or permission rule is introduced. See
   [Live Voice](../03-runtime/live-voice.md) and
   [Live Work](../03-runtime/live-work-session.md).

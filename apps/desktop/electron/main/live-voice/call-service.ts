@@ -21,7 +21,7 @@ import {
   type LiveWorkStopOperationResult,
 } from "@pi-desktop/shared";
 import { LiveWorkFeedbackScheduler, liveWorkUnselectedSessionId, type LiveWorkIntent, type LiveWorkPendingQuestion } from "@pi-desktop/host-runtime";
-import { LIVE_WORK_TOOL_NAME, parseLiveWorkArguments, type LiveWireEvent } from "@pi-desktop/voice-runtime/live";
+import { LIVE_WORK_TOOL_NAME, parseLiveWorkArguments, type LiveWireEvent } from "@pi-desktop/live-voice-protocol";
 import { LiveAuthResolver } from "./auth-resolver";
 import type { LivePcmBridge } from "./audio-port";
 import type { LiveAdapter, LiveAdapterContext, LiveResolvedAuth } from "./types";
@@ -153,7 +153,7 @@ export class LiveCallService {
     const slot = createLiveCallSlot(owner, request, this.now);
     try {
       // Reserve the process-wide capture lease synchronously with prepare so
-      // Dictation cannot begin while the renderer is opening its permission UI.
+      // no other call can claim it while the renderer opens its permission UI.
       slot.releaseMicrophone = this.deps.acquireMicrophone(slot.callId);
     } catch (error) {
       return Promise.reject(error);

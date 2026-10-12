@@ -2,7 +2,7 @@ import type { LiveBinding, LiveEndReason, LivePlaybackCursor, LiveProviderReceip
 import type { LiveWorkFeedback } from "@pi-desktop/shared";
 import type { ProviderPublic } from "@pi-desktop/shared";
 import type { ModelAuth } from "@earendil-works/pi-ai";
-import type { LiveWireEvent } from "@pi-desktop/voice-runtime/live";
+import type { LiveWireEvent } from "@pi-desktop/live-voice-protocol";
 
 export type LiveResolvedProvider = {
   provider: ProviderPublic;

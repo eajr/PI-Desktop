@@ -22,5 +22,4 @@ export * from "./extensions/index.js";
 export { startAuthenticatedProxyRelay } from "./authenticated-proxy-relay.js";
 export type { AuthenticatedProxyRelay } from "./authenticated-proxy-relay.js";
 
-export * from "./speech/index.js";
 export * from "./image-generation/index.js";

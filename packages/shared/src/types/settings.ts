@@ -7,7 +7,6 @@ import type { ContextCompactionSettings } from "./sessions.js";
 import type { Mode } from "./common.js";
 import type { GlobalPermissionMode } from "./permissions.js";
 import type { PluginMarketSource } from "./plugins.js";
-import type { SpeechSettings } from "./speech.js";
 import type { ThinkingLevel } from "./models.js";
 import type { UpdatePreference } from "./platform.js";
 import type { LiveVoiceSettings } from "./live-voice.js";
@@ -47,9 +46,7 @@ export type AppSettings = {
   updatePreference?: UpdatePreference;
   /** Last manually announced release; kept local to avoid repeating notices. */
   lastNotifiedUpdateVersion?: string;
-  /** Host speech bindings. Absent means voice actions stay disabled. */
-  speech?: SpeechSettings;
-  /** App-owned real-time voice bindings; separate from local dictation. */
+  /** App-owned real-time voice bindings. */
   liveVoice?: LiveVoiceSettings;
   defaultMode: Mode;
   /**
@@ -157,23 +154,7 @@ export type AppSettings = {
    * platforms. Absent and false mean the system manages sleep normally.
    */
   preventScreenSleep?: boolean;
-  /** Voice input settings (D-voice-runtime). */
-  voice?: VoiceInputSettings;
   onboardingDismissed: boolean;
-};
-
-export type ChineseVariant = "simplified" | "traditional-taiwan" | "traditional-hong-kong";
-
-export type VoiceInputSettings = {
-  enabled: boolean;
-  /** Microphone device ID; null means system default. */
-  deviceId: string | null;
-  /** Language codes for recognition, e.g. ["zh", "en"]. */
-  languages: string[];
-  /** Chinese output variant. */
-  chineseVariant: ChineseVariant;
-  /** Catalog model ID. Empty string means no model selected yet. */
-  modelId: string;
 };
 
 export type LinkOpenTarget = "workpanel" | "external";
