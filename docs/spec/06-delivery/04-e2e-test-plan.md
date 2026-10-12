@@ -17473,9 +17473,12 @@ host-created files. The full app's file-preview viewer is covered separately.
   passes it ephemerally to the sidecar.
   `JevClassify` appears in the Agent's deferred catalog only with a key and
   never in Plan or Goal. Closing the dialog cancels an in-flight check the same
-  way a refused key does: nothing stored, nothing enabled. The fixture receives
-  the TypeSafe System One payload and bearer header; the tool returns bounded
-  structured answers and usage.
+  way a refused key does: nothing stored, nothing enabled. Each `JevClassify`
+  call first asks host-core `tools.execute` to authorize it; the fixture is not
+  contacted until that gate allows the call, and a denied call returns a tool
+  error with no request. Host-core's `ask` card names `api.typesafe.ai` and the
+  payload size. The fixture receives the TypeSafe System One payload and bearer
+  header; the tool returns bounded structured answers and usage.
 - **Specs:** [Tools and permissions](../03-runtime/03-tools-and-permissions.md),
   [provider/model system](../03-runtime/11-provider-model-system.md),
   [secrets storage](../03-runtime/14-secrets-storage.md),

@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createJevClassifierTool } from "./jev-classifier-tool.js";
+import {
+  createJevClassifierTool,
+  type JevAuthorization,
+  type JevAuthorize,
+} from "./jev-classifier-tool.js";
 
 const API_KEY = "jev-fixture-secret-do-not-leak";
 
@@ -23,6 +27,8 @@ const params = {
     },
   },
 };
+
+const approve: JevAuthorize = async () => ({ ok: true });
 
 function successResponse(): Response {
   return new Response(
@@ -48,7 +54,7 @@ describe("JevClassify", () => {
     const fetchMock = vi.fn<typeof fetch>(async () => successResponse());
     vi.stubGlobal("fetch", fetchMock);
     try {
-      const result = await createJevClassifierTool(API_KEY).execute(
+      const result = await createJevClassifierTool(API_KEY, approve).execute(
         "call-1",
         params,
       );
@@ -89,7 +95,7 @@ describe("JevClassify", () => {
     const fetchMock = vi.fn<typeof fetch>(async () => successResponse());
     vi.stubGlobal("fetch", fetchMock);
     try {
-      const tool = createJevClassifierTool(API_KEY);
+      const tool = createJevClassifierTool(API_KEY, approve);
       const malformed = await tool.execute("call-bad", {
         ...params,
         state: { score: Number.NaN },
@@ -126,7 +132,7 @@ describe("JevClassify", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     try {
-      const pending = createJevClassifierTool(API_KEY).execute(
+      const pending = createJevClassifierTool(API_KEY, approve).execute(
         "call-abort",
         params,
         controller.signal,
@@ -143,7 +149,7 @@ describe("JevClassify", () => {
           new Response(API_KEY, { status: 401 }),
         ),
       );
-      const failed = await createJevClassifierTool(API_KEY).execute(
+      const failed = await createJevClassifierTool(API_KEY, approve).execute(
         "call-error",
         params,
       );
@@ -178,7 +184,7 @@ describe("JevClassify", () => {
       ),
     );
     try {
-      const pending = createJevClassifierTool(API_KEY).execute(
+      const pending = createJevClassifierTool(API_KEY, approve).execute(
         "call-timeout",
         params,
       );
@@ -190,6 +196,76 @@ describe("JevClassify", () => {
       expect(result.details).toMatchObject({ errorCode: "JEV_ABORTED" });
     } finally {
       timeoutSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not call TypeSafe until the host gate approves", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => successResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    let approveCall: (value: JevAuthorization) => void = () => undefined;
+    const authorize = vi.fn<JevAuthorize>(
+      () =>
+        new Promise<JevAuthorization>((resolve) => {
+          approveCall = resolve;
+        }),
+    );
+    try {
+      const pending = createJevClassifierTool(API_KEY, authorize).execute(
+        "call-gated",
+        params,
+      );
+      await vi.waitFor(() => expect(authorize).toHaveBeenCalledTimes(1));
+      expect(authorize.mock.calls[0][0]).toMatchObject({
+        toolCallId: "call-gated",
+        context: { state: params.state },
+      });
+      // Give any premature request a chance to start.
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      approveCall({ ok: true });
+      const result = await pending;
+      expect(result.isError).not.toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("makes no network call when the user denies or the gate fails", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => successResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const denied = await createJevClassifierTool(API_KEY, async () => ({
+        ok: false,
+        errorCode: "TOOL_DENIED",
+        denied: true,
+      })).execute("call-denied", params);
+      expect(denied.isError).toBe(true);
+      expect(denied.details).toMatchObject({
+        errorCode: "TOOL_DENIED",
+        denied: true,
+      });
+
+      const failed = await createJevClassifierTool(API_KEY, async () => {
+        throw new Error(`host unavailable ${API_KEY}`);
+      }).execute("call-gate-error", params);
+      expect(failed.isError).toBe(true);
+      expect(failed.details).toMatchObject({
+        errorCode: "JEV_AUTHORIZATION_FAILED",
+      });
+      expect(JSON.stringify(failed)).not.toContain(API_KEY);
+
+      const controller = new AbortController();
+      const cancelled = await createJevClassifierTool(API_KEY, async () => {
+        controller.abort();
+        return { ok: true };
+      }).execute("call-cancelled", params, controller.signal);
+      expect(cancelled.details).toMatchObject({ errorCode: "JEV_ABORTED" });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
       vi.unstubAllGlobals();
     }
   });

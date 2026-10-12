@@ -1115,6 +1115,11 @@ pub async fn execute_tool_with_path_access(
         // Authorize the desktop-owned image request through the normal host gate.
         // Only the trusted desktop runner performs the external call.
         "GenerateImages" => Ok(serde_json::json!({ "authorized": true })),
+        // Third-party egress (JevClassify): host-core only authorizes; the
+        // caller sends the request after this allow result.
+        name if crate::permissions::egress::is_third_party_egress_tool(name) => {
+            Ok(serde_json::json!({ "authorized": true }))
+        }
         "Read" | "Glob" | "Grep" | "Write" | "Edit" => {
             run_file_tool(
                 workspace,
