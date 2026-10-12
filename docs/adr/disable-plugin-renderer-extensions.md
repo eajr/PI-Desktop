@@ -48,13 +48,14 @@ turns the feature off.
 4. Plugins that declare a renderer entry still install, keep their recorded
    `renderer.extension` grant (host-core requires every declared permission
    at install), and load all their other contributions. The grant does
-   nothing. The install and development reviews and the marketplace detail
-   sheet show "Renderer extensions are disabled in this build" in place of
+   nothing. The install and development reviews show "Renderer extensions
+   are disabled in this build" in place of
    the permission's usual explanation. An installed plugin's details show the
    same notice.
-5. No bundled first-party plugin uses a renderer extension (`pi.browser` and
-   `pi.file-manager` declare neither `manifest.renderer` nor the
-   permission), so no allowlist is needed. Only the example
+5. No bundled first-party plugin uses a renderer extension (`pi.browser`
+   declares neither `manifest.renderer` nor the permission; the bundled
+   `pi.file-manager` is gone with ADR fork-removes-plugin-marketplace), so
+   no allowlist is needed. Only the example
    `examples/plugins/ui-slots-lab` and third-party or development plugins
    lose the feature.
 
