@@ -293,6 +293,25 @@ export function registerSkillsIpc({
     },
   );
 
+  /**
+   * Approve one project skill's reviewed document. The renderer echoes the
+   * hash of the document it displayed, so a file edited while the review was
+   * open is refused by host-core instead of approving text the user never saw.
+   */
+  handle(
+    IPC.invoke.skillApprove,
+    async (payload: { id: string; projectPath: string; contentHash: string }) => {
+      if (!host) throw new Error("host unavailable");
+      const res = await host.call<{ skill: UserSkillRecord | null }>("skills.approve", {
+        id: payload?.id,
+        projectPath: payload?.projectPath,
+        contentHash: payload?.contentHash,
+      });
+      sendToRenderer(IPC.event.pluginChanged, { reason: "skill" });
+      return res;
+    },
+  );
+
   handle(
     IPC.invoke.skillSetScope,
     async (payload: { id: string; scope: ActivationScope }) => {

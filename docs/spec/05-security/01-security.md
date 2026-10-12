@@ -277,16 +277,22 @@ code merely because the project was opened.
   during review is refused. Electron Main's MCP runtime independently refuses
   to connect an unapproved project record (ADR project-mcp-server-approval,
   D659). Global servers in the user's home directory are unaffected.
+- **Skills** (`<project>/.agents/skills`) are prompt content: their name and
+  description enter the skill catalog and composer slash commands, and the
+  `Skill` tool returns their body. A project skill reaches none of these until
+  the user approves a SHA-256 of the exact skill document in Settings > Agent >
+  Skills, after reading its name, description and body. The approval lives in
+  `<data>/agent-capabilities/skills.json`; an edited document reads as
+  "changed" and leaves the catalog until re-approved, `skills.read` refuses a
+  document that changed between scan and read, and both the Desktop and the
+  headless Pi Host `Skill` tools refuse a skill that is not active for the
+  session's project (D661). Sibling resources of a directory skill are not part
+  of the approval; the runtime never injects them, and the model reaches them
+  only through the ordinary permission-checked file tools. Global skills are
+  unaffected.
 - **Native Pi resources** (`.pi/` settings and extensions, `.agents/skills`
   read by the Pi SDK) load only for a cwd the user trusted in Pi's own trust
   store; see §12.
-- **Residual risk — project skills.** Skill documents under
-  `<project>/.agents/skills` are still listed in the session's skill catalog by
-  default (name and description) and their body is loaded on demand through the
-  `Skill` tool. They execute no code by themselves, but they are an untrusted
-  prompt-injection surface that can steer the model toward tool calls; those
-  calls still pass the normal permission path. Content-bound approval for
-  project skills is a tracked follow-up.
 
 ## 5. Command execution
 
@@ -434,6 +440,7 @@ host-core. They do not change the loopback-only rule above.
 | Malicious local plugin | declared permissions, no secret access, process isolation tracked post-MVP (ADR 0008) |
 | Agent- or repo-written launcher opened from the UI | `openPathOrReveal` reveals launchable files instead of opening them (§2a) |
 | Cloned repository ships a project MCP server | content-hash-bound approval before any spawn/connect; changed file needs re-approval; Main refuses unapproved project records (§4.4) |
+| Cloned repository ships a prompt-injecting project skill | content-hash-bound approval before catalog, slash-command or `Skill` tool exposure; changed document needs re-approval (§4.4) |
 | Skill market SSRF via user source URL | public-HTTPS classifier + DNS + per-hop redirect checks in main; renderer CSP forbids the fetch (ADR 0243) |
 
 ## 11. Security acceptance gates
@@ -458,6 +465,9 @@ host-core. They do not change the loopback-only rule above.
 11. A project MCP server with no approval, or whose execution-relevant content
     changed since approval, is never spawned or connected (host-core unit tests
     and `apps/desktop/test/user-mcp.test.mjs`)
+12. A project skill with no approval, or whose document changed since approval,
+    is absent from the skill catalog and refused by the `Skill` tool (host-core
+    `user_skills` approval tests and `apps/pi-host/src/skill-tool.test.ts`)
 
 ## 12. Native Pi session boundary (ADR 0254)
 

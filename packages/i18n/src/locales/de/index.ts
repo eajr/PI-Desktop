@@ -1137,6 +1137,15 @@ sklm: {
       "approve": "Freigeben und aktivieren",
       "approved": "{{name}} freigegeben",
     },
+    "skillApproval": {
+      "pending": "Freigabe erforderlich",
+      "changed": "Seit Freigabe geändert",
+      "pendingNotice": "Dieser Skill stammt aus dem Ordner .agents/skills des Projekts. Der Agent sieht ihn erst, wenn du seinen genauen Text geprüft und freigegeben hast.",
+      "changedNotice": "Der Text dieses Skills wurde nach deiner Freigabe geändert. Der Agent sieht ihn erst nach einer erneuten Prüfung.",
+      "show": "Text prüfen",
+      "approve": "Freigeben und aktivieren",
+      "approved": "{{name}} freigegeben",
+    },
     "mcpMarket": {
       browse: "Market",
       back: "Meine Server",

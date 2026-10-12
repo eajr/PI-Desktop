@@ -377,7 +377,7 @@ Each ADR includes:
 | 0325 | [Smooth Windows main-window corner compositing](0325-windows-window-corner-compositing.md) | Proposed (implementation candidate; Windows E2E pending) |
 | 0326 | [Verified SSH Host installation and daily startup](0326-verified-ssh-host-installation.md) | Accepted for experimental implementation (amends ADR 0292; Linux SSH qualification and publication pending) |
 | 0327 | [Click-to-load remote media in rendered Markdown](0327-click-to-load-remote-markdown-media.md) | Accepted |
-| project-mcp-server-approval | [Project MCP servers run only after content-bound approval](project-mcp-server-approval.md) | Accepted (D659; amends ADR 0056, ADR 0112, D193) |
+| project-mcp-server-approval | [Project MCP servers run only after content-bound approval](project-mcp-server-approval.md) | Accepted (D659, extended to project skills by D661; amends ADR 0056, ADR 0112, D193) |
 | 0328 | [Confirm SSH host keys instead of trusting on first use](0328-ssh-host-key-confirmation.md) | Accepted (amends ADR 0292) |
 | plugin-fetch-redirect-policy | [Host-enforced plugin fetch redirect policy](plugin-fetch-redirect-policy.md) | Accepted (implementation candidate for #1475) |
 | external-mcp-import-secret-custody | [Keep external MCP import secrets in Electron main](external-mcp-import-secret-custody.md) | Accepted |

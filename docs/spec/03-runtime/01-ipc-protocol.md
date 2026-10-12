@@ -1628,8 +1628,26 @@ one-liner.
 - `skills.read({ id, level?, projectPath? })` → `{ skill, body }`
 - `skills.remove({ id, level?, projectPath? })`
 - `skills.setEnabled({ id, enabled, level, projectPath? })`
+- `skills.approve({ id, projectPath, contentHash })` → `{ skill }` approves and
+  switches on one project skill (D661). `contentHash` must equal the record's
+  current hash or the call fails with `SKILL_INVALID`. Desktop IPC:
+  `pi-desktop/skill/approve`.
 - `skills.disabledBuiltins()` → `{ disabled: string[] }`
 - `skills.setBuiltinEnabled({ id, enabled })` → `{ id, enabled }`
+
+Project skill records additionally carry `contentHash` (SHA-256 of the raw
+skill document) and `approval` (`approved` | `pending` | `changed`). A project
+skill is `enabled`, and so listed by `skills.active`, only when its switch is on
+and its approval matches `contentHash`; a project skill with no stored state is
+`pending`. `skills.setEnabled({ enabled: true })` on an unapproved project skill
+fails with `SKILL_INVALID`, and `skills.read` fails with `SKILL_INVALID` if a
+project document changed between the scan and the read. `skills.create` and
+`skills.import` approve the project skill they write (unless saved disabled);
+`skills.update` keeps an approved skill approved and leaves a pending one
+pending; a transfer into a project approves the arriving skill only if it was
+active at its source. Global records carry neither field. Approvals live in the
+`approvals` map of `<data>/agent-capabilities/skills.json` and are excluded
+from configuration-sync payloads.
 
 Built-in skill activation is global and defaults to enabled. Host stores only
 disabled IDs in `<data>/agent-capabilities/skill-builtins.json`, separately

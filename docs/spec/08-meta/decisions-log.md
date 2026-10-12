@@ -7684,7 +7684,8 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - Native Pi continuation passes Pi's stored project trust decision as
   `projectTrusted` instead of `true`.
 - Project skills keep default-on catalog listing; content-bound approval for
-  them is a tracked follow-up (security §4.4 residual risk).
+  them is a tracked follow-up (security §4.4 residual risk). Superseded by
+  D661.
 - Covered by host-core `mcp_servers` tests, `apps/desktop/test/user-mcp.test.mjs`,
   `apps/desktop/test/mcp-project-approval.test.mjs`, and
   `packages/agent-runtime/src/native-pi-session.test.ts`. See
@@ -7710,3 +7711,26 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `remote-host-key-confirm-ui.test.mjs`, and
   E2E-REMOTE-HOST-ssh-host-key-confirmation. See ADR 0328 and
   `05-security/02-remote-control-security.md` §3.4.
+
+## 2026-10-12 — Project skills need content-bound approval (D661)
+
+- D661 extends D659 to project skills (`<project>/.agents/skills`): a project
+  skill reaches the skill catalog, composer slash commands and the `Skill` tool
+  only after the user approves a SHA-256 of its raw skill document. Approvals
+  live in the `approvals` map of `<data>/agent-capabilities/skills.json`; a
+  project skill with no stored state reads as `pending`, an explicit off stays
+  off, and a changed document reads as `changed` until re-approved. Sibling
+  resources of a directory skill are not hashed because the runtime never
+  injects them. Global skills are unchanged.
+- `skills.approve({ id, projectPath, contentHash })` approves the hash the user
+  was shown and refuses a stale one; `skills.setEnabled(true)` refuses an
+  unapproved project skill; `skills.read` refuses a project document that
+  changed between scan and read. Skills the user creates or imports through the
+  app are approved as written. The headless Pi Host `Skill` tool now refuses a
+  skill that is not active for the session's project, as Desktop's already did.
+- Removes the project-skill residual risk recorded by D659 (security §4.4).
+- Covered by host-core `user_skills` approval tests,
+  `apps/pi-host/src/skill-tool.test.ts`, and
+  `apps/desktop/test/skill-project-approval.test.mjs`. See
+  `docs/adr/project-mcp-server-approval.md` and
+  E2E-SKILL-project-skill-requires-approval.

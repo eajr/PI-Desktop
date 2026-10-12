@@ -1130,6 +1130,15 @@ sklm: {
       approve: "核准並啟用",
       approved: "已核准 {{name}}",
     },
+    skillApproval: {
+      pending: "需要核准",
+      changed: "核准後已變更",
+      pendingNotice: "此技能來自專案的 .agents/skills 資料夾。在你審查並核准其確切內容之前，智慧代理不會看到它。",
+      changedNotice: "此技能的內容在你核准後已變更。重新審查之前智慧代理不會看到它。",
+      show: "檢視內容",
+      approve: "核准並啟用",
+      approved: "已核准 {{name}}",
+    },
     mcpProjectSubtitle: "僅在 {{project}} 中生效。",
     mcpEmpty: "此目錄中沒有 MCP 伺服器",
     mcpMarket: {

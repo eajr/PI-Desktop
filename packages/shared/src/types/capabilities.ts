@@ -81,7 +81,10 @@ export type McpServerRecord = {
   updatedAt: string;
 };
 
-export type McpApproval = "approved" | "pending" | "changed";
+/** Trust state of a project-level capability document (MCP server or skill). */
+export type CapabilityApproval = "approved" | "pending" | "changed";
+
+export type McpApproval = CapabilityApproval;
 
 /** Fields accepted when creating or editing a user MCP server. */
 export type McpServerInput = {
@@ -158,6 +161,15 @@ export type UserSkillRecord = {
   path: string;
   /** Bytes of the document, so the list can flag one that grew past the cap. */
   sizeBytes: number;
+  /** Project records only: hash of the `SKILL.md` bytes. Echo it to `skillApprove`. */
+  contentHash?: string;
+  /**
+   * Project records only. A project skill came with the repository and is
+   * prompt content, so it stays out of the catalog, the prompt and the `Skill`
+   * tool until the user approves this exact document; `changed` means the file
+   * was edited after an earlier approval.
+   */
+  approval?: CapabilityApproval;
   createdAt: string;
   updatedAt: string;
 };

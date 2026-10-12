@@ -1,9 +1,10 @@
 use crate::activation::ActivationScope;
 use crate::agent_capabilities::{
-    capability_dir, capability_id, copy_directory_tree, display_name_candidate, file_timestamp,
-    move_capability_file, normalize_project_path, parse_front_matter, path_stem_for_id,
-    set_moved_capability_state, slugify, sorted_files, suffixed_capability_id, valid_capability_id,
-    CapabilityLevel, CapabilityState, CapabilityTarget, MAX_ID_SUFFIX,
+    capability_dir, capability_id, content_hash, copy_directory_tree, display_name_candidate,
+    file_timestamp, move_capability_file, normalize_project_path, parse_front_matter,
+    path_stem_for_id, set_moved_capability_state, slugify, sorted_files, suffixed_capability_id,
+    valid_capability_id, CapabilityLevel, CapabilityState, CapabilityTarget, ContentApproval,
+    MAX_ID_SUFFIX,
 };
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -49,6 +50,14 @@ pub struct UserSkillRecord {
     pub path: String,
     #[serde(default)]
     pub size_bytes: u64,
+    /// Project records only: hash of the `SKILL.md` document as read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
+    /// Project records only: whether the user approved this exact document.
+    /// A project skill reaches the catalog, the prompt and the `Skill` tool
+    /// only while this is `Approved`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<ContentApproval>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -753,6 +762,20 @@ impl UserSkillRegistry {
             &moved.id,
             source.enabled,
         )?;
+        // A skill that was active where it came from is one the user already
+        // trusts; moving it into a project must not demote it to "pending".
+        // One that was off or unapproved arrives unapproved.
+        if to.level == CapabilityLevel::Project && source.enabled {
+            if let Some(hash) = moved.content_hash.as_deref() {
+                self.state.approve(
+                    SKILL_KIND,
+                    CapabilityLevel::Project,
+                    &moved.id,
+                    to.project_path.as_deref(),
+                    hash,
+                )?;
+            }
+        }
         self.find(&moved.id, Some(to.level), to.project_path.as_deref())?
             .ok_or_else(|| anyhow::anyhow!("SKILL_INVALID: moved skill was not found"))
     }
@@ -839,9 +862,28 @@ impl UserSkillRegistry {
                 continue;
             }
             let scope = scope_for(level, owner_project_path.as_deref());
-            let enabled = self
+            let switched_on = self
                 .state
                 .enabled(SKILL_KIND, level, &id, effective_project);
+            // A global document lives in the user's own home directory. A
+            // project document came with the repository and is prompt content,
+            // so it is active only once the user approved these exact bytes.
+            let (content_hash, approval) = match level {
+                CapabilityLevel::Global => (None, None),
+                CapabilityLevel::Project => {
+                    let hash = content_hash(raw.as_bytes());
+                    let approval = self.state.approval_status(
+                        SKILL_KIND,
+                        level,
+                        &id,
+                        effective_project,
+                        &hash,
+                    );
+                    (Some(hash), Some(approval))
+                }
+            };
+            let enabled =
+                switched_on && approval.is_none_or(|value| value == ContentApproval::Approved);
             let description = front
                 .get("description")
                 .map(|value| clip(value, MAX_DESCRIPTION_CHARS))
@@ -858,6 +900,8 @@ impl UserSkillRegistry {
                 source: "imported".into(),
                 path: path.to_string_lossy().to_string(),
                 size_bytes: raw.len() as u64,
+                content_hash,
+                approval,
                 created_at: updated_at.clone(),
                 updated_at,
             });
@@ -976,6 +1020,7 @@ impl UserSkillRegistry {
             directory.join(format!("{id}.md"))
         };
         fs::write(&path, &document).with_context(|| format!("write {}", path.display()))?;
+        self.approve_authored(level, &id, project_path.as_deref(), input.enabled)?;
         if input.enabled == Some(false) {
             self.state
                 .set_enabled(SKILL_KIND, level, &id, project_path.as_deref(), false)?;
@@ -1165,6 +1210,7 @@ impl UserSkillRegistry {
         project_path: Option<&str>,
         enabled: Option<bool>,
     ) -> Result<UserSkillRecord> {
+        self.approve_authored(level, id, project_path, enabled)?;
         if enabled == Some(false) {
             self.state
                 .set_enabled(SKILL_KIND, level, id, project_path, false)?;
@@ -1205,15 +1251,19 @@ impl UserSkillRegistry {
         if document.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
         }
-        fs::write(&record.path, document)?;
+        fs::write(&record.path, &document)?;
+        let record_level = record
+            .level
+            .as_deref()
+            .and_then(|value| CapabilityLevel::parse(Some(value)).ok())
+            .unwrap_or(CapabilityLevel::Global);
+        self.keep_edit_approved(&record, document.as_bytes())?;
+        // The switch is stored even for a skill awaiting review (a config-sync
+        // replay carries it); the scan keeps that skill inactive regardless.
         if let Some(enabled) = input.enabled {
             self.state.set_enabled(
                 SKILL_KIND,
-                record
-                    .level
-                    .as_deref()
-                    .and_then(|value| CapabilityLevel::parse(Some(value)).ok())
-                    .unwrap_or(CapabilityLevel::Global),
+                record_level,
                 id,
                 record.project_path.as_deref(),
                 enabled,
@@ -1234,6 +1284,16 @@ impl UserSkillRegistry {
         let raw = fs::read_to_string(&record.path)?;
         if raw.len() > MAX_SKILL_BYTES {
             bail!("SKILL_INVALID: document exceeds {MAX_SKILL_BYTES} bytes");
+        }
+        // The record's approval describes the bytes the scan read. A project
+        // document rewritten since must not be served under that verdict, or
+        // the `Skill` tool could load text the user never approved.
+        if record
+            .content_hash
+            .as_deref()
+            .is_some_and(|hash| hash != content_hash(raw.as_bytes()))
+        {
+            bail!("SKILL_INVALID: skill \"{id}\" changed while it was read; try again");
         }
         let (_, body) = parse_front_matter(&raw);
         Ok(Some((record, body)))
@@ -1326,6 +1386,7 @@ impl UserSkillRegistry {
             .map(|value| CapabilityLevel::parse(Some(value)))
             .transpose()?
             .unwrap_or(CapabilityLevel::Global);
+        self.ensure_approved_to_enable(&record, enabled)?;
         self.state.set_enabled(
             SKILL_KIND,
             record_level,
@@ -1362,11 +1423,14 @@ fn scope_for(level: CapabilityLevel, project_path: Option<&str>) -> ActivationSc
     }
 }
 
+mod approval;
 mod package_sync;
 /// Package bounds are asserted in their own module: `tests.rs` is close to the
 /// rust file-size limit, and these tests share one fixture.
 #[cfg(test)]
 mod package_tests;
 
+#[cfg(test)]
+mod approval_tests;
 #[cfg(test)]
 mod tests;

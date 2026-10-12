@@ -199,6 +199,9 @@ fn capture_skills(
                     "sizeBytes",
                     "createdAt",
                     "updatedAt",
+                    // Approval is this device's trust decision, never portable.
+                    "contentHash",
+                    "approval",
                 ],
             );
             let project_scope = record

@@ -959,6 +959,15 @@ export const ptBR = {
       approve: "Aprovar e ativar",
       approved: "{{name}} aprovado",
     },
+    skillApproval: {
+      pending: "Requer aprovação",
+      changed: "Alterado desde a aprovação",
+      pendingNotice: "Esta skill vem da pasta .agents/skills do projeto. O agente não a verá até você revisar e aprovar o texto exato.",
+      changedNotice: "O texto desta skill mudou depois da sua aprovação. O agente não a verá até você revisá-la novamente.",
+      show: "Revisar texto",
+      approve: "Aprovar e ativar",
+      approved: "{{name}} aprovada",
+    },
     mcpProjectSubtitle: "Ativo apenas em {{project}}.",
     mcpEmpty: "Nenhum servidor MCP nesta pasta",
     mcpMarket: {

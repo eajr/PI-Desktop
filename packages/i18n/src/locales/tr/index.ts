@@ -1139,6 +1139,15 @@ sklm: {
       approve: "Onayla ve etkinleştir",
       approved: "{{name}} onaylandı",
     },
+    skillApproval: {
+      pending: "Onay gerekiyor",
+      changed: "Onaydan sonra değişti",
+      pendingNotice: "Bu beceri projenin .agents/skills klasöründen geliyor. Tam metnini inceleyip onaylayana kadar ajan onu görmez.",
+      changedNotice: "Bu becerinin metni onayınızdan sonra değişti. Yeniden incelenene kadar ajan onu görmez.",
+      show: "Metni incele",
+      approve: "Onayla ve etkinleştir",
+      approved: "{{name}} onaylandı",
+    },
     mcpProjectSubtitle: "Yalnızca {{project}} içinde etkin.",
     mcpEmpty: "Bu klasörde MCP sunucusu yok",
     mcpMarket: {
