@@ -923,27 +923,6 @@ identify the platform validation still needed.
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
   each release (run only in a capable environment when this surface changes)
 
-#### E2E-212: GitHub Release starts the CNB mirror pipeline
-
-- **Preconditions**: Repository secret `CNB_MIRROR_TOKEN` is configured on
-  `vastsa/PI-Desktop`; the CNB pipeline at `aixk/Pi-Desktop` listens for
-  `api_trigger_mirror`; a GitHub Release tag such as `vX.Y.Z` exists with
-  uploaded artifacts.
-- **Steps**: 1) Publish or edit that GitHub Release, or dispatch
-  `mirror-to-cnb.yml` with the same tag. 2) Inspect the Actions log for the
-  resolved tag and the POST to `api.cnb.cool`. 3) Confirm the CNB pipeline
-  starts with `MIRROR_TAGS` equal to that tag.
-- **Expected**: The job runs only on `vastsa/PI-Desktop`. Manual dispatch
-  without a `vX.Y.Z` tag fails before calling CNB. A missing
-  `CNB_MIRROR_TOKEN` fails closed. The JSON body is built with `jq` (not
-  YAML string interpolation). GitHub Release artifacts and updater feeds are
-  unchanged; CNB is a mirror of the same tag.
-- **Specs linked**: `06-delivery/06-release-runbook.md`
-- **Acceptance**: Quality (release mirroring)
-- **Milestone**: M6+
-- **Status**: Source-contract covered (`ci-workflow.test.mjs`); live CNB
-  start remains operator validation (run only in a capable environment when this surface changes)
-
 ### Boot & Healthcheck
 
 #### E2E-001: App launches and shows main window
@@ -9789,7 +9768,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | M2 (IME slash alias) | E2E-255 |
 | M5 (Skill residency) | E2E-254 |
 | M6 | E2E-104, E2E-105, E2E-106, E2E-107, E2E-108, E2E-109, E2E-110, E2E-111, E2E-112, E2E-113, E2E-114, E2E-115, E2E-116, E2E-117, E2E-118, E2E-119, E2E-120, E2E-103, E2E-172 |
-| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-SETTINGS-inline-capability-imports, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-212, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-259, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
+| M6+ | E2E-121, E2E-122, E2E-148, E2E-150, E2E-151, E2E-154, E2E-155, E2E-158, E2E-159, E2E-160, E2E-161, E2E-162, E2E-163, E2E-166, E2E-168, E2E-173, E2E-174, E2E-176, E2E-179, E2E-196a, E2E-196b, E2E-196c, E2E-198, E2E-199, E2E-200, E2E-202, E2E-203, E2E-205, E2E-209, E2E-SETTINGS-inline-capability-imports, E2E-210, E2E-UPDATE-preference-and-once-only-reminder, E2E-213, E2E-214, E2E-215, E2E-216, E2E-217, E2E-218, E2E-259, E2E-219, E2E-257, E2E-SUBAGENT-settlement-updates-before-parent-poll, E2E-PLUGIN-fs-root-follows-the-calling-session, E2E-SUBAGENT-resume-a-settled-delegation |
 | M6+ (Session Orchestrator) | E2E-PLUGIN-session-orchestrator-real-workers |
 | M6+ (Selected model order) | E2E-MODEL-selected-order-persists |
 | M6+ (MCP server timeout override) | E2E-261 |

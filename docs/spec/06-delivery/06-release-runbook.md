@@ -284,30 +284,7 @@ Deployments are disabled in `docs/vercel.json`, so changes to documentation
 sources do not automatically update the production site. Deployments must be
 initiated manually in Vercel when required.
 
-### 4.5 CNB mirror trigger
-
-After `softprops/action-gh-release` publishes or updates a GitHub Release,
-`.github/workflows/mirror-to-cnb.yml` starts the CNB pipeline at
-`aixk/Pi-Desktop`. GitHub Release remains the canonical artifact source; CNB
-is a copy of the same tag for users who pull from
-https://cnb.cool/aixk/Pi-Desktop.
-
-The job:
-
-- runs only on `vastsa/PI-Desktop`
-- fires on `release` `published` / `edited`, and on `workflow_dispatch` with
-  an explicit tag such as `v0.14.6`
-- sends event `api_trigger_mirror` and `MIRROR_TAGS` set to that tag
-- uses repository secret `CNB_MIRROR_TOKEN` (already configured) and fails
-  closed if the secret is empty
-- builds the JSON body with `jq` so a missing tag cannot produce an empty
-  `MIRROR_TAGS` value on a manual run
-
-Re-running the workflow for the same tag is safe if the CNB pipeline is
-idempotent. It does not rebuild desktop artifacts and does not change
-electron-updater feeds.
-
-### 4.6 GitHub Actions secrets for macOS signing
+### 4.5 GitHub Actions secrets for macOS signing
 
 Create these under GitHub → repository `vastsa/PI-Desktop` → Settings →
 Secrets and variables → Actions. Never commit the p12, password, Apple ID, or
@@ -330,7 +307,7 @@ base64 -i developer-id-application.p12 | pbcopy
 On Linux use `base64 -w0 developer-id-application.p12`. Files that must never
 enter git: `*.p12`, `*.cer`, `*.p8`, `*.mobileprovision`.
 
-### 4.7 macOS signing observability and timeouts
+### 4.6 macOS signing observability and timeouts
 
 `electron-builder` prints one line before signing — `signing
 file=release/mac-arm64/PI-Desktop.app platform=darwin type=distribution
