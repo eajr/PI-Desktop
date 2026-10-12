@@ -14904,6 +14904,40 @@ browser milestones are scheduled.
   `apps/desktop/test/remote-device-repair.test.mjs`.
 
 
+#### E2E-REMOTE-HOST-ssh-host-key-confirmation
+
+- **Preconditions**: Settings → Remote Hosts is available. A Linux test machine
+  runs `sshd` and is absent from `~/.ssh/known_hosts` and from the app's
+  `<dataDir>/ssh_known_hosts`. A second machine is already listed in the user's
+  `~/.ssh/known_hosts`. The test operator can read the first machine's host key
+  fingerprint locally (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`).
+- **Steps**: 1) Install over SSH to the first machine (key or password mode).
+  2) Compare the shown fingerprint with the server's and press Cancel.
+  3) Install again and press "Trust and install". 4) Quit, relaunch and let the
+  host reconnect. 5) Install to the second machine. 6) Regenerate the first
+  machine's host key (or point its name at a different `sshd`) and reconnect
+  it; then try a fresh install to it. 7) Submit a bootstrap request whose host
+  is `-oProxyCommand=…` or contains a space through the IPC channel directly.
+- **Expected**: Step 1 shows a confirmation with host, port, key type and the
+  `SHA256:` fingerprint, focused on Cancel, before any remote command runs or a
+  password is sent (the server logs show no authentication attempt). Cancel
+  records nothing and leaves the form editable. Trust installs and pairs, and
+  the key appears only in `<dataDir>/ssh_known_hosts` (`0600`), never in
+  `~/.ssh/known_hosts`. The relaunch reconnects with no prompt. The second
+  machine installs with no prompt. In step 6 reconnect fails with a "host key
+  changed" message, the host shows "action required", the install is refused
+  the same way, and no option accepts the new key. Step 7 is refused with
+  `INVALID_ARGUMENT` before any `ssh` process starts. Every `ssh` argv carries
+  `StrictHostKeyChecking=yes` and `--` before the destination.
+- **Specs linked**: `05-security/02-remote-control-security.md` §3.4 (gate 22),
+  `02-architecture/05-remote-agent-control.md` §5.2, ADR 0328
+- **Acceptance**: Security, D (surfaces)
+- **Milestone**: Post-MVP (rollout R2b)
+- **Status**: Draft; remote harness with a Linux SSH target required. Covered
+  offline by `apps/desktop/test/remote-host-ssh-host-keys.test.mjs` (argv,
+  fingerprints, approve/decline/mismatch/changed, injection) and
+  `apps/desktop/test/remote-host-key-confirm-ui.test.mjs` (renderer flow).
+
 #### E2E-REMOTE-HOST-settings-compact-inventory
 
 - **Preconditions**: The desktop Settings window can open. No paired remote

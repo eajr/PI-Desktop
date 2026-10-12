@@ -29,6 +29,14 @@ import { pipeline } from "node:stream/promises";
 import { ErrorCodes } from "@pi-desktop/shared";
 import { redactBootstrapOutput } from "./pi-host-bootstrap-script.js";
 import { createSshAskpass, type SshAskpassMaterial } from "./ssh-askpass.js";
+import {
+  ensureHostKeyTrusted,
+  hostKeyChangedError,
+  hostKeyUnknownError,
+  isHostKeyChangedDiagnostic,
+  isHostKeyUnknownDiagnostic,
+  strictHostKeyArgs,
+} from "./ssh-host-keys.js";
 
 /** Where to reach a machine over SSH. */
 export type SshTarget = {
@@ -77,6 +85,15 @@ export interface SshTransport {
     remotePort: number;
     timeoutMs?: number;
   }): Promise<SshForward>;
+  /**
+   * Make sure the host key is trusted before the first authenticated
+   * connection (`ssh-host-keys.ts`). Throws `SSH_HOST_KEY_UNKNOWN` with the
+   * presented fingerprints unless every one of them is in `approved`, and
+   * `SSH_HOST_KEY_CHANGED` when the key contradicts a trusted one. Optional
+   * because every connection already fails closed on an unknown key; this is
+   * only how a user-approved key gets recorded.
+   */
+  trustHostKey?(approved: readonly string[]): Promise<void>;
   /** Kill anything still running. Safe to call twice. */
   dispose(): void;
 }
@@ -89,6 +106,12 @@ export type SystemSshTransportOptions = {
   binary?: string;
   /** Extra `-o` options appended after the ones this module always sets. */
   extraOptions?: string[];
+  /**
+   * App-managed known_hosts file, consulted before the user's own files and
+   * the only one the app ever writes. Without it only the user's files are
+   * consulted and no host key can be recorded.
+   */
+  knownHostsFile?: string;
   log?: (level: "info" | "warn", message: string, data?: unknown) => void;
 };
 
@@ -113,7 +136,8 @@ function lastSshDiagnostic(stderr: string): string {
 /**
  * Reject a value that would be read as an `ssh` option rather than as a
  * destination. `host` is passed as its own argv entry, so a leading `-` is the
- * only way it can influence the command line (`-oProxyCommand=…`).
+ * only way it can influence the command line (`-oProxyCommand=…`). Control
+ * characters are refused too: no SSH value legitimately carries a line break.
  */
 export function assertSshArgument(value: string, field: string): string {
   const trimmed = value.trim();
@@ -123,11 +147,39 @@ export function assertSshArgument(value: string, field: string): string {
   if (trimmed.startsWith("-")) {
     throw fail(`${field} must not start with '-'`, ErrorCodes.INVALID_ARGUMENT, { field });
   }
+  if (/[\u0000-\u001f\u007f]/.test(trimmed)) {
+    throw fail(`${field} must not contain control characters`, ErrorCodes.INVALID_ARGUMENT, { field });
+  }
   return trimmed;
 }
 
-/** The argv `ssh` receives, minus the final command. */
-export function sshCommonArgs(target: SshTarget): string[] {
+/**
+ * Stricter check for the host name and login user, which form the
+ * `user@host` destination: on top of {@link assertSshArgument}, no whitespace
+ * anywhere. An identity file path may legitimately contain a space and keeps
+ * the looser rule, because it travels as its own `-i` argv entry.
+ */
+export function assertSshDestinationField(value: string, field: string): string {
+  const trimmed = assertSshArgument(value, field);
+  if (/\s/.test(trimmed)) {
+    throw fail(`${field} must not contain whitespace`, ErrorCodes.INVALID_ARGUMENT, { field });
+  }
+  return trimmed;
+}
+
+function assertSshPort(port: number): number {
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw fail("port must be an integer between 1 and 65535", ErrorCodes.INVALID_ARGUMENT, { field: "port" });
+  }
+  return port;
+}
+
+/**
+ * The options `ssh` receives, before any per-call flags and the `--`
+ * separator. Destination fields are re-validated here, at the one place they
+ * become argv, whatever path they arrived by.
+ */
+export function sshOptionArgs(target: SshTarget, options: { knownHostsFile?: string } = {}): string[] {
   const password = target.password !== undefined;
   const args = [
     // Fail instead of prompting when there is no secret to answer with: there
@@ -135,9 +187,11 @@ export function sshCommonArgs(target: SshTarget): string[] {
     // askpass helper instead, which is the only reason BatchMode is relaxed.
     "-o",
     password ? "BatchMode=no" : "BatchMode=yes",
-    // Trust-on-first-use, as `ssh` itself offers interactively.
-    "-o",
-    "StrictHostKeyChecking=accept-new",
+    // Never trust on first use silently: an unknown or changed key fails, and
+    // a new host is only trusted after the user confirms its fingerprint
+    // (`ssh-host-keys.ts`). The app-managed file comes before the user's own
+    // known_hosts so both are honoured and only the app's is ever written.
+    ...strictHostKeyArgs(options.knownHostsFile),
     "-o",
     "ConnectTimeout=15",
     // A forward that cannot be set up must not leave a half-open session.
@@ -153,11 +207,38 @@ export function sshCommonArgs(target: SshTarget): string[] {
     // Settings replaces a key; users with both pick key mode.
     args.push("-o", "NumberOfPasswordPrompts=1", "-o", "PubkeyAuthentication=no");
   }
-  if (target.port !== undefined) args.push("-p", String(target.port));
-  if (target.identityFile) args.push("-i", target.identityFile);
-  const user = target.user?.trim();
-  args.push(user ? `${user}@${target.host}` : target.host);
+  if (target.port !== undefined) args.push("-p", String(assertSshPort(target.port)));
+  if (target.identityFile) args.push("-i", assertSshArgument(target.identityFile, "identityFile"));
   return args;
+}
+
+/**
+ * `--` plus the destination. `--` ends option parsing, so even a value that
+ * slipped past validation is read as a host, never as a flag; everything after
+ * it is the remote command.
+ */
+export function sshDestinationArgs(target: SshTarget): string[] {
+  const host = assertSshDestinationField(target.host, "host");
+  const user = target.user?.trim() ? assertSshDestinationField(target.user, "user") : "";
+  return ["--", user ? `${user}@${host}` : host];
+}
+
+/** The argv `ssh` receives, minus the final command. */
+export function sshCommonArgs(target: SshTarget, options: { knownHostsFile?: string } = {}): string[] {
+  return [...sshOptionArgs(target, options), ...sshDestinationArgs(target)];
+}
+
+/**
+ * Turn a failed ssh exit into a typed host-key error when that is what it
+ * was, so the UI can say "host key changed" instead of "exit code 255". Only
+ * ssh's own failure status (255) qualifies: a remote command that merely
+ * prints similar text keeps its ordinary error.
+ */
+function hostKeyFailure(code: number | null, stderr: string, target: SshTarget): Error | null {
+  if (code !== 255) return null;
+  if (isHostKeyChangedDiagnostic(stderr)) return hostKeyChangedError(target.host, target.port);
+  if (isHostKeyUnknownDiagnostic(stderr)) return hostKeyUnknownError(target.host, target.port, []);
+  return null;
 }
 
 /** A loopback port nothing is listening on, for `-L` to claim. */
@@ -345,7 +426,9 @@ export function createSystemSshTransport(
 ): SshTransport {
   const log = options.log ?? (() => undefined);
   const binary = options.binary ?? "ssh";
-  const base = [...sshCommonArgs(target), ...(options.extraOptions ?? [])];
+  const knownHostsFile = options.knownHostsFile;
+  const base = [...sshOptionArgs(target, { knownHostsFile }), ...(options.extraOptions ?? [])];
+  const destination = sshDestinationArgs(target);
   const children = new Set<ChildProcessWithoutNullStreams>();
 
   // Askpass material is written on the first spawn and dropped once no child
@@ -395,7 +478,7 @@ export function createSystemSshTransport(
   ): Promise<SshExecResult> => {
     // The caller selects the program; bootstrap explicitly requests `sh -s`.
     // Data sent on stdin must never be interpreted as a shell script implicitly.
-    const args = [...base, command];
+    const args = [...base, ...destination, command];
     const env = await acquireEnv();
     let result: SshExecResult;
     try {
@@ -416,6 +499,8 @@ export function createSystemSshTransport(
       await releaseEnv();
     }
     if (result.code !== 0) {
+      const hostKeyError = hostKeyFailure(result.code, result.stderr, target);
+      if (hostKeyError) throw hostKeyError;
       const stderr = redactBootstrapOutput(result.stderr).slice(-2000);
       const diagnostic = lastSshDiagnostic(stderr);
       throw fail(
@@ -450,6 +535,7 @@ export function createSystemSshTransport(
         "-N",
         "-L",
         `127.0.0.1:${localPort}:${remoteHost}:${remotePort}`,
+        ...destination,
       ];
       const child = spawnTracked(args, env);
       let stderr = "";
@@ -467,7 +553,8 @@ export function createSystemSshTransport(
       });
       child.once("close", (code: number | null) => {
         exited = true;
-        earlyGate.reject?.(
+        const hostKeyError = hostKeyFailure(code, stderr, target);
+        earlyGate.reject?.(hostKeyError ??
           fail(
             `ssh exited before the forward was ready (code ${code ?? -1}): ${
               stderr.trim().slice(-500) || "no diagnostic"
@@ -543,6 +630,8 @@ export function createSystemSshTransport(
         },
       };
     },
+    trustHostKey: (approved) =>
+      ensureHostKeyTrusted(target, { knownHostsFile, approvedFingerprints: approved, binary }),
     dispose() {
       for (const child of children) child.kill("SIGKILL");
       children.clear();

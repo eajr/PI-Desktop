@@ -1259,6 +1259,11 @@ sklm: {
       "sshRunning": "Installation…",
       "sshSucceeded": "{{label}} installé.",
       "sshFailed": "Échec de l'installation : {{message}}",
+      "hostKeyTitle": "Confirmer la clé d'hôte SSH",
+      "hostKeyBody": "{{host}} n'est pas un hôte connu. Il a présenté la clé ci-dessous. Lui faire confiance permet à l'app de se connecter et d'envoyer votre connexion SSH et les identifiants synchronisés à ce serveur.",
+      "hostKeyVerify": "Comparez l'empreinte avec celle obtenue directement sur le serveur (par exemple `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`). Ne faites confiance que si elles correspondent.",
+      "hostKeyTrust": "Faire confiance et installer",
+      "hostKeyCancel": "Annuler",
       "transportSsh": "SSH",
       "experimental": "Expérimental"
     },

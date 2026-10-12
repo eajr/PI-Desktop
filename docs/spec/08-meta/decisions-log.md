@@ -52,6 +52,7 @@ This log freezes previously open questions into concrete decisions.
 | D656 | Quarantine appends the host keeps refusing instead of stalling the outbox | **Amend ADR 0041 / D318 / D444 / D597: an append whose `session.appendMessage` or `session.recordUsage` call fails with an error the outbox cannot classify as a duplicate message id, a `PERMISSION_DENIED:` poison row, or a foreign-key orphan is retried on a bounded backoff (5s, doubling to a 60s cap) instead of ending the flush. The fifth consecutive failure on that head moves it into an application-owned dead-letter file, `session-message-outbox.dead-letter.json`, with its payload, session id, quarantine timestamp, and host error; only the newest 256 quarantined appends are kept, and the oldest is discarded with a warn. The flush then continues with the next entry, so one refused append can no longer hold the FIFO head, fill the 1024-entry cap, or fail every session's writes. Quarantined appends are never replayed automatically, and `session.delete` drops that session's quarantined appends too. No protocol version, storage schema, or queued-outbox format change.** | A `stream did not contain valid UTF-8` append stayed at the FIFO head for 14.8 hours while `session.persistence.outbox.is.full` fired 5990 times, so every session's appends failed until restart. Only three error classes had a drain, and every other error was treated as transient forever (#1560). |
 | D657 | Window bounds recovery never runs an external helper | **Supersede D053; amend D447. The main process no longer executes the `/tmp/pi-window-bounds` CoreGraphics helper (or any external process) to detect a Stage Manager shelf. Shelf detection in `bootstrap/window.ts` uses Electron bounds only (width < 500 or height < 400), which is what every build without that unshipped dev binary already did. The macOS watchdog cadence, `ensureStableBounds` triggers and the Codex footprint restore are unchanged.** | `/tmp` is world-writable, so any local user could plant that path and get code execution as the desktop user every 1.5s, including in packaged builds; nothing in the repository builds or ships the helper. |
 | D658 | RACP device tokens expire and re-pair over SSH | **Amend D448 / ADR 0285 / ADR remote-provider-import / security §3.4: a `pdt1.` device token is refused after 30 days unused or 180 days since issue (`RACP_DEVICE_TOKEN_IDLE_TTL_MS`, `RACP_DEVICE_TOKEN_MAX_LIFETIME_MS`); upgrade and connection close record use. An expired-but-valid token gets `401` with `x-racp-error: REMOTE_DEVICE_TOKEN_EXPIRED` (new non-retriable code); other refusals keep `REMOTE_AUTH_FAILED`. An SSH-managed desktop then runs `pi-host pairing-issue` over SSH (admin-socket `pairing.issue`, single-use, two-minute token), exchanges it with the Host id check, stores the new token, and retries once; no reinstall or restart, and revoked tokens are never re-paired. `credentials.json` becomes version 2 (`tokenIssuedAt`, persisted `lastSeenAt`); version 1 records start both windows at migration time. Failed upgrade authentications are throttled per address (10-failure bucket, one per 6 s, then `429` + `Retry-After` from 1 s doubling to 60 s), logged without token material. `applyCeilingToPairedDevices` stays off because the same default also governs the local desktop principal.** | A never-expiring `owner` credential stayed useful indefinitely once copied; SSH is the pairing root of trust, so renewal can be automatic without asking the user or restarting the Host. See ADR racp-device-token-lifetime. |
+| D660 | Confirm SSH host keys instead of trusting on first use | **Amend ADR 0292 / D453 through ADR 0328: every remote-host `ssh` child uses `StrictHostKeyChecking=yes` with `UserKnownHostsFile` listing the app-managed `<dataDir>/ssh_known_hosts` first and the user's default files after it. An unknown host fails with `SSH_HOST_KEY_UNKNOWN` carrying key type and SHA-256 fingerprint; Settings asks the user to confirm, and only a confirmed key is recorded in the app file. A changed key fails with `SSH_HOST_KEY_CHANGED` and is never accepted by the app. `RemoteHostBootstrapRequest.trustedHostKeys` and both error codes are additive; host/user argv values also reject whitespace and control characters, and the destination follows `--`. See `05-security/02-remote-control-security.md` §3.4 and E2E-REMOTE-HOST-ssh-host-key-confirmation.** | `accept-new` trusted a never-seen host silently, so an attacker at first connect could impersonate it and receive the SSH password and synced provider keys. |
 
 ## B. Secondary implementation defaults
 
@@ -7664,6 +7665,7 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `apps/pi-host/src/pairing-issue.test.ts`, and
   `apps/desktop/test/remote-device-repair.test.mjs`. See ADR
   racp-device-token-lifetime.
+
 ## 2026-10-12 — Project MCP servers need content-bound approval (D659)
 
 - D659 amends D193, ADR 0056, and ADR 0112: a project-level MCP server
@@ -7688,3 +7690,23 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
   `packages/agent-runtime/src/native-pi-session.test.ts`. See
   `docs/adr/project-mcp-server-approval.md` and
   E2E-MCP-project-server-requires-approval.
+
+## 2026-10-12 — Confirm SSH host keys instead of trusting on first use (D660)
+
+- D660 amends ADR 0292 decision 1 and D453 through ADR 0328: SSH connections
+  to remote hosts use `StrictHostKeyChecking=yes` instead of `accept-new`. An
+  unknown host is refused with `SSH_HOST_KEY_UNKNOWN`, and Settings shows its
+  key type and SHA-256 fingerprint for confirmation; only a confirmed key is
+  recorded, in the app-managed `<dataDir>/ssh_known_hosts`. A changed key fails
+  with `SSH_HOST_KEY_CHANGED` and is never accepted by the app.
+- The user's own `~/.ssh/known_hosts` stays consulted (after the app file) and
+  is never written, so previously paired hosts reconnect unchanged. The key is
+  learned by an `ssh` probe with every authentication method disabled, so no
+  password or provider key reaches a host before its key is trusted.
+- `RemoteHostBootstrapRequest.trustedHostKeys` and the two error codes are
+  additive. Host and user argv values now also reject whitespace and control
+  characters, and the destination follows `--`.
+- Covered by `apps/desktop/test/remote-host-ssh-host-keys.test.mjs`,
+  `remote-host-key-confirm-ui.test.mjs`, and
+  E2E-REMOTE-HOST-ssh-host-key-confirmation. See ADR 0328 and
+  `05-security/02-remote-control-security.md` §3.4.

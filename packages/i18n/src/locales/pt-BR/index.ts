@@ -1079,6 +1079,11 @@ export const ptBR = {
       sshRunning: "Instalando…",
       sshSucceeded: "{{label}} instalado.",
       sshFailed: "Falha na conexão SSH: {{message}}",
+      hostKeyTitle: "Confirmar a chave do host SSH",
+      hostKeyBody: "{{host}} não é um host conhecido. Ele apresentou a chave abaixo. Confiar nela permite que o app se conecte e envie seu login SSH e as credenciais sincronizadas para este servidor.",
+      hostKeyVerify: "Compare a impressão digital com uma obtida no próprio servidor (por exemplo `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`). Confie somente se forem iguais.",
+      hostKeyTrust: "Confiar e instalar",
+      hostKeyCancel: "Cancelar",
       transportSsh: "SSH",
       experimental: "Experimental"
     },

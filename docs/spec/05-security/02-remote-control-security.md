@@ -218,6 +218,27 @@ password for a host the user paired that way, under these rules:
   encrypted local key would consume the single askpass answer as a passphrase.
   A user with both a key and a password picks key mode.
 
+**SSH host-key trust (ADR 0328).** The desktop never trusts an SSH host key
+silently:
+
+- Every `ssh` child runs with `StrictHostKeyChecking=yes` and
+  `UserKnownHostsFile` listing the app-managed `<dataDir>/ssh_known_hosts`
+  first, then `~/.ssh/known_hosts` and `~/.ssh/known_hosts2`. Keys the user
+  already trusts keep working; the app writes only its own file (`0600`).
+- Before the first authenticated command of a bootstrap, a probe connection
+  with every authentication method disabled learns the presented key. No
+  password, key, askpass helper or provider secret is used by the probe.
+- An unknown key fails with `SSH_HOST_KEY_UNKNOWN` carrying host, port, key
+  type and `SHA256:` fingerprint. The key is recorded only after the user
+  confirms that fingerprint in Settings and only if every key the server then
+  presents matches a confirmed fingerprint. Declining records nothing.
+- A changed or revoked key fails with `SSH_HOST_KEY_CHANGED` and is never
+  accepted by the app, even with a confirmed fingerprint; the user resolves it
+  outside the app.
+- Host and user values that reach the `ssh` argv must not be empty, start
+  with `-`, or contain whitespace or control characters; the port is an
+  integer in 1..65535; the destination follows `--`.
+
 ### 3.5 Explicit provider import for the experimental MVP
 
 - Only SSH-managed hosts offer copy. The renderer sends provider IDs and an
@@ -604,6 +625,9 @@ separate, explicitly specified credential-management capability is added.
 21. An SSH login password is supplied only by the user, reaches `ssh` only
     through the askpass helper, is stored only encrypted, and never appears in
     a process argument list, the renderer, or a log line.
+22. No SSH connection trusts an unknown host key implicitly: a new host is
+    trusted only after the user confirms its SHA-256 fingerprint, no
+    credential is offered before that, and a changed host key is refused.
 ## 13. Amendment history
 
 D374 (2026-09-10) added the browser cookie/header authentication profiles,
@@ -639,3 +663,7 @@ through the Host's admin socket, migration of stored records without a
 lifetime, and a per-address throttle on failed upgrade authentications
 (§3.4, gate 16). It kept `applyCeilingToPairedDevices` off (§4.3). See
 [ADR racp-device-token-lifetime](../../adr/racp-device-token-lifetime.md).
+
+D660 (2026-10-12) replaced SSH trust-on-first-use with strict host-key
+checking, an app-managed known_hosts file, and an explicit SHA-256
+fingerprint confirmation (§3.4, gate 22; ADR 0328).

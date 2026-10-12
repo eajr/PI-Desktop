@@ -40,6 +40,7 @@ import {
 } from "./pi-host-release.js";
 import {
   assertSshArgument,
+  assertSshDestinationField,
   createSystemSshTransport,
   reserveLocalPort,
   type SshForward,
@@ -48,6 +49,7 @@ import {
   type SshTransport,
 } from "./ssh-transport.js";
 import { assertSshPassword } from "./ssh-askpass.js";
+import { assertTrustedFingerprints } from "./ssh-host-keys.js";
 import { racpUrlForLocalPort } from "./ssh-tunnel.js";
 import { installPiHost } from "./pi-host-installer.js";
 import type { uploadSshArtifact } from "./ssh-artifact-transfer.js";
@@ -67,6 +69,11 @@ export type SshBootstrapDeps = {
   version: string;
   /** Build the SSH transport for one target. Defaults to the system `ssh`. */
   buildTransport?: (target: SshTarget) => SshTransport;
+  /**
+   * App-managed known_hosts file the default transport consults first and
+   * records user-approved host keys in (`ssh-host-keys.ts`).
+   */
+  knownHostsFile?: string;
   /** Read the published `.sha256` text. Defaults to an HTTPS GET. */
   fetchChecksum?: (url: string, signal?: AbortSignal) => Promise<string>;
   uploadArtifact?: typeof uploadSshArtifact;
@@ -192,7 +199,7 @@ async function defaultFetchChecksum(url: string, signal?: AbortSignal): Promise<
 }
 
 function validateTarget(request: RemoteHostBootstrapRequest): SshTarget {
-  const host = assertSshArgument(String(request?.host ?? ""), "host");
+  const host = assertSshDestinationField(String(request?.host ?? ""), "host");
   const target: SshTarget = { host };
   if (request?.port !== undefined && request.port !== null) {
     const port = Number(request.port);
@@ -203,7 +210,7 @@ function validateTarget(request: RemoteHostBootstrapRequest): SshTarget {
     }
     target.port = port;
   }
-  if (request?.user) target.user = assertSshArgument(String(request.user), "user");
+  if (request?.user) target.user = assertSshDestinationField(String(request.user), "user");
   if (request?.identityFile) {
     target.identityFile = assertSshArgument(String(request.identityFile), "identityFile");
   }
@@ -242,6 +249,7 @@ export function createSshBootstrap(deps: SshBootstrapDeps): SshBootstrap {
     deps.buildTransport ??
     ((target: SshTarget) =>
       createSystemSshTransport(target, {
+        knownHostsFile: deps.knownHostsFile,
         log: (level, message, data) => log(level, message, data),
       }));
   const fetchChecksum = deps.fetchChecksum ?? defaultFetchChecksum;
@@ -255,6 +263,7 @@ export function createSshBootstrap(deps: SshBootstrapDeps): SshBootstrap {
       signal?.throwIfAborted();
       const label = String(request?.label ?? "").trim() || "remote host";
       const target = validateTarget(request);
+      const trustedHostKeys = assertTrustedFingerprints(request?.trustedHostKeys);
       const hostKey = (request?.hostKey ?? "").trim() || synthesizeSshHostKey(target, label);
       if (hostKey.includes(":")) {
         throw fail("hostKey must not contain ':'", ErrorCodes.INVALID_ARGUMENT, { field: "hostKey" });
@@ -271,6 +280,12 @@ export function createSshBootstrap(deps: SshBootstrapDeps): SshBootstrap {
       signal?.addEventListener("abort", abort, { once: true });
       let completed = false;
       try {
+        // 0. Before anything authenticates — and before a password or a
+        // provider key could reach an impostor — the host key must be one the
+        // user already trusts or has just confirmed by fingerprint.
+        await transport.trustHostKey?.(trustedHostKeys);
+        signal?.throwIfAborted();
+
         // 1. Ask the remote machine what it is.
         mark("probe");
         const probe = await transport.exec("uname -s && uname -m");
