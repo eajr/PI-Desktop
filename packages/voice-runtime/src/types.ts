@@ -62,6 +62,16 @@ export interface ModelInfo {
   sizeBytes: number;
   hfRepo: string;
   hfFilename: string;
+  /**
+   * Hugging Face commit (40 hex chars) the file is fetched from. Pinned so a
+   * later push to the repo cannot change what gets downloaded.
+   */
+  hfRevision: string;
+  /**
+   * Lowercase hex SHA-256 of the file at `hfRevision` (the LFS oid). The
+   * file is parsed by native code, so it is verified before first use and
+   * an empty or malformed value is a hard error, never a pass.
+   */
   sha256: string;
   supportsStreaming: boolean;
   recommended: boolean;

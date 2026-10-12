@@ -73,3 +73,24 @@ pi-desktop/speech/synthesize
 Whisper / TTS 模型不得出现在聊天模型选择器中。
 
 v1 不实现麦克风采集、Realtime 和 agent 工具。
+
+## 7. 本地听写模型
+
+`packages/voice-runtime` 从 Hugging Face 下载 Whisper / SenseVoice 的 GGUF
+文件到语音模型缓存，并交给原生 `transcribe-cpp` 解析器加载，因此模型文件在
+校验通过之前都视为原生代码的不可信输入：
+
+- 目录（`src/model-catalog.ts`）中每个条目都固定 `hfRevision`（40 位十六进制
+  提交）、`sha256`（该提交下文件的 LFS oid，64 位小写十六进制）和
+  `sizeBytes`。下载请求固定提交，从不使用 `main`。
+- 下载器在字节写入 `<file>.part` 的同时计算哈希，只有摘要匹配才重命名到最终
+  路径；不匹配时删除部分文件并让下载失败。`sha256` 或 `hfRevision` 为空或
+  格式不对的条目在发出任何网络请求之前就被拒绝。
+- `ModelManager` 在每个进程内首次原生加载前重新计算磁盘文件的哈希，因此旧版本
+  （未做校验）下载的文件或被改动过的文件不会因“已存在”而被信任。校验失败的
+  文件会被删除，模型状态变为 `error` 并清空 `localPath`，下次下载重新开始。
+  同一进程内的后续加载跳过重新哈希；校验后替换文件需要对用户配置目录有本地
+  写权限，不在本防护范围内。
+- 升级模型时，需依据 `GET /api/models/<repo>/revision/<commit>?blobs=true`
+  同时更新 `hfRevision`、`sha256` 与 `sizeBytes`；
+  `test/model-catalog.test.ts` 会拒绝缺少合规固定值的条目。
