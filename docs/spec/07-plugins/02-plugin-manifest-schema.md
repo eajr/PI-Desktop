@@ -484,13 +484,29 @@ is refused before the transport is asked to open anything.
 
 `"net.anyHost"` lifts the allowlist for a plugin whose endpoints the user types
 in (a self-hosted server, a personal domain no manifest written ahead of time
-can name). With the grant, every egress path above admits any host over
-http(s)/ws(s) — except cloud metadata endpoints (`169.254.169.254` and peers),
-which the grant never reaches: their answers are instance credentials. A host
-declared in `net.domains` keeps today's behavior, so existing manifests are
-unaffected; a plugin without the grant sees no change either. The grant is
-an install-time permission like any other: the user sees it in the review
-dialog and nothing prompts at request time.
+can name). With the grant, every egress path above admits any **public** host
+over http(s)/ws(s). It does not reach:
+
+- cloud metadata endpoints (`169.254.169.254`, `100.100.100.200`,
+  `fd00:ec2::254`, `metadata.google.internal` and peers), in any spelling —
+  these are refused for every plugin, even one whose `net.domains` names them:
+  their answers are instance credentials;
+- loopback, unspecified, link-local and private addresses (`127.0.0.0/8`,
+  `0.0.0.0/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16`, `::1`, `::`,
+  `fc00::/7`, `fe80::/10`, `fec0::/10`) and `localhost`, unless `net.domains`
+  names the host.
+
+Hosts are compared after normalization: every IPv4 notation the URL parser
+accepts (`0xa9fea9fe`, `2852039166`, `169.254.43518`), IPv4-mapped and
+IPv4-compatible IPv6 (`[::ffff:a9fe:a9fe]`), brackets, case and trailing dots
+all mean the address they name. For `pi.net.fetch` and `pi.net.websocket` the
+host also resolves the name and applies the same rule to every address it
+resolves to, then connects only to an address it checked
+([04-plugin-security.md §8.0](04-plugin-security.md#80-egress-allowlist)). A
+plugin that talks to a local daemon or a LAN server declares that host in
+`net.domains`, with or without the grant. The grant is an install-time
+permission like any other: the user sees it in the review dialog and nothing
+prompts at request time.
 
 ## 5.1 Bus topic grammar
 

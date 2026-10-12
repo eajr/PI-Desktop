@@ -2280,7 +2280,7 @@ sklm: {
       "speech.adapter.register": "可以新增轉寫或朗讀協定，沿用你既有的服務金鑰。外掛拿不到金鑰。",
       "keyboard.globalShortcut": "註冊系統級快捷鍵，在 PI-Desktop 未聚焦時觸發此外掛自己的命令。",
       "net.websocket": "與外掛宣告的網域建立即時雙向連線。",
-      "net.anyHost": "可存取任意伺服器(HTTP(S)/WebSocket(S)),包括使用者自行填寫的自建服務位址。雲端中繼資料位址一律拒絕。",
+      "net.anyHost": "可存取任意公網伺服器(HTTP(S)/WebSocket(S)),包括使用者自行填寫的自建服務位址。本機與區域網路位址僅在外掛宣告後可存取;雲端中繼資料位址一律拒絕。",
       "bus.publish": "可在其宣告的主題上傳送訊息。",
       "bus.subscribe": "可在其宣告的主題上接收訊息。",
       "browser.cdp":

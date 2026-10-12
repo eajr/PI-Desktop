@@ -2285,7 +2285,7 @@ sklm: {
       "speech.adapter.register": "Puede añadir un protocolo de transcripción o voz que use tus claves de proveedor. El complemento nunca ve la clave.",
       "keyboard.globalShortcut": "Registra atajos de teclado del sistema que activan los comandos propios de este complemento mientras PI-Desktop no tiene el foco.",
       "net.websocket": "Abre conexiones bidireccionales en tiempo real con los hosts que declara el complemento.",
-      "net.anyHost": "Puede contactar cualquier servidor por HTTP(S) o WebSocket(S), incluidas direcciones autoalojadas introducidas por el usuario. Los endpoints de metadatos de la nube siguen bloqueados.",
+      "net.anyHost": "Puede contactar cualquier servidor público por HTTP(S) o WebSocket(S), incluidas direcciones autoalojadas introducidas por el usuario. Las direcciones de loopback y de la red local solo son accesibles si el plugin las declara; los endpoints de metadatos de la nube siguen bloqueados.",
       "bus.publish": "Puede enviar mensajes sobre los temas que declaró.",
       "bus.subscribe": "Puede recibir mensajes sobre los temas que declaró.",
       "browser.cdp": "Puede navegar por el navegador del panel de trabajo, leer la página, ejecutar JavaScript y enviar comandos de Chrome DevTools incluidos en la lista permitida. Las cookies y los métodos de almacenamiento están bloqueados.",

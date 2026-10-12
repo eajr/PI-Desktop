@@ -374,6 +374,37 @@ An absent, empty, or malformed list means no egress at all, and a bare `*` is
 refused at install so nobody declares their way out. This is what makes a
 generous `fs.read` scope affordable (§6).
 
+**Addresses, not spellings.** Every chokepoint decides on the normalized host
+(`normalizeNetHost` in `@pi-desktop/plugin-sdk`): IPv4 in any notation the URL
+parser accepts, IPv4-mapped/compatible IPv6, brackets, case and trailing dots
+all mean the address they name. Cloud metadata endpoints are refused in every
+spelling for every plugin, even when `net.domains` names one. Under
+`net.anyHost`, loopback, unspecified, link-local and private literals and
+`localhost` are refused unless `net.domains` names the host (manifest schema
+§5.3.1).
+
+**Resolved addresses.** A DNS name can point anywhere, so for `pi.net.fetch` and
+`pi.net.websocket` Electron main (`plugin-net-guard.ts`) resolves the name once
+per hop, judges every answer — metadata refused; a loopback, link-local or
+private answer admitted only for a host `net.domains` covers — and then dials
+only an admitted address:
+
+- `pi.net.fetch` on a direct route (Chromium's `resolveProxy` answers `DIRECT`)
+  connects to that exact IP with the original `Host` and TLS server name, so a
+  rebinding resolver cannot swap the address between check and connect. Each
+  redirect hop is resolved and judged again.
+- On a proxied or unknown route the request stays on `net.fetch` so the user's
+  proxy applies; the local answer is judged first, but the proxy resolves the
+  name itself, so the pin is not enforceable there.
+- `pi.net.websocket` gives the `ws` client a lookup hook that answers only with
+  admitted addresses.
+
+A refused address reaches the plugin as `PERMISSION_DENIED` and is audited with
+the host and the address. The panel session and remote HTTP MCP endpoints get
+the normalized hostname policy but no resolved-address check: Chromium and the
+MCP client resolve names themselves and expose no hook to pin the connection.
+See [ADR: plugin egress on the address](../../adr/plugin-net-resolved-address-guard.md).
+
 Still open, tracked separately: `agent.prompt.inject` (skill text can ask a
 shell-capable agent to do the carrying), `shell.openExternal`, a `bus.publish`
 relayed to a net-capable plugin, and raw `fetch` inside the plugin process — the
