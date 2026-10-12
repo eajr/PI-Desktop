@@ -46,6 +46,8 @@ import type {
   FsIndexResult,
   FsReadResult,
   HostHealth,
+  RemoteMediaFetchRequest,
+  RemoteMediaFetchResult,
   HostStatusEvent,
   MarketSource,
   McpCatalogEntry,
@@ -1443,6 +1445,9 @@ export const api = {
       ...(mimeType ? { mimeType } : {}),
       ...(sessionId ? { sessionId } : {}),
     }),
+  /** One reader-clicked remote media URL, fetched by Main (ADR 0327). */
+  mediaFetchRemote: (request: RemoteMediaFetchRequest) =>
+    invoke<RemoteMediaFetchResult>(IPC.invoke.mediaFetchRemote, request),
   fsReveal: (path: string, sessionId?: string) => invoke(IPC.invoke.fsReveal, { path, ...(sessionId ? { sessionId } : {}) }),
   fsOpen: (path: string, mimeType?: string, sessionId?: string) =>
     invoke(IPC.invoke.fsOpen, { path, mimeType, ...(sessionId ? { sessionId } : {}) }),

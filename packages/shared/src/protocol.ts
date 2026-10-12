@@ -379,6 +379,7 @@ export const IPC = {
     fsList: "pi-desktop/fs/list",
     fsRead: "pi-desktop/fs/read",
     fsReadImageDataUrl: "pi-desktop/fs/readImageDataUrl",
+    mediaFetchRemote: "pi-desktop/media/fetchRemote",
     statsGetTokenUsageHistory: "pi-desktop/stats/getTokenUsageHistory",
     fsReveal: "pi-desktop/fs/reveal",
     fsOpen: "pi-desktop/fs/open",

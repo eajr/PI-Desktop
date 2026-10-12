@@ -2660,6 +2660,26 @@ Markdown 源码，不是 `text/html` 负载；对禁用行内 HTML 的外部编�
 - **状态**：单位覆盖（`user-select.test.mjs`、`thinking-ui.test.mjs`、
   `markdown-prose-style.test.mjs`）；全视觉场景草稿
 
+#### E2E-MARKDOWN-remote-media-is-click-to-load：渲染 Markdown 绝不联系远程媒体主机
+
+- **前置条件**：一条已完成的助手回答（或工具输出，或在 Files 中打开的工作区
+  `.md`），包含 Markdown 图片、原始 HTML `<img>`、`<audio>`、带 `poster` 的
+  `<video>`，以及带 `<source>` 子元素的 `<video>`，均指向一个可观察访问日志的
+  `https://` 主机；同一消息中还有一张本地工作区图片。
+- **步骤**：1）打开会话并滚动到该消息。2）检查主机访问日志。3）悬停一个占位符，
+  然后点击其加载操作。4）再次检查访问日志。5）切换会话后返回。
+- **预期**：点击之前主机收不到任何请求：每个远程项都是标明主机的占位符，提示中
+  显示完整 URL，poster 不会被获取。本地图片照常内联显示。点击一个占位符只会由
+  Main 进程发出一次请求（加至多三次重定向），不带 cookie，并且只把该占位符替换为
+  图片或播放器，其余仍为占位符。`http:`、私有地址、非媒体或过大的目标显示
+  “加载失败”及“重试”。返回会话后已加载项保持显示，不会再次请求。
+- **关联规范**：`05-security/01-security.md`、`04-ux/08-component-spec.md`
+  §8.7、ADR 0327
+- **验收**：C（对话流）、品质
+- **里程碑**：M6+
+- **状态**：单元覆盖（`remote-media-markdown.test.mjs`、
+  `remote-media-fetch.test.mjs`、`mermaid-rendering.test.mjs`）；打包场景为草稿
+
 #### E2E-061：用户消息纯文本布局在包装和重新加载中仍然存在
 
 - **先决条件**：已配置提供商；输入框可以接受多行输入
@@ -5763,6 +5783,9 @@ eleven-tool-round desktop paths are verified by
 | 品质（崩溃上报） | E2E-PLUGIN-crash-report-names-the-exit-code |
 | F — 持久化（存储的模型绑定数组） | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
 | 品质（存储的模型绑定数组） | E2E-PROVIDER-stored-binding-array-reads-entry-by-entry |
+| C — 对话与流式（远程媒体点击加载） | E2E-MARKDOWN-remote-media-is-click-to-load |
+| 品质（远程媒体点击加载） | E2E-MARKDOWN-remote-media-is-click-to-load |
+| M6+（远程媒体点击加载） | E2E-MARKDOWN-remote-media-is-click-to-load |
 
 `US-UI-*` 视觉场景（§UI shell 视觉场景）追踪到
 [决策日志 §D](/zh-CN/spec/08-meta/decisions-log) 中的法典平价决策

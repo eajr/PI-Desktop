@@ -108,9 +108,13 @@ rate-limit a download, and it keeps counts for a device rather than the identity
 behind it. The two backup channels and a custom source do not send it.
 
 Links opened through the application are handled by the operating system or an
-external browser. Markdown written by a model may include remote images,
-audio, or video; when rendered, the relevant host may receive a request from
-your computer. Do not include sensitive data in URLs or remote media requests.
+external browser. Markdown written by a model, returned by a tool, or read from
+a workspace file or plugin README may reference remote images, audio, or video.
+PI-Desktop does not load them automatically: each appears as a placeholder
+naming its host, and only an item you click to load is requested, without
+cookies, from your computer. That host (and any host it redirects to) then
+receives the request, including the full URL and your IP address. Do not load
+remote media whose URL may carry sensitive data.
 
 ### 3.4 Local control interfaces
 

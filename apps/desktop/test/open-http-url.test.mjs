@@ -153,7 +153,7 @@ test("chat markdown HTTP clicks share openHttpUrl", () => {
   assert.match(markdownSource, /import \{ openHttpUrl \} from "\.\.\/lib\/open-http-url"/);
   assert.match(markdownSource, /openHttpUrl\(href\)/);
   assert.match(markdownSource, /openHttpUrl\(target\.url\)/);
-  assert.match(markdownSource, /openHttpUrl\(source\)/);
+  assert.match(markdownSource, /openHttpUrl\(remoteUrl\)/);
   assert.doesNotMatch(
     markdownSource,
     /if \(linkOpenTarget === "external"\) \{\s*void api\.browserOpenExternal\(href\);/,

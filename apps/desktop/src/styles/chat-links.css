@@ -95,6 +95,47 @@
   background: var(--ds-tile-hover);
 }
 
+/* Remote media never loads on render (ADR 0327): a chip names the host and
+   loads only the item the reader clicks. */
+.chat-remote-media {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 6px 4px 10px;
+  font-size: var(--text-sm);
+  color: var(--ds-text-secondary);
+  background: var(--ds-tile);
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+.chat-remote-media-host {
+  color: var(--ds-text-primary);
+  overflow-wrap: anywhere;
+}
+.chat-remote-media-label {
+  overflow-wrap: anywhere;
+}
+.chat-remote-media-error {
+  color: var(--ds-error);
+}
+.chat-remote-media-load {
+  padding: 2px 8px;
+  font: inherit;
+  color: var(--ds-accent);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.chat-remote-media-load:hover:not(:disabled) {
+  background: var(--ds-tile-hover);
+}
+.chat-remote-media-load:disabled {
+  cursor: default;
+  color: var(--ds-text-secondary);
+}
+
 .chat-image-local,
 .chat-image-remote {
   cursor: pointer;

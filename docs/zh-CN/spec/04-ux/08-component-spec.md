@@ -1398,10 +1398,18 @@ Renderer： `apps/desktop/src/components/Markdown.tsx` + `apps/desktop/src/lib/s
   `remark-math` + `rehype-katex`（内联 `$…$` 或 `\(…\)`，显示 `$$…$$`
   或 `\[…\]`）。原始 HTML 是
   由 `rehype-raw` 解析并立即受扩展约束
-  `rehype-sanitize` 默认架构；仅渲染器拥有的 audio/video/source，以及
+  `rehype-sanitize` 默认架构；仅渲染器拥有的 audio/video/source（`src`、
+  `controls`、`preload`、`className`；不含 `poster`），以及
   `code` 上的 `math-inline`/`math-display` 类（保证 TeX `\[…\]` 使用块级布局）
   允许添加。 KaTeX 的 Vite 内联 WOFF2 字体被允许
 渲染器的 `font-src 'self' data:` CSP 指令。
+- **远程媒体（ADR 0327）**：`src` 或 `<source>` 子元素指向其他主机（绝对地址、
+  协议相对地址或 URL 解析器会解析到外部的任何写法）的图片、音频或视频，渲染为
+  内联占位符：媒体图标、主机名、可选的 alt 文本，以及本地化的
+  **加载图片 / 加载音频 / 加载视频** 操作；提示文本说明未自动加载并显示完整 URL。
+  点击只通过 Main 加载这一项，并替换为图片或 `preload="none"` 播放器；加载中显示
+  **正在加载…**，被拒绝或失败时显示 **加载失败** 与 **重试**。已加载项在本次会话
+  内保持加载（有界缓存），消息重新挂载后亦然。本地图片和附件行为不变。
 - **复制公式（D619）**：覆盖到渲染公式的选区，以公式被写下时的 TeX 进入剪贴板
   ——行内 `$…$`，块级 `$$…$$` 独占行；两者的定界符长度都像代码段的围栏那样，
   比公式内部出现的最长同字符串再长一位，因此含字面 `$` 的公式仍能被完整读回。
