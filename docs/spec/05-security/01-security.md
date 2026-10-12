@@ -32,10 +32,15 @@ Required (all **implemented**):
   defaults
 - Preload exposes a whitelist-checked `invoke`/`on` bridge only
   (`IPC_WHITELIST` enforced on both preload and main sides)
-- Transcript Markdown is sanitized (`rehype-sanitize`), but remote `http(s)`
-  images, audio, and video that a model writes into a reply are fetched on
-  render, without a click. This is a deliberate readability trade-off: a
-  reply can therefore reveal the user's IP to the host it names. Links never
+- Transcript Markdown is sanitized (`rehype-sanitize`), and rendering it never
+  contacts a remote host (ADR 0327). Remote images, audio, video, `<source>`
+  children and posters in assistant text, tool output, subagent transcripts,
+  workspace Markdown previews and plugin READMEs render as a click-to-load
+  chip naming the host. Only the clicked item is fetched, by Electron Main
+  over `pi-desktop/media/fetchRemote`: public HTTPS hosts only, each of at most
+  three redirects re-validated, no cookies or HTTP auth, a 20 s deadline, a
+  content type in the requested media family, and at most 10 MiB (image) or
+  25 MiB (audio/video). The renderer receives a `data:` URL. Links never
   navigate in-app and always route through the external-open path.
 
 ### Content Security Policy
@@ -48,14 +53,21 @@ Required (all **implemented**):
   at build time (`tightenCsp` plugin in `electron.vite.config.ts`);
   `connect-src 'self'` only. Provider network traffic happens in the Node
   sidecar, never in the renderer.
+- `img-src` and `media-src` admit `'self'`, `data:`, `blob:` and the app's own
+  plugin schemes, never `https:` or `http:` (ADR 0327). Remote Markdown media
+  reaches the renderer only as a bounded `data:` URL after a reader click.
 - Assistant Mermaid diagrams do not widen CSP or renderer privileges. Only a
   completed answer fence may dynamically load the bundled local renderer.
   Mermaid runs with `securityLevel: strict`, protected security/theme/limit
   configuration, HTML labels disabled, a 20,000-character source limit, and a
   500-edge limit. Its generated SVG then passes through DOMPurify's SVG profile;
   links, URL attributes, `foreignObject`, script, embedded media, and external
-  image elements are removed before the SVG reaches the DOM. Invalid or
-  oversized input fails closed to escaped source text.
+  image elements are removed before the SVG reaches the DOM. CSS inside the
+  SVG (`<style>` text and attribute values) keeps only `url(#id)` and
+  `url(data:…)`; `@import`, `image-set()`, CSS `src()` and every other
+  `url()` are removed, and CSS that hides a reference behind escapes or
+  comments is dropped (ADR 0327). Invalid or oversized input fails closed to
+  escaped source text.
 
 ### Packaged binary hardening (ADR electron-fuses-and-packaged-code-paths)
 

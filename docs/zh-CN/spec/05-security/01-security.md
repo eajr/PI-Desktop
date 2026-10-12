@@ -41,13 +41,22 @@
   在构建时（`electron.vite.config.ts` 中的 `tightenCsp` 插件）；
   仅限 `connect-src 'self'`。提供商网络流量发生在 Node 中
   sidecar，从未在渲染器中。
+- `img-src` 和 `media-src` 只允许 `'self'`、`data:`、`blob:` 以及应用自身的
+  插件 scheme，绝不允许 `https:` 或 `http:`（ADR 0327）。渲染 Markdown 不会
+  联系任何远程主机：远程图片、音频、视频、`<source>` 子元素和 poster 显示为
+  标明主机的点击加载占位符。只有用户点击的那一项由 Electron Main 通过
+  `pi-desktop/media/fetchRemote` 获取：仅公网 HTTPS 主机，最多三次重定向且逐跳
+  重新校验，不带 cookie 或 HTTP 认证，20 秒期限，内容类型须属于所请求的媒体
+  类别，图片不超过 10 MiB、音视频不超过 25 MiB；渲染器只收到 `data:` URL。
 - 助理美人鱼图不会扩大 CSP 或渲染器权限。只有一个
   完成的答案栅栏可以动态加载捆绑的本地渲染器。
   美人鱼与 `securityLevel: strict` 一起运行，受保护的 security/theme/limit
   配置、禁用 HTML 标签、20,000 个字符的源限制以及
   500 边限制。其生成的 SVG 然后通过 DOMPurify 的 SVG 配置文件；
   链接、URL 属性、`foreignObject`、脚本、嵌入媒体和外部
-  图像元素在 SVG 到达 DOM 之前被删除。无效或
+  图像元素在 SVG 到达 DOM 之前被删除。SVG 内的 CSS（`<style>` 文本和属性值）
+  只保留 `url(#id)` 与 `url(data:…)`；`@import`、`image-set()`、CSS `src()`
+  及其他 `url()` 均被移除，借转义或注释隐藏引用的 CSS 整体丢弃（ADR 0327）。无效或
   过大的输入无法关闭转义源文本。
 
 ### 打包二进制加固（ADR electron-fuses-and-packaged-code-paths）

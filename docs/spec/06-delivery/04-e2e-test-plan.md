@@ -4875,6 +4875,32 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 - **Status**: Unit-covered (`user-select.test.mjs`, `thinking-ui.test.mjs`,
   `markdown-prose-style.test.mjs`); full visual scenario Draft
 
+#### E2E-MARKDOWN-remote-media-is-click-to-load: Rendering Markdown never contacts a remote media host
+
+- **Preconditions**: A completed assistant answer (or tool output, or a
+  workspace `.md` opened in Files) containing a Markdown image, a raw HTML
+  `<img>`, an `<audio>`, a `<video>` with a `poster`, and a `<video>` with a
+  `<source>` child, each pointing at an `https://` host whose access log is
+  observable; a local workspace image in the same message.
+- **Steps**: 1) Open the session and scroll the message into view. 2) Check
+  the host's access log. 3) Hover one chip, then click its Load action. 4)
+  Check the access log again. 5) Switch sessions and return.
+- **Expected**: Before any click the host receives no request: every remote
+  item is a chip naming its host, with the full URL in the tooltip, and no
+  poster is fetched. The local image renders inline as before. Clicking one
+  chip produces exactly one request (plus at most three redirects) from the
+  Main process, without cookies, and replaces only that chip with the image or
+  a player; the others stay chips. A plain `http:`, private-address, non-media
+  or oversized target shows "Couldn't load" with Try again. Returning to the
+  session keeps the loaded item without a new request.
+- **Specs linked**: `05-security/01-security.md`, `04-ux/08-component-spec.md`
+  §8.7, ADR 0327
+- **Acceptance**: C (chat stream), Quality
+- **Milestone**: M6+
+- **Status**: Unit-covered (`remote-media-markdown.test.mjs`,
+  `remote-media-fetch.test.mjs`, `mermaid-rendering.test.mjs`); packaged
+  scenario Draft
+
 #### E2E-061: User message plaintext layout survives wrapping and reload
 
 - **Preconditions**: Provider configured; composer can accept multi-line input
@@ -9863,6 +9889,9 @@ must keep splitting are covered by `markdown-blocks.test.mjs`.
 | Quality (loop context ownership) | E2E-RUNTIME-loop-context-ownership |
 | G — Plugin host lifecycle (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
 | Quality (crash report) | E2E-PLUGIN-crash-report-names-the-exit-code |
+| C — Conversation & stream (remote media click-to-load) | E2E-MARKDOWN-remote-media-is-click-to-load |
+| Quality (remote media click-to-load) | E2E-MARKDOWN-remote-media-is-click-to-load |
+| M6+ (remote media click-to-load) | E2E-MARKDOWN-remote-media-is-click-to-load |
 
 The `US-UI-*` visual scenarios (§UI shell visual scenarios) trace to the
 Codex parity decisions in [decisions-log §D](../08-meta/decisions-log.md)
